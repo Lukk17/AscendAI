@@ -164,9 +164,7 @@ def coerce_field(value: Any, field_schema: dict[str, Any]) -> Any:
     return value
 
 
-def build_object(
-    page_html: str, selectors: dict[str, str], schema: dict[str, Any]
-) -> dict[str, Any]:
+def build_object(page_html: str, selectors: dict[str, str], schema: dict[str, Any]) -> dict[str, Any]:
     """Run stored selectors and coerce each value to its schema type."""
     raw = apply_selectors(page_html, selectors)
     properties = schema.get("properties")

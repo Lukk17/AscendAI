@@ -16,6 +16,14 @@ async def test_health_check(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_metrics_endpoint_serves_prometheus(client: AsyncClient) -> None:
+    # given
+    from src.observability import metrics as service_metrics
+
+    service_metrics.SEARCH_RESULTS_RETURNED.labels(engine="searxng", outcome="ok").observe(2)
+    service_metrics.STRATEGY_ATTEMPTS_TOTAL.labels(
+        strategy="1-beautifulsoup", outcome="success", domain="example.com"
+    ).inc()
+
     # when
     resp = await client.get("/metrics")
 
@@ -24,7 +32,9 @@ async def test_metrics_endpoint_serves_prometheus(client: AsyncClient) -> None:
     assert "text/plain" in resp.headers["content-type"]
     body = resp.text
     assert "process_" in body or "python_" in body
-    assert "ascendwebhunter_search_results_total" in body
+    assert "search_results_returned" in body
+    assert "strategy_attempts_total" in body
+    assert "ascendwebhunter_search_results_total" not in body
 
 
 @pytest.mark.asyncio

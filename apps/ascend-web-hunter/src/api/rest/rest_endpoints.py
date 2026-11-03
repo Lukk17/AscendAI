@@ -115,9 +115,7 @@ class PlaywrightOrigin(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     origin: str
-    local_storage: list[PlaywrightLocalStorageItem] = Field(
-        default_factory=list, alias="localStorage"
-    )
+    local_storage: list[PlaywrightLocalStorageItem] = Field(default_factory=list, alias="localStorage")
 
 
 class PlaywrightStorageState(BaseModel):
@@ -349,9 +347,7 @@ async def import_session(request: SessionImportRequest) -> dict[str, Any]:
         raise UnsafeUriError(f"URL host has no registrable domain: {parsed_host}")
     domain = f"{extracted.domain}.{extracted.suffix}"
 
-    effective_profile = (
-        request.profile if request.profile is not None else settings.SESSION_DEFAULT_PROFILE
-    )
+    effective_profile = request.profile if request.profile is not None else settings.SESSION_DEFAULT_PROFILE
     if re.fullmatch(PROFILE_PATTERN, effective_profile) is None:
         raise InvalidProfileError(f"profile must match {PROFILE_PATTERN}")
 
@@ -378,6 +374,7 @@ async def import_session(request: SessionImportRequest) -> dict[str, Any]:
         produced_by=PRODUCED_BY_IMPORT,
     )
     web_reader.clear_cache_for_domain(domain)
+    await publish_purge(domain)
 
     auth_cookies = sum(1 for cookie in kept if cookie.name not in _WAF_COOKIE_NAMES)
     waf_cookies = sum(1 for cookie in kept if cookie.name in _WAF_COOKIE_NAMES)

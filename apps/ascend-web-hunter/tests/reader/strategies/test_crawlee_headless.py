@@ -6,9 +6,11 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from crawlee.statistics import FinalStatistics
 
 from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.validator.url_validator import URLValidator
+from tests.reader.crawlee_test_support import final_statistics
 
 
 def _mock_url_validator() -> URLValidator:
@@ -25,8 +27,8 @@ def _mock_crawler(html: str = "<html><body>content</body></html>") -> MagicMock:
     crawler.run = AsyncMock()
 
     # Simulate the result container being populated by the handler
-    async def fake_run(urls: list[str]) -> None:
-        pass
+    async def fake_run(urls: list[str]) -> FinalStatistics:
+        return final_statistics(1)
 
     crawler.run = AsyncMock(side_effect=fake_run)
     return crawler
@@ -59,7 +61,7 @@ async def test_crawlee_uses_playwright_headless_setting() -> Any:
         crawler.router = MagicMock()
         crawler.router.default_handler = lambda f: f
         crawler.pre_navigation_hook = lambda f: f
-        crawler.run = AsyncMock()
+        crawler.run = AsyncMock(return_value=final_statistics(1))
         return crawler
 
     # when
@@ -98,7 +100,7 @@ async def test_crawlee_headless_false_when_setting_false() -> Any:
         crawler.router = MagicMock()
         crawler.router.default_handler = lambda f: f
         crawler.pre_navigation_hook = lambda f: f
-        crawler.run = AsyncMock()
+        crawler.run = AsyncMock(return_value=final_statistics(1))
         return crawler
 
     # when
@@ -218,7 +220,7 @@ async def test_crawlee_sets_memory_mbytes_env_var_before_crawler_construction(
         crawler.router = MagicMock()
         crawler.router.default_handler = lambda f: f
         crawler.pre_navigation_hook = lambda f: f
-        crawler.run = AsyncMock()
+        crawler.run = AsyncMock(return_value=final_statistics(1))
         return crawler
 
     # when / then
@@ -261,7 +263,7 @@ async def test_crawlee_sets_storage_dir_env_var_before_crawler_construction(
         crawler.router = MagicMock()
         crawler.router.default_handler = lambda f: f
         crawler.pre_navigation_hook = lambda f: f
-        crawler.run = AsyncMock()
+        crawler.run = AsyncMock(return_value=final_statistics(1))
         return crawler
 
     # when / then
@@ -311,8 +313,9 @@ async def test_crawlee_refused_navigation_raises_unsafe_uri() -> None:
     fake_context.page.context.route_web_socket = None
     fake_context.page.on = MagicMock()
 
-    async def fake_run(urls: list[str]) -> None:
+    async def fake_run(urls: list[str]) -> FinalStatistics:
         await captured["pre_nav"](fake_context)
+        return final_statistics(1)
 
     def fake_crawler_factory(**kwargs: Any) -> MagicMock:
         crawler = MagicMock()

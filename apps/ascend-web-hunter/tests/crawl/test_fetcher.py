@@ -108,9 +108,7 @@ async def test_probe_refused_url_answers_none() -> None:
     from ascend_python_common.uri_guard import UnsafeUriError
 
     # when
-    with patch(
-        "src.crawl.fetcher.check_fetch_uri", new=AsyncMock(side_effect=UnsafeUriError("no"))
-    ):
+    with patch("src.crawl.fetcher.check_fetch_uri", new=AsyncMock(side_effect=UnsafeUriError("no"))):
         probe = await conditional_probe("http://127.0.0.1/")
 
     # then
@@ -189,9 +187,7 @@ async def test_head_refused_url_answers_nones() -> None:
     from ascend_python_common.uri_guard import UnsafeUriError
 
     # when
-    with patch(
-        "src.crawl.fetcher.check_fetch_uri", new=AsyncMock(side_effect=UnsafeUriError("no"))
-    ):
+    with patch("src.crawl.fetcher.check_fetch_uri", new=AsyncMock(side_effect=UnsafeUriError("no"))):
         validators = await head_validators("http://127.0.0.1/")
 
     # then

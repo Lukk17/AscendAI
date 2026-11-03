@@ -62,6 +62,7 @@ def _reset_crawlee_globals() -> None:
     service_locator._event_manager = None
     service_locator._configuration = None
 
+
 _CANARY = (
     "The QUARRY-THRUSH survey logged 47 nesting pairs along the basalt cliffs of Lake Mirell on June 9th."
 )
@@ -260,9 +261,7 @@ async def test_script_navigation_reaches_no_listener(
 
 
 @pytest.mark.asyncio
-async def test_crawlee_tier_covers_all_pages(
-    web_server: str, sentinel: tuple[int, list[str]]
-) -> None:
+async def test_crawlee_tier_covers_all_pages(web_server: str, sentinel: tuple[int, list[str]]) -> None:
     """The four pages sequentially through `5-crawlee_adaptive`.
 
     Crawlee keeps process-global loop-bound state across `crawler.run` calls
@@ -306,9 +305,7 @@ async def test_redirect_answers_unsafe_uri_on_rest(web_server: str, client: Asyn
 
 
 @pytest.mark.asyncio
-async def test_script_navigation_answers_unsafe_uri_on_rest(
-    web_server: str, client: AsyncClient
-) -> None:
+async def test_script_navigation_answers_unsafe_uri_on_rest(web_server: str, client: AsyncClient) -> None:
     # when
     with patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True):
         resp = await client.post(
@@ -368,9 +365,7 @@ async def test_guarded_and_unguarded_read_time_is_recorded(web_server: str) -> N
     guarded = await WebReader().read(url, tier="4-playwright_stealth")
     guarded_ms = (time.perf_counter() - started) * 1000
 
-    with patch(
-        "src.reader.strategies.playwright_strategy.install_browser_guard", new=_no_guard
-    ):
+    with patch("src.reader.strategies.playwright_strategy.install_browser_guard", new=_no_guard):
         started = time.perf_counter()
         unguarded = await WebReader().read(url, tier="4-playwright_stealth")
         unguarded_ms = (time.perf_counter() - started) * 1000
@@ -387,5 +382,3 @@ def test_tier_names_cover_every_browser_tier() -> None:
     # when / then
     for tier in _BROWSER_TIERS:
         assert tier in TIER_ORDER
-
-

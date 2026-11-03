@@ -9,7 +9,7 @@ Copy this file to `../runs/<UTC-timestamp>_2-search-happy-path-tasks.md` before 
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 - [ ] SearXNG `/search?q=test&format=html` returns HTTP 200 with HTML content
 - [ ] SearXNG `/search?q=openstreetmap&format=json` returns a non-zero `results.Count` (otherwise mark **BLOCKED**, not FAIL)
 

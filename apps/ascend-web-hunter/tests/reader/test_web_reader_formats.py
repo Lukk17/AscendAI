@@ -196,12 +196,10 @@ async def test_schema_replay_skips_the_model() -> None:
         patch("src.reader.web_reader.recipe_lookup", new=AsyncMock(return_value=selectors)),
         patch("src.reader.web_reader.run_schema_model", new=AsyncMock()) as model,
     ):
-        result = await reader.read(
-            "https://example.com/", output_format="schema", extraction_schema=_SCHEMA
-        )
+        result = await reader.read("https://example.com/", output_format="schema", extraction_schema=_SCHEMA)
 
     # then
-    assert result["name"] == "Red Widget"
+    assert result["content"]["name"] == "Red Widget"
     assert result["recipe"] == "replay"
     model.assert_not_awaited()
 
@@ -224,12 +222,10 @@ async def test_schema_drift_rebuilds_the_recipe() -> None:
         ) as model,
         patch("src.reader.web_reader.recipe_store_put", new=AsyncMock()) as stored,
     ):
-        result = await reader.read(
-            "https://example.com/", output_format="schema", extraction_schema=_SCHEMA
-        )
+        result = await reader.read("https://example.com/", output_format="schema", extraction_schema=_SCHEMA)
 
     # then
-    assert result["name"] == "Red Widget"
+    assert result["content"]["name"] == "Red Widget"
     assert result["recipe"] == "model"
     model.assert_awaited_once()
     deleted.assert_awaited_once()
@@ -358,18 +354,14 @@ async def test_direct_route_failure_returns_routing_error() -> None:
 async def test_main_pdf_link_routes_and_replaces_content() -> None:
     # given
     reader = WebReader()
-    stub = _StubStrategy(
-        html=_ARTICLE_HTML + '<a href="https://cdn.example.com/files/doc.pdf">PDF</a>'
-    )
+    stub = _StubStrategy(html=_ARTICLE_HTML + '<a href="https://cdn.example.com/files/doc.pdf">PDF</a>')
 
     # when
     with (
         _strategies(reader, stub),
         patch(
             "src.reader.web_reader.route_document",
-            new=AsyncMock(
-                side_effect=[None, RouteResult("pdf", "# Linked PDF text", None)]
-            ),
+            new=AsyncMock(side_effect=[None, RouteResult("pdf", "# Linked PDF text", None)]),
         ),
     ):
         result = await reader.read("https://example.com/page")
@@ -392,9 +384,7 @@ async def test_blocked_main_pdf_link_keeps_page_text_with_routing_error() -> Non
         _strategies(reader, stub),
         patch(
             "src.reader.web_reader.route_document",
-            new=AsyncMock(
-                side_effect=[None, RouteResult("pdf", None, "download_failed")]
-            ),
+            new=AsyncMock(side_effect=[None, RouteResult("pdf", None, "download_failed")]),
         ),
     ):
         result = await reader.read("https://example.com/page")
@@ -409,16 +399,12 @@ async def test_blocked_main_pdf_link_keeps_page_text_with_routing_error() -> Non
 async def test_page_without_pdf_link_reads_as_before() -> None:
     # given
     reader = WebReader()
-    stub = _StubStrategy(
-        html=_ARTICLE_HTML + '<a href="https://example.com/other">Other</a>'
-    )
+    stub = _StubStrategy(html=_ARTICLE_HTML + '<a href="https://example.com/other">Other</a>')
 
     # when
     with (
         _strategies(reader, stub),
-        patch(
-            "src.reader.web_reader.route_document", new=AsyncMock(return_value=None)
-        ) as routed,
+        patch("src.reader.web_reader.route_document", new=AsyncMock(return_value=None)) as routed,
     ):
         result = await reader.read("https://example.com/page")
 

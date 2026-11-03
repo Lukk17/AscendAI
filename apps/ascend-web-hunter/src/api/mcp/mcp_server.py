@@ -130,9 +130,7 @@ async def web_read(
         _raise_mapped_error("web_read", FormatCombinationError(output_format))
 
     if output_format == "schema" and extraction_schema is None:
-        _raise_mapped_error(
-            "web_read", ValueError("extraction_schema is required with output_format=schema")
-        )
+        _raise_mapped_error("web_read", ValueError("extraction_schema is required with output_format=schema"))
 
     try:
         if include_links:
@@ -379,9 +377,7 @@ async def crawl_list_jobs(ctx: Context | None = None) -> dict[str, Any]:
         records = await job_service.list_jobs(_mcp_tenant(ctx))
     except Exception as exc:
         _raise_mapped_error("crawl_list_jobs", exc)
-    return CrawlJobList(
-        jobs=[CrawlJobView.from_record(record) for record in records]
-    ).model_dump(mode="json")
+    return CrawlJobList(jobs=[CrawlJobView.from_record(record) for record in records]).model_dump(mode="json")
 
 
 @mcp.tool()

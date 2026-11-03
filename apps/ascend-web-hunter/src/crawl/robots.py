@@ -63,8 +63,7 @@ def ensure_opt_out(seeds: list[str], respect_robots: bool) -> None:
         domain = cookie_manager.registrable_domain(seed)
         if domain not in allowed:
             raise ValueError(
-                f"respect_robots=false is refused for {domain}: "
-                "add it to CRAWL_ROBOTS_OPT_OUT_DOMAINS"
+                f"respect_robots=false is refused for {domain}: add it to CRAWL_ROBOTS_OPT_OUT_DOMAINS"
             )
 
 
@@ -100,9 +99,7 @@ def _loc_of(entry: ET.Element) -> str | None:
     return None
 
 
-async def collect_sitemap_urls(
-    sitemap_urls: list[str], fetch: FetchFn = _default_fetch
-) -> list[str]:
+async def collect_sitemap_urls(sitemap_urls: list[str], fetch: FetchFn = _default_fetch) -> list[str]:
     """Fetch sitemap documents and return every page URL they name.
 
     Sitemap indexes are followed one level at a time with a visited set,

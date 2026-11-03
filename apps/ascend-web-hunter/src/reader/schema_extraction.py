@@ -100,6 +100,15 @@ def sanitize_selectors(raw: Any) -> dict[str, str]:
     return kept
 
 
+def _strip_think_prefix(body: str) -> str:
+    """Drop one leading reasoning block some models prepend to the answer."""
+    text = body.lstrip()
+    if text.startswith("<think>"):
+        _, _, rest = text.partition("</think>")
+        return rest.strip()
+    return text
+
+
 def parse_model_answer(body: str, schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
     """Parse and schema-validate one model answer.
 
@@ -108,7 +117,7 @@ def parse_model_answer(body: str, schema: dict[str, Any]) -> tuple[dict[str, Any
             object, or the `data` object does not validate against the schema.
     """
     try:
-        answer: Any = json.loads(body)
+        answer: Any = json.loads(_strip_think_prefix(body))
     except json.JSONDecodeError as exc:
         raise ExtractionFailedError("the model answer was not JSON") from exc
     if not isinstance(answer, dict) or not isinstance(answer.get("data"), dict):
@@ -139,6 +148,8 @@ async def run_model(
     if not base_url:
         raise ExtractionNotConfiguredError()
     check_schema_size(schema)
+    api_key = settings.EXTRACTION_LLM_API_KEY.strip()
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
     owned = client is None
     active = client if client is not None else httpx.AsyncClient()
     try:
@@ -149,6 +160,7 @@ async def run_model(
                 "messages": build_messages(page_text, schema),
                 "temperature": 0,
             },
+            headers=headers,
             timeout=settings.EXTRACTION_LLM_TIMEOUT_SECONDS,
         )
         response.raise_for_status()

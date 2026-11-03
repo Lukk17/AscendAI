@@ -177,3 +177,41 @@ async def test_search_fails_fast_when_breaker_open() -> None:
 
     # when / then
     await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_search_observes_results_returned_histogram() -> None:
+    # given
+    import re
+
+    from prometheus_client import generate_latest
+
+    html = _build_html_with_articles(3)
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = html
+    mock_response.raise_for_status = MagicMock()
+
+    client = SearxngClient()
+    labels = 'engine="searxng",outcome="ok"'
+
+    def _observed() -> tuple[float, float]:
+        payload = generate_latest().decode()
+        count = re.search(rf"^search_results_returned_count\{{{labels}\}} (\S+)$", payload, re.MULTILINE)
+        total = re.search(rf"^search_results_returned_sum\{{{labels}\}} (\S+)$", payload, re.MULTILINE)
+        assert count is not None
+        assert total is not None
+        return float(count.group(1)), float(total.group(1))
+
+    before_count, before_sum = _observed()
+
+    # when
+    with patch.object(client.client, "get", new=AsyncMock(return_value=mock_response)):
+        results = await client.search("query")
+
+    # then
+    assert len(results) == 3
+    after_count, after_sum = _observed()
+    assert after_count - before_count == 1.0
+    assert after_sum - before_sum == 3.0
+    await client.aclose()

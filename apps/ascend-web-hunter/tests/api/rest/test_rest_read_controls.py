@@ -231,9 +231,7 @@ async def test_schema_format_forwards_extraction_schema(client: AsyncClient) -> 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("output_format", ["schema", "tables", "screenshot"])
-async def test_every_non_text_format_with_links_is_refused(
-    client: AsyncClient, output_format: str
-) -> None:
+async def test_every_non_text_format_with_links_is_refused(client: AsyncClient, output_format: str) -> None:
     # when
     with (
         patch(_READ_WITH_LINKS, new_callable=AsyncMock) as mock_read,

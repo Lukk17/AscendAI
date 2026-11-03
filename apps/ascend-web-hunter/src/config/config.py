@@ -361,7 +361,7 @@ class Settings(ServiceSettings):
         default=20, ge=-1_000, le=1_000, description="Weight of the no_article signal."
     )
     CHALLENGE_WEIGHT_RICH_CONTENT: int = Field(
-        default=-60, ge=-1_000, le=1_000, description="Weight of the rich_content guard signal."
+        default=-70, ge=-1_000, le=1_000, description="Weight of the rich_content guard signal."
     )
     CHALLENGE_WEIGHT_MANY_LINKS: int = Field(
         default=-20, ge=-1_000, le=1_000, description="Weight of the many_links guard signal."
@@ -430,8 +430,7 @@ class Settings(ServiceSettings):
     EXTRACTION_LLM_MODEL: str = Field(
         default="",
         description=(
-            "Model name sent to the extraction endpoint. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
+            "Model name sent to the extraction endpoint. Added by `enhance-web-search-extraction-and-tiers`."
         ),
     )
     EXTRACTION_LLM_API_KEY: str = Field(
@@ -516,9 +515,7 @@ class Settings(ServiceSettings):
     CRAWL_MAX_SEEDS: int = Field(
         default=20,
         ge=1,
-        description=(
-            "Most seeds in one crawl request. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description=("Most seeds in one crawl request. Added by `enhance-web-search-crawl-at-scale`."),
     )
     CRAWL_MAX_PATTERNS: int = Field(
         default=50,
@@ -532,8 +529,7 @@ class Settings(ServiceSettings):
         default=5,
         ge=0,
         description=(
-            "Largest `max_depth` a crawl request may ask for. "
-            "Added by `enhance-web-search-crawl-at-scale`."
+            "Largest `max_depth` a crawl request may ask for. Added by `enhance-web-search-crawl-at-scale`."
         ),
     )
     CRAWL_DEFAULT_DEPTH: int = Field(
@@ -548,8 +544,7 @@ class Settings(ServiceSettings):
         default=10000,
         ge=1,
         description=(
-            "Largest `page_budget` a crawl request may ask for. "
-            "Added by `enhance-web-search-crawl-at-scale`."
+            "Largest `page_budget` a crawl request may ask for. Added by `enhance-web-search-crawl-at-scale`."
         ),
     )
     CRAWL_DEFAULT_PAGE_BUDGET: int = Field(
@@ -569,9 +564,7 @@ class Settings(ServiceSettings):
     )
     CRAWL_RESULT_S3_BUCKET: str = Field(
         default="web-hunter-crawls",
-        description=(
-            "Bucket of the crawl results. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description=("Bucket of the crawl results. Added by `enhance-web-search-crawl-at-scale`."),
     )
     CRAWL_RESULT_S3_PREFIX: str = Field(
         default="crawl-results/",
@@ -600,8 +593,7 @@ class Settings(ServiceSettings):
         default=1.0,
         ge=0,
         description=(
-            "Least time between two fetches of one domain. "
-            "Added by `enhance-web-search-crawl-at-scale`."
+            "Least time between two fetches of one domain. Added by `enhance-web-search-crawl-at-scale`."
         ),
     )
     CRAWL_PROXY_URL: str = Field(
@@ -614,32 +606,27 @@ class Settings(ServiceSettings):
     CRAWL_CLAIM_LEASE_SECONDS: int = Field(
         default=120,
         ge=1,
-        description=(
-            "Lifetime of a page claim. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description=("Lifetime of a page claim. Added by `enhance-web-search-crawl-at-scale`."),
     )
     CRAWL_CLAIM_MAX_EXPIRIES: int = Field(
         default=2,
         ge=1,
         description=(
-            "Claim expiries after which a URL counts as failed. "
-            "Added by `enhance-web-search-crawl-at-scale`."
+            "Claim expiries after which a URL counts as failed. Added by `enhance-web-search-crawl-at-scale`."
         ),
     )
     CRAWL_WORKER_CONCURRENCY: int = Field(
         default=4,
         ge=1,
         description=(
-            "Crawl worker tasks each instance starts. "
-            "Added by `enhance-web-search-crawl-at-scale`."
+            "Crawl worker tasks each instance starts. Added by `enhance-web-search-crawl-at-scale`."
         ),
     )
     CRAWL_WORKER_IDLE_SECONDS: float = Field(
         default=1.0,
         gt=0,
         description=(
-            "Wait of a worker that found nothing to claim. "
-            "Added by `enhance-web-search-crawl-at-scale`."
+            "Wait of a worker that found nothing to claim. Added by `enhance-web-search-crawl-at-scale`."
         ),
     )
     CRAWL_POLL_AFTER_SECONDS: int = Field(
@@ -652,21 +639,15 @@ class Settings(ServiceSettings):
     )
     OBJECT_STORE_S3_ENDPOINT: str = Field(
         default="http://localhost:9070",
-        description=(
-            "Address of the S3-compatible store. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description=("Address of the S3-compatible store. Added by `enhance-web-search-crawl-at-scale`."),
     )
     OBJECT_STORE_S3_ACCESS_KEY: str = Field(
         default="",
-        description=(
-            "Access key of the store. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description=("Access key of the store. Added by `enhance-web-search-crawl-at-scale`."),
     )
     OBJECT_STORE_S3_SECRET_KEY: str = Field(
         default="",
-        description=(
-            "Secret key of the store. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description=("Secret key of the store. Added by `enhance-web-search-crawl-at-scale`."),
     )
 
     # Group 7 - Observability: per-domain metric label cardinality cap

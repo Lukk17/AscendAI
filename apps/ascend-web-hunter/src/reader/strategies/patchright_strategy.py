@@ -75,9 +75,7 @@ class PatchrightStrategy(BaseStrategy):
                         url,
                     )
                     raise ChallengeDetectedException(
-                        as_login_verdict(
-                            assess(200, "", None, await self._context_cookie_names(context))
-                        )
+                        as_login_verdict(assess(200, "", None, await self._context_cookie_names(context)))
                     )
 
                 response_status, initial_headers = await self._initial_navigation(
@@ -95,14 +93,10 @@ class PatchrightStrategy(BaseStrategy):
                         await page.wait_for_timeout(settings.NETWORKIDLE_POLL_MS)
                         continue
 
-                    verdict = await self._assess_content(
-                        page, url, response_status, initial_headers, content
-                    )
+                    verdict = await self._assess_content(page, url, response_status, initial_headers, content)
 
                     if verdict.wall and verdict.intervention_type == "login":
-                        logger.warning(
-                            "PatchrightStrategy: Login wall detected on %s (early exit)", url
-                        )
+                        logger.warning("PatchrightStrategy: Login wall detected on %s (early exit)", url)
 
                         raise ChallengeDetectedException(verdict)
 
@@ -120,9 +114,7 @@ class PatchrightStrategy(BaseStrategy):
                         continue
 
                     try:
-                        await page.wait_for_load_state(
-                            "networkidle", timeout=settings.NETWORKIDLE_POLL_MS
-                        )
+                        await page.wait_for_load_state("networkidle", timeout=settings.NETWORKIDLE_POLL_MS)
                         break
                     except PatchrightError:
                         pass
@@ -169,9 +161,7 @@ class PatchrightStrategy(BaseStrategy):
         """One verdict over the rendered content, then the refusal check: a
         page whose script navigated to a refused address fails the tier even
         when the rendered content itself looks clean."""
-        verdict = await self._assess_content(
-            page, url, response_status, initial_headers, content
-        )
+        verdict = await self._assess_content(page, url, response_status, initial_headers, content)
 
         if verdict.wall and verdict.intervention_type == "login":
             logger.warning(
@@ -183,16 +173,12 @@ class PatchrightStrategy(BaseStrategy):
             raise ChallengeDetectedException(verdict)
 
         if not verdict.accepted:
-            logger.warning(
-                "PatchrightStrategy: WAF/Cloudflare block detected post-render on %s", url
-            )
+            logger.warning("PatchrightStrategy: WAF/Cloudflare block detected post-render on %s", url)
 
             raise ChallengeDetectedException(verdict)
 
         if refused_navigations:
-            logger.warning(
-                "PatchrightStrategy: Blocked navigation detected post-render on %s", url
-            )
+            logger.warning("PatchrightStrategy: Blocked navigation detected post-render on %s", url)
 
             raise UnsafeUriError(f"browser request refused: {refused_navigations[0]}")
 
@@ -277,6 +263,4 @@ class PatchrightStrategy(BaseStrategy):
         return await browser.new_context(**kwargs)
 
     async def _apply_protections(self, page: Page) -> list[str]:
-        return await install_browser_guard(
-            cast("PlaywrightBrowserContext", page.context), self.url_validator
-        )
+        return await install_browser_guard(cast("PlaywrightBrowserContext", page.context), self.url_validator)

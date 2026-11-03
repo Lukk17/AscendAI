@@ -149,9 +149,7 @@ async def test_transport_error_returns_no_file() -> None:
     assert result is None
 
 
-async def test_write_error_deletes_partial_file(
-    local_server: str, tmp_path: Path, monkeypatch: Any
-) -> None:
+async def test_write_error_deletes_partial_file(local_server: str, tmp_path: Path, monkeypatch: Any) -> None:
     # given
     monkeypatch.setenv("TMPDIR", str(tmp_path))
     created: list[str] = []

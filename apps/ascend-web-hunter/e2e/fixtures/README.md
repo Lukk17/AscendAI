@@ -14,6 +14,10 @@ string arguments only - no file uploads.
   reachable without waiting 14 days for one to lapse naturally. Test 9's `active`-branch call needs a `saved_at` of
   "now" instead, which can't be a committed fixture without going stale immediately, so that JSON is built inline
   in the spec's Run section rather than checked in here.
+- `session-import-mixed.json` - the full `POST /api/v2/web/session/import` request body used by test 17
+  ([../testing/17-session-import-test.md](../testing/17-session-import-test.md)): a Playwright `storage_state`
+  with two `example.net` cookies carrying canary values and one `example.org` cookie, so the import keeps two,
+  drops one, and stores provenance `import`.
 
 Reserved for future tests that might need canary content, e.g. a small static HTML page hosted under
 `fixtures/static/` for an extraction-tier regression test against a known body.
@@ -54,22 +58,51 @@ canary.mp3`. The declared word is Kaksma: ascend-audio-scribe
 "KAKSMA", verified twice on 2026-10-19.
 
 Canary pages (all `text/html; charset=utf-8` unless noted): `/` index,
-`/article` (QUARRY-THRUSH survey, 47 nesting pairs), `/product` (JSON-LD
-Brassbound Meridian Astrolabe, 847.25 USD, layout 2 via `/__state`),
+`/article` (QUARRY-THRUSH survey, 47 nesting pairs), `/product` (visible
+Brassbound Meridian Astrolabe, 847.25 USD plus JSON-LD, layout 2 via `/__state`
+with changed selectors and its own visible price),
 `/product-broken` (malformed JSON-LD), `/tables` (SKU-1147/2203/3318),
 `/js-only` (NIGHT-HERON ledger, 11 lanterns, script-injected only),
-`/captcha-wall` (long article plus `#captcha-widget`), `/prompt-injection`
-(secret canary MOTH-SECRET-99, never a spec expectation),
+`/captcha-wall` (Mirell field-notes blog of 190+ extracted words with a
+reCAPTCHA `g-recaptcha` widget under its comment form, keeps the
+QUARRY-THRUSH canary), `/prompt-injection` (real page values Brassbound Meridian Astrolabe, 847.25 USD
+beside the injection text; secret canary MOTH-SECRET-99 in the text, never a
+spec expectation),
 `/redirect-1` to `/redirect-2` to `/article` (302 chain),
 `/redirect-blocked` (302 to the blocked name), `/private-image` (img from the
 blocked name), `/script-nav` (script sets `window.location` to the blocked
 name), `/crawl/` sitemap tree down to `/crawl/a/b/c` plus `/crawl/outside` and
 `/crawl/blocked-link`, `/crawl/disallowed` (see `/robots.txt`), `/wall-ko`
-(Korean captcha), `/wall-tr` (Turkish login), `/wall-header` (403 plus
-`cf-mitigated: challenge`), `/article-ja`, `/article-ar`, `/prose-captcha`
-(word captcha in prose only), `/rich-403` (403 rich body), `/robots.txt`
-(`text/plain`, disallows `/crawl/disallowed`), `/sitemap.xml`
+(Korean captcha: captcha image, `captcha_answer` text input, the Korean phrase
+`로봇이 아님을 확인하십시오. 계속하려면 상자를 선택하십시오.`, no vendor marker),
+`/wall-tr` (Turkish login: the sentence `Giriş yapmak için kutuyu işaretleyin.`
+with a password input and a `captcha` input), `/wall-header` (403 plus
+`cf-mitigated: challenge`, body `Full article text behind the wall.`),
+`/wall-vendor-thin` (thin page whose only vendor marker is the catalogued
+DataDome script `js.datadome.co/tags.js`, body `Loading, please wait.`),
+`/wall-oversized` (recaptcha vendor script inside the first
+`CHALLENGE_DETECTION_MAX_BYTES` with a body longer than that, canary
+`Type the letters shown in the image above to continue.`),
+`/turnstile-wall` (thin page with a `cf-turnstile` div and no script, canary
+`Please confirm you are human to continue.`),
+`/article-ja` (Japanese survey article of a dozen paragraphs with a six-link
+archive nav, keeps `QUARRY-THRUSHの調査で47組の営巣を確認した。`),
+`/article-ar` (Arabic survey article of seven paragraphs with a six-link
+archive nav, keeps `سجل مسح QUARRY-THRUSH 47 زوجا معششا.`),
+`/prose-captcha` (QUARRY-THRUSH canary plus `The essay uses the word captcha
+only as prose.`), `/rich-403` (403, members article of ten paragraphs with a
+22-link archive nav, keeps `Long rich member article text.`),
+`/robots.txt` (`text/plain`, disallows `/crawl/disallowed`), `/sitemap.xml`
 (`application/xml`), `/oversized-declared` (large body with `Content-Length`),
 `/oversized-undeclared` (chunked, no `Content-Length`), `/slow` (streams one
 chunk per second, no `Content-Length`), `/pdf-link-blocked` (its own canary
 sentence plus a `.pdf` link to `http://e2e-fake-site-blocked:7031/files/canary.pdf`).
+
+The challenge pages above live as one file each under `../fake-site/pages/`
+(served unchanged by `../fake-site/app.py` with the status and headers named
+here) and are judged by the unit test
+`tests/reader/cloudflare/test_fake_site_verdicts.py`, which runs `assess` over
+every file: wall verdicts for `/wall-ko` (`captcha`), `/wall-tr` (`login`),
+`/wall-vendor-thin`, `/wall-header`, `/wall-oversized` and `/turnstile-wall`,
+content verdicts for `/captcha-wall`, `/article-ja`, `/article-ar`,
+`/prose-captcha` and `/rich-403`.

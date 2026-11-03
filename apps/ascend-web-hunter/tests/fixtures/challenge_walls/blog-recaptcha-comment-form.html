@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+<title>Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API) - CodexWorld</title>
+<meta charset="utf-8">
+<meta content="IE=Edge" http-equiv="X-UA-Compatible">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="author" content="CodexWorld">
+			<link rel="icon" href="https://www.codexworld.com/wp-content/uploads/2014/09/favicon.ico" type="image/x-icon" />
+            <link rel="shortcut icon" href="https://www.codexworld.com/wp-content/uploads/2014/09/favicon.ico" type="image/x-icon">
+		        <!--iOS/android/handheld specific -->	
+        <!--<meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+<!-- Bootstrap core CSS -->
+<link href="https://www.codexworld.com/wp-content/themes/techblog/css/bootstrap.min.css" rel="stylesheet">
+<!-- plugins css -->
+<link href="https://www.codexworld.com/wp-content/themes/techblog/css/material-fonts.css" rel="stylesheet">
+<!-- Custom styles for this template -->
+<!--<link href="/css/fonts.css" rel="stylesheet">-->
+<link href="https://www.codexworld.com/wp-content/themes/techblog/css/reset.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" media="all" href="https://www.codexworld.com/wp-content/themes/techblog/style.css" />
+<link href="https://www.codexworld.com/wp-content/themes/techblog/css/previous_custom.css" rel="stylesheet">
+<link href="https://www.codexworld.com/wp-content/themes/techblog/css/custom.css" rel="stylesheet">
+<link href="https://www.codexworld.com/wp-content/themes/techblog/css/responsive.css" rel="stylesheet">
+
+
+<link rel="pingback" href="https://www.codexworld.com/xmlrpc.php" />
+<meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
+
+	<!-- This site is optimized with the Yoast SEO plugin v28.8 - https://yoast.com/product/yoast-seo-wordpress/ -->
+	<meta name="description" content="Create a real-time temperature widget using JavaScript and PHP with auto IP detection and Open-Meteo API integration." />
+	<link rel="canonical" href="https://www.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/" />
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:type" content="article" />
+	<meta property="og:title" content="Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API) - CodexWorld" />
+	<meta property="og:description" content="Create a real-time temperature widget using JavaScript and PHP with auto IP detection and Open-Meteo API integration." />
+	<meta property="og:url" content="https://www.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/" />
+	<meta property="og:site_name" content="CodexWorld" />
+	<meta property="article:publisher" content="https://www.facebook.com/codexworld" />
+	<meta property="article:author" content="https://www.facebook.com/codexworld" />
+	<meta property="article:published_time" content="2026-02-21T09:17:37+00:00" />
+	<meta property="article:modified_time" content="2026-02-21T09:47:53+00:00" />
+	<meta property="og:image" content="https://www.codexworld.com/wp-content/uploads/2026/02/create-temperature-widget-using-javascript-php-auto-location-live-weather-api-codexworld.jpg" />
+	<meta property="og:image:width" content="1536" />
+	<meta property="og:image:height" content="1024" />
+	<meta property="og:image:type" content="image/jpeg" />
+	<meta name="author" content="CodexWorld" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:creator" content="@codexworldblog" />
+	<meta name="twitter:site" content="@codexworldweb" />
+	<meta name="twitter:label1" content="Written by" />
+	<meta name="twitter:data1" content="CodexWorld" />
+	<meta name="twitter:label2" content="Est. reading time" />
+	<meta name="twitter:data2" content="4 minutes" />
+	<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https:\/\/schema.org","@graph":[{"@type":"Article","@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/#article","isPartOf":{"@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/"},"author":{"name":"CodexWorld","@id":"https:\/\/www.codexworld.com\/#\/schema\/person\/9da51d8fa3cdefeb5ec9c69136d4baf0"},"headline":"Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API)","datePublished":"2026-02-21T09:17:37+00:00","dateModified":"2026-02-21T09:47:53+00:00","mainEntityOfPage":{"@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/"},"wordCount":727,"commentCount":0,"publisher":{"@id":"https:\/\/www.codexworld.com\/#organization"},"image":{"@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/#primaryimage"},"thumbnailUrl":"https:\/\/www.codexworld.com\/wp-content\/uploads\/2026\/02\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api-codexworld.jpg","keywords":["IP Address","JavaScript","Open-Meteo API","PHP","Temperature Widget","Weather"],"articleSection":["PHP"],"inLanguage":"en-US","potentialAction":[{"@type":"CommentAction","name":"Comment","target":["https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/#respond"]}]},{"@type":"WebPage","@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/","url":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/","name":"Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API) - CodexWorld","isPartOf":{"@id":"https:\/\/www.codexworld.com\/#website"},"primaryImageOfPage":{"@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/#primaryimage"},"image":{"@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/#primaryimage"},"thumbnailUrl":"https:\/\/www.codexworld.com\/wp-content\/uploads\/2026\/02\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api-codexworld.jpg","datePublished":"2026-02-21T09:17:37+00:00","dateModified":"2026-02-21T09:47:53+00:00","description":"Create a real-time temperature widget using JavaScript and PHP with auto IP detection and Open-Meteo API integration.","breadcrumb":{"@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/#breadcrumb"},"inLanguage":"en-US","potentialAction":[{"@type":"ReadAction","target":["https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/"]}]},{"@type":"ImageObject","inLanguage":"en-US","@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/#primaryimage","url":"https:\/\/www.codexworld.com\/wp-content\/uploads\/2026\/02\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api-codexworld.jpg","contentUrl":"https:\/\/www.codexworld.com\/wp-content\/uploads\/2026\/02\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api-codexworld.jpg","width":1536,"height":1024,"caption":"create-temperature-widget-using-javascript-php-auto-location-live-weather-api-codexworld"},{"@type":"BreadcrumbList","@id":"https:\/\/www.codexworld.com\/create-temperature-widget-using-javascript-php-auto-location-live-weather-api\/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https:\/\/www.codexworld.com\/"},{"@type":"ListItem","position":2,"name":"Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API)"}]},{"@type":"WebSite","@id":"https:\/\/www.codexworld.com\/#website","url":"https:\/\/www.codexworld.com\/","name":"CodexWorld","description":"Web &amp; Mobile App Development Company","publisher":{"@id":"https:\/\/www.codexworld.com\/#organization"},"potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https:\/\/www.codexworld.com\/?s={search_term_string}"},"query-input":{"@type":"PropertyValueSpecification","valueRequired":true,"valueName":"search_term_string"}}],"inLanguage":"en-US"},{"@type":"Organization","@id":"https:\/\/www.codexworld.com\/#organization","name":"CodexWorld","url":"https:\/\/www.codexworld.com\/","logo":{"@type":"ImageObject","inLanguage":"en-US","@id":"https:\/\/www.codexworld.com\/#\/schema\/logo\/image\/","url":"https:\/\/www.codexworld.com\/wp-content\/uploads\/2014\/09\/codexworld-logo.png","contentUrl":"https:\/\/www.codexworld.com\/wp-content\/uploads\/2014\/09\/codexworld-logo.png","width":200,"height":19,"caption":"CodexWorld"},"image":{"@id":"https:\/\/www.codexworld.com\/#\/schema\/logo\/image\/"},"sameAs":["https:\/\/www.facebook.com\/codexworld","https:\/\/x.com\/codexworldweb","https:\/\/www.linkedin.com\/company\/codexworld","https:\/\/www.youtube.com\/codexworld"]},{"@type":"Person","@id":"https:\/\/www.codexworld.com\/#\/schema\/person\/9da51d8fa3cdefeb5ec9c69136d4baf0","name":"CodexWorld","image":{"@type":"ImageObject","inLanguage":"en-US","@id":"https:\/\/secure.gravatar.com\/avatar\/cf4999db3b409de559f80677afa01729bb2eeda19be273c254e8b2c22729e386?s=96&r=g","url":"https:\/\/secure.gravatar.com\/avatar\/cf4999db3b409de559f80677afa01729bb2eeda19be273c254e8b2c22729e386?s=96&r=g","contentUrl":"https:\/\/secure.gravatar.com\/avatar\/cf4999db3b409de559f80677afa01729bb2eeda19be273c254e8b2c22729e386?s=96&r=g","caption":"CodexWorld"},"description":"CodexWorld is a programming blog, one-stop destination for web professionals — developers, programmers, freelancers, and site owners.","sameAs":["http:\/\/www.codexworld.com","https:\/\/www.facebook.com\/codexworld","https:\/\/x.com\/codexworldblog"],"url":"https:\/\/www.codexworld.com\/author\/nitya192265\/"}]}</script>
+	<!-- / Yoast SEO plugin. -->
+
+
+<link rel='dns-prefetch' href='//fonts.googleapis.com' />
+<link rel='dns-prefetch' href='//v0.wordpress.com' />
+<link rel="alternate" type="application/rss+xml" title="CodexWorld &raquo; Feed" href="https://www.codexworld.com/feed/" />
+<link rel="alternate" type="application/rss+xml" title="CodexWorld &raquo; Comments Feed" href="https://www.codexworld.com/comments/feed/" />
+<link rel="alternate" type="application/rss+xml" title="CodexWorld &raquo; Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API) Comments Feed" href="https://www.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/feed/" />
+<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://www.codexworld.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.codexworld.com%2Fcreate-temperature-widget-using-javascript-php-auto-location-live-weather-api%2F" />
+<link rel="alternate" title="oEmbed (XML)" type="text/xml+oembed" href="https://www.codexworld.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fwww.codexworld.com%2Fcreate-temperature-widget-using-javascript-php-auto-location-live-weather-api%2F&#038;format=xml" />
+<style id="wp-img-auto-sizes-contain-inline-css">
+img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
+/*# sourceURL=wp-img-auto-sizes-contain-inline-css */
+</style>
+<link rel='stylesheet' id='GoogleFonts-css' href='https://fonts.googleapis.com/css?family=Open+Sans:300,300italic,regular,italic,600,600italic|Oswald:300,300italic,regular,italic,600,600italic&#038;&#038;ver=c57c5adc63fe22274ff5f6f023f9b2b9#038;subset=latin' media='all' />
+<style id="wp-emoji-styles-inline-css">
+
+	img.wp-smiley, img.emoji {
+		display: inline !important;
+		border: none !important;
+		box-shadow: none !important;
+		height: 1em !important;
+		width: 1em !important;
+		margin: 0 0.07em !important;
+		vertical-align: -0.1em !important;
+		background: none !important;
+		padding: 0 !important;
+	}
+/*# sourceURL=wp-emoji-styles-inline-css */
+</style>
+<style id="wp-block-library-inline-css">
+:root{--wp-block-synced-color:#7a00df;--wp-block-synced-color--rgb:122,0,223;--wp-bound-block-color:var(--wp-block-synced-color);--wp-editor-canvas-background:#ddd;--wp-admin-theme-color:#007cba;--wp-admin-theme-color--rgb:0,124,186;--wp-admin-theme-color-darker-10:#006ba1;--wp-admin-theme-color-darker-10--rgb:0,107,160.5;--wp-admin-theme-color-darker-20:#005a87;--wp-admin-theme-color-darker-20--rgb:0,90,135;--wp-admin-border-width-focus:2px}@media (min-resolution:192dpi){:root{--wp-admin-border-width-focus:1.5px}}.wp-element-button{cursor:pointer}:root .has-very-light-gray-background-color{background-color:#eee}:root .has-very-dark-gray-background-color{background-color:#313131}:root .has-very-light-gray-color{color:#eee}:root .has-very-dark-gray-color{color:#313131}:root .has-vivid-green-cyan-to-vivid-cyan-blue-gradient-background{background:linear-gradient(135deg,#00d084,#0693e3)}:root .has-purple-crush-gradient-background{background:linear-gradient(135deg,#34e2e4,#4721fb 50%,#ab1dfe)}:root .has-hazy-dawn-gradient-background{background:linear-gradient(135deg,#faaca8,#dad0ec)}:root .has-subdued-olive-gradient-background{background:linear-gradient(135deg,#fafae1,#67a671)}:root .has-atomic-cream-gradient-background{background:linear-gradient(135deg,#fdd79a,#004a59)}:root .has-nightshade-gradient-background{background:linear-gradient(135deg,#330968,#31cdcf)}:root .has-midnight-gradient-background{background:linear-gradient(135deg,#020381,#2874fc)}:root{--wp--preset--font-size--normal:16px;--wp--preset--font-size--huge:42px}.has-regular-font-size{font-size:1em}.has-larger-font-size{font-size:2.625em}.has-normal-font-size{font-size:var(--wp--preset--font-size--normal)}.has-huge-font-size{font-size:var(--wp--preset--font-size--huge)}:root .has-text-align-center{text-align:center}:root .has-text-align-left{text-align:left}:root .has-text-align-right{text-align:right}.has-fit-text{white-space:nowrap!important}#end-resizable-editor-section{display:none}.aligncenter{clear:both}.items-justified-left{justify-content:flex-start}.items-justified-center{justify-content:center}.items-justified-right{justify-content:flex-end}.items-justified-space-between{justify-content:space-between}.screen-reader-text{word-wrap:normal!important;border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;width:1px;word-break:normal!important}.screen-reader-text:focus{background-color:#ddd;clip-path:none;color:#444;display:block;font-size:1em;height:auto;left:5px;line-height:normal;padding:15px 23px 14px;text-decoration:none;top:5px;width:auto;z-index:100000}html :where(.has-border-color){border-style:solid}html :where([style^=border-color],[style*=";border-color"],[style*="; border-color"]){border-style:solid}html :where([style^=border-top-color],[style*=";border-top-color"],[style*="; border-top-color"]){border-top-style:solid}html :where([style^=border-right-color],[style*=";border-right-color"],[style*="; border-right-color"]){border-right-style:solid}html :where([style^=border-bottom-color],[style*=";border-bottom-color"],[style*="; border-bottom-color"]){border-bottom-style:solid}html :where([style^=border-left-color],[style*=";border-left-color"],[style*="; border-left-color"]){border-left-style:solid}html :where([style^=border-width],[style*=";border-width"],[style*="; border-width"]){border-style:solid}html :where([style^=border-top-width],[style*=";border-top-width"],[style*="; border-top-width"]){border-top-style:solid}html :where([style^=border-right-width],[style*=";border-right-width"],[style*="; border-right-width"]){border-right-style:solid}html :where([style^=border-bottom-width],[style*=";border-bottom-width"],[style*="; border-bottom-width"]){border-bottom-style:solid}html :where([style^=border-left-width],[style*=";border-left-width"],[style*="; border-left-width"]){border-left-style:solid}html :where(img[class*=wp-image-]){height:auto;max-width:100%}:where(figure){margin:0 0 1em}html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:var(--wp-admin--admin-bar--height,0px)}@media screen and (max-width:600px){html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:0px}}
+
+/*# sourceURL=/wp-includes/css/dist/block-library/common.min.css */
+</style>
+<style id="classic-theme-styles-inline-css">
+/*! This file is auto-generated */
+.wp-block-button__link{color:#fff;background-color:#32373c;border-radius:9999px;box-shadow:none;text-decoration:none;padding:calc(.667em + 2px) calc(1.333em + 2px);font-size:1.125em}.wp-block-file__button{background:#32373c;color:#fff;text-decoration:none}
+/*# sourceURL=/wp-includes/css/classic-themes.min.css */
+</style>
+
+<style id="global-styles-inline-css">
+:root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -3px rgb(255, 255, 255), 6px 6px rgb(0, 0, 0);--wp--preset--shadow--crisp: 6px 6px 0px rgb(0, 0, 0);}.wp-block-button{--wp--preset--dimension--25: 25%;--wp--preset--dimension--50: 50%;--wp--preset--dimension--75: 75%;--wp--preset--dimension--100: 100%;}:where(body) { margin: 0; }:where(.is-layout-flex){gap: 0.5em;}:where(.is-layout-grid){gap: 0.5em;}body .is-layout-flex{display: flex;}.is-layout-flex{flex-wrap: wrap;align-items: center;}.is-layout-flex > :is(*, div){margin: 0;}body .is-layout-grid{display: grid;}.is-layout-grid > :is(*, div){margin: 0;}body{padding-top: 0px;padding-right: 0px;padding-bottom: 0px;padding-left: 0px;}:root :where(.wp-element-button, .wp-block-button__link){background-color: #32373c;border-width: 0;color: #fff;font-family: inherit;font-size: inherit;font-style: inherit;font-weight: inherit;letter-spacing: inherit;line-height: inherit;padding-top: calc(0.667em + 2px);padding-right: calc(1.333em + 2px);padding-bottom: calc(0.667em + 2px);padding-left: calc(1.333em + 2px);text-decoration: none;text-transform: inherit;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
+/*# sourceURL=global-styles-inline-css */
+</style>
+
+<style id="jetpack-stats-inline-css">
+img#wpstats{display:none}
+/*# sourceURL=jetpack-stats-inline-css */
+</style>
+<script id="jquery-js" src="https://www.codexworld.com/wp-content/themes/techblog/js/jquery.min.js?ver=c57c5adc63fe22274ff5f6f023f9b2b9"></script>
+<script id="jquery-ui-js" src="https://www.codexworld.com/wp-content/themes/techblog/js/jquery-ui.min.js?ver=c57c5adc63fe22274ff5f6f023f9b2b9"></script>
+<script id="popper-js" src="https://www.codexworld.com/wp-content/themes/techblog/js/popper.min.js?ver=c57c5adc63fe22274ff5f6f023f9b2b9"></script>
+<script id="bootstrap-js" src="https://www.codexworld.com/wp-content/themes/techblog/js/bootstrap.min.js?ver=c57c5adc63fe22274ff5f6f023f9b2b9"></script>
+<link rel="https://api.w.org/" href="https://www.codexworld.com/wp-json/" /><link rel="alternate" title="JSON" type="application/json" href="https://www.codexworld.com/wp-json/wp/v2/posts/6049" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://www.codexworld.com/xmlrpc.php?rsd" />
+<!--Theme by CodexWorld.com-->
+<link rel='shortlink' href='https://wp.me/p6bxIh-1zz' />
+<script type="text/javascript">
+(function(url){
+	if(/(?:Chrome\/26\.0\.1410\.63 Safari\/537\.31|WordfenceTestMonBot)/.test(navigator.userAgent)){ return; }
+	var addEvent = function(evt, handler) {
+		if (window.addEventListener) {
+			document.addEventListener(evt, handler, false);
+		} else if (window.attachEvent) {
+			document.attachEvent('on' + evt, handler);
+		}
+	};
+	var removeEvent = function(evt, handler) {
+		if (window.removeEventListener) {
+			document.removeEventListener(evt, handler, false);
+		} else if (window.detachEvent) {
+			document.detachEvent('on' + evt, handler);
+		}
+	};
+	var evts = 'contextmenu dblclick drag dragend dragenter dragleave dragover dragstart drop keydown keypress keyup mousedown mousemove mouseout mouseover mouseup mousewheel scroll'.split(' ');
+	var logHuman = function() {
+		if (window.wfLogHumanRan) { return; }
+		window.wfLogHumanRan = true;
+		var wfscr = document.createElement('script');
+		wfscr.type = 'text/javascript';
+		wfscr.async = true;
+		wfscr.src = url + '&r=' + Math.random();
+		(document.getElementsByTagName('head')[0]||document.getElementsByTagName('body')[0]).appendChild(wfscr);
+		for (var i = 0; i < evts.length; i++) {
+			removeEvent(evts[i], logHuman);
+		}
+	};
+	for (var i = 0; i < evts.length; i++) {
+		addEvent(evts[i], logHuman);
+	}
+})('//www.codexworld.com/?wordfence_lh=1&hid=1F71DC50398EE78DCA04DE9336CFCFFE');
+</script><link rel="icon" href="https://www.codexworld.com/wp-content/uploads/2020/04/favicon.ico" sizes="32x32" />
+<link rel="icon" href="https://www.codexworld.com/wp-content/uploads/2020/04/favicon.ico" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://www.codexworld.com/wp-content/uploads/2020/04/favicon.ico" />
+<meta name="msapplication-TileImage" content="https://www.codexworld.com/wp-content/uploads/2020/04/favicon.ico" />
+
+</head>
+
+<body class="wp-singular post-template-default single single-post postid-6049 single-format-standard wp-theme-techblog cat-4-id">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-PZPKEVXVH2"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-PZPKEVXVH2');
+</script>
+
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5750766974376423"
+     crossorigin="anonymous"></script>
+
+<style>
+.hidden{display:none;}
+.links_right a.hranch {
+    color: #5632f7;
+    /*animation: color-change 1s infinite;*/
+}
+.links_right a.hranch:hover {
+    color: #fb4314;
+}
+@keyframes color-change {
+  0% { color: #5632f7; }
+  50% { color: #fb4314; }
+  100% { color: #5632f7; }
+}
+</style>
+<header class="header_outer">
+    <div class="hdr_top">
+        <div class="container-fluid">
+            <div class="top_menuOuter">
+                <div class="top_menuLft">
+                    <span class="menu_cross"><i class="material-icons-outlined">close </i></span>
+                    <div class="innr_menubody">
+                    <div class="menu_innr">
+                        <ul>
+                            <li>
+                                <a href="https://www.codexworld.com/" title="CodexWorld">
+                                    <i class="material-icons-outlined">home </i>
+                                    <span>Home</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://www.xwebtools.com/" title="Web development tools">
+                                    <i class="material-icons-outlined">construction </i>
+                                    <span>Web Tools</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://www.geocords.com/" title="Latitude & Longitude Finder">
+                                    <i class="material-icons-outlined">location_on </i>
+                                    <span>Geo Tools</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://www.qrnative.com/" title="Online QR Code Generator">
+                                    <i class="material-icons-outlined">qr_code </i>
+                                    <span>QR Code Generator</span>
+                                </a>
+                            </li>
+                            <!--<li>
+                                <a href="javascript:void(0);">
+                                    <i class="material-icons-outlined">work_outline </i>
+                                    <span>jobs</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="javascript:void(0);">
+                                    <i class="material-icons-outlined">business </i>
+                                    <span>business</span>
+                                </a>
+                            </li>-->
+                        </ul>
+                    </div>
+                    <div class="dropdwn_listOuter">
+                        <div class="dropdwn_list_item">
+                            <li class="button-dropdown">
+                                <a href="javascript:void(0);" class="slct_dropmenu ">Tutorials <span class="material-icons-outlined expnd_arw">
+                                expand_more</span></a>
+                                <div class="check_list">
+                                    <ul>
+                                        <li>
+                                            <a href="https://www.codexworld.com/php/" title="PHP tutorials">
+                                                <i class="material-icons-outlined">data_object</i>
+                                                <span>PHP</span>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="https://www.codexworld.com/codeigniter/" title="CodeIgniter tutorials">
+                                                <i class="material-icons-outlined">api</i>
+                                                <span>CodeIgniter</span>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="https://www.codexworld.com/wordpress/" title="WordPress tutorials">
+                                                <i class="material-icons-outlined">webhook</i>
+                                                <span>WordPress</span>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="https://www.codexworld.com/tutorials/javascript/" title="JavaScript tutorials">
+                                                <i class="material-icons-outlined">code_off</i>
+                                                <span> JavaScript</span>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a href="https://www.codexworld.com/tutorials/html-css/" title="HTML&CSS tutorials">
+                                                <i class="material-icons-outlined">code</i>
+                                                <span> HTML&CSS</span>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </li>    
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/how-to/" class="" title="How to Guides on Web Development">
+                                <i class="material-icons-outlined">integration_instructions</i>
+                                <span>How To</span>
+                            </a>  
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/scripts/" class="" title="Buy PHP Scripts, Code, Projects for Web Development">
+                                <i class="material-icons-outlined">data_object</i>
+                                <span>Scripts</span>
+                            </a>  
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/code-snippets/" class="" title="Example code snippets for HTML, CSS, JavaScript">
+                                <i class="material-icons-outlined">text_snippet</i>
+                                <span>Snippets</span>
+                            </a>  
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://demos.codexworld.com/" title="Tutorials Demos">
+                                <i class="material-icons-outlined">preview</i>
+                                <span>Demos</span>
+                            </a>  
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/web-development/" class="" title="Web Development Services">
+                                <i class="material-icons-outlined">developer_mode</i>
+                                <span>Web Development Service</span>
+                            </a>  
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/logo-design/" class="" title="Logo Design Services">
+                                <i class="material-icons-outlined">draw</i>
+                                <span>Logo Design</span>
+                            </a>  
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                <div class="top_menuright">
+                    <div class="links_right">
+                                                <a href="https://www.codexworld.com/contact" class="hranch" title="Contact for a free quote">
+                            <i class="material-icons-outlined">question_answer </i>
+                            <span>Contact for Free Quote</span>
+                        </a>
+                                            </div>
+                    <div class="hdr_social">
+                        <ul>
+                            <li>
+                                <a href="https://www.facebook.com/codexworld" target="_blank" title="Follow CodexWorld on Facebook">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06h40.42V6.26S260.43 0 225.36 0c-73.22 0-121.08 44.38-121.08 124.72v70.62H22.89V288h81.39v224h100.17V288z"/></svg>
+                                </a>
+                            </li>
+                                <li>
+                                <a href="https://twitter.com/codexworldweb" target="_blank" title="Follow CodexWorld on Twitter">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M459.37 151.716c.325 4.548.325 9.097.325 13.645 0 138.72-105.583 298.558-298.558 298.558-59.452 0-114.68-17.219-161.137-47.106 8.447.974 16.568 1.299 25.34 1.299 49.055 0 94.213-16.568 130.274-44.832-46.132-.975-84.792-31.188-98.112-72.772 6.498.974 12.995 1.624 19.818 1.624 9.421 0 18.843-1.3 27.614-3.573-48.081-9.747-84.143-51.98-84.143-102.985v-1.299c13.969 7.797 30.214 12.67 47.431 13.319-28.264-18.843-46.781-51.005-46.781-87.391 0-19.492 5.197-37.36 14.294-52.954 51.655 63.675 129.3 105.258 216.365 109.807-1.624-7.797-2.599-15.918-2.599-24.04 0-57.828 46.782-104.934 104.934-104.934 30.213 0 57.502 12.67 76.67 33.137 23.715-4.548 46.456-13.32 66.599-25.34-7.798 24.366-24.366 44.833-46.132 57.827 21.117-2.273 41.584-8.122 60.426-16.243-14.292 20.791-32.161 39.308-52.628 54.253z"/></svg>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="https://www.youtube.com/codexworld" target="_blank" title="Subscribe CodexWorld on YouTube">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><path d="M549.655 124.083c-6.281-23.65-24.787-42.276-48.284-48.597C458.781 64 288 64 288 64S117.22 64 74.629 75.486c-23.497 6.322-42.003 24.947-48.284 48.597-11.412 42.867-11.412 132.305-11.412 132.305s0 89.438 11.412 132.305c6.281 23.65 24.787 41.5 48.284 47.821C117.22 448 288 448 288 448s170.78 0 213.371-11.486c23.497-6.321 42.003-24.171 48.284-47.821 11.412-42.867 11.412-132.305 11.412-132.305s0-89.438-11.412-132.305zm-317.51 213.508V175.185l142.739 81.205-142.739 81.201z"/></svg>
+                                </a>
+                            </li>
+                                <li>
+                                <a href="https://www.linkedin.com/company/codexworld" target="_blank" title="Follow CodexWorld on LinkedIn">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M100.28 448H7.4V148.9h92.88zM53.79 108.1C24.09 108.1 0 83.5 0 53.8a53.79 53.79 0 0 1 107.58 0c0 29.7-24.1 54.3-53.79 54.3zM447.9 448h-92.68V302.4c0-34.7-.7-79.2-48.29-79.2-48.29 0-55.69 37.7-55.69 76.7V448h-92.78V148.9h89.08v40.8h1.3c12.4-23.5 42.69-48.3 87.88-48.3 94 0 111.28 61.9 111.28 142.3V448z"/></svg>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="hdr_bttm">
+        <div class="container-fluid">
+            <div class="bttm_menuOuter">
+                <div class="hdr_logo">
+                    <a href="javascript:void(0);" class="menu_trigger"><i class="material-icons-outlined">menu</i></a>
+                    <a href="https://www.codexworld.com/" class="logo" title="Web & Mobile App Development Services"><img src="https://www.codexworld.com/wp-content/uploads/2014/09/codexworld-logo.png" alt="CodexWorld" /></a>
+                </div>
+                <div class="left_logomenu">
+                    <div class="dropdwn_listOuter">
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/developer-resources/" class="" title="Developer Resources for Web Development">
+                                <i class="material-icons-outlined">terminal</i>
+                                <span>Developer Resources</span>
+                            </a>  
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/tutorials/" class="" title="Programming Tutorials">
+                                <i class="material-icons-outlined">local_library</i>
+                                <span>Tutorials</span>
+                            </a>  
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/scripts/" class="" title="Ready-to-use PHP Scripts for Web Development">
+                                <i class="material-icons-outlined">integration_instructions</i>
+                                <span>Scripts</span>
+                            </a>  
+                        </div>
+                        
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/code-snippets/" class="" title="Example Code Snippets for Web Development">
+                                <i class="material-icons-outlined">code</i>
+                                <span>Snippets</span>
+                            </a>  
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://demos.codexworld.com/" title="Live Demos of Tutorials and Scripts">
+                                <i class="material-icons-outlined">preview</i>
+                                <span>Demos</span>
+                            </a>  
+                        </div>
+                        <div class="dropdwn_list_item single">
+                            <a href="https://www.codexworld.com/services" class="" title="Web & App Development Services">
+                                <i class="material-icons-outlined">developer_mode</i>
+                                <span>Development Services</span>
+                            </a>  
+                        </div>
+                    </div>
+                </div>
+                <div class="right_srch_login">
+
+                                        <a href="https://www.codexworld.com/contact" class="hranch navmenu-hrlink hidden" title="Contact for a free quote">
+                        <i class="material-icons-outlined">question_answer </i>
+                        <span>Contact for Free Quote</span>
+                    </a>
+                    
+                    <div class="header_searhfill">
+                        <form name="googleForm" action="https://www.codexworld.com/search" class="navbar-form navbar-left">
+                        <div class="srch_mob_btn">
+                            <i class="material-icons-outlined">search </i>
+                        </div>
+                        <div class="search_fill">
+                            <button class="hdr_srchbtn" type="submit"><i class="material-icons-outlined">search </i></button>
+                            <input type="text" name="q" id="q" value="" class="form-control" placeholder="Search tutorials" />
+                        </div>
+                        </form>
+                    </div>
+                                        <div class="header_login">
+                        <a href="https://www.codexworld.com/login/" class="login_btn border_btn">
+                            <i class="material-icons-outlined">login </i>
+                            <span>Login</span>
+                        </a>
+                    </div>
+                                    </div>
+            </div>
+        </div>
+    </div>
+    <div class="overlay"></div>
+</header>
+
+    
+<!-- Google reCAPTCHA API -->
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+<section class="postdetails_area">
+    <div class="container-fluid">
+        <div class="blog_pnlouter">
+            <div class="row">
+                <div class="col-lg-8">
+				                    <div class="blog_leftpnl">
+                        <div class="breadcums_area">
+						                            <ol class="breadcrumb">
+								<li class="breadcrumb-item"><a href="https://www.codexworld.com" rel="nofollow">Home</a></li><li class="breadcrumb-item"><a href="https://www.codexworld.com/tutorials/php/" rel="nofollow">PHP</a></li><li class="breadcrumb-item active">Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API)</li>                            </ol>
+						                        </div>
+                        <div class="details_panel">
+                            <div class="blog_hdng">
+								<h1>Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API)</h1>
+                            </div>
+                            <div class="date_catagory_outer">
+                                <div class="post_dateauthor">
+                                    <div class="post-meta">
+                                        <span>By: CodexWorld</span>
+                                        <span class="meta-sep"> | </span>
+                                        <span>In: <a href="https://www.codexworld.com/tutorials/php/" alt="PHP">PHP</a></span>
+                                        <span class="meta-sep"> | </span>
+                                        <span>Last Updated:&nbsp;Feb 21, 2026</span>
+                                    </div>
+                                </div>
+                                <div class="social_share">
+									<!--<a href="javascript:void(0);" class="btn btn-success ask" title="Submit request for support" data-bs-toggle="modal" data-bs-target="#hireModal">Support Request</a>
+									<a href="https://www.codexqa.com/questions/ask?reflink=https://www.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/" class="btn btn-primary ask" title="Ask questions about this script" target="_blank">Ask Question</a>-->
+									<a href="javascript:void(0);" class="btn btn-primary ask" style="margin-right: 10px;" onclick="document.getElementById('post-btm-section').scrollIntoView({ behavior: 'smooth' });"><i class="material-icons-outlined">keyboard_double_arrow_down</i> Jump to Demo & Download</a>
+                                    
+                                    <ul>
+                                        <li><a href="javascript:void(0);" onclick="javascript:generic_social_share('https://www.facebook.com/sharer.php?u=https%3A%2F%2Fwww.codexworld.com%2Fcreate-temperature-widget-using-javascript-php-auto-location-live-weather-api%2F')" title="Facebook Share"><i class="icon-custom facebook-round"></i></a></li>
+                                        <li><a href="javascript:void(0);" onclick="javascript:generic_social_share('https://twitter.com/share?text=Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API)&amp;url=https://www.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/')" title="Twitter Share"><i class="icon-custom twitter-round"></i></a></li>
+                                        <li><a href="javascript:void(0);" onclick="javascript:generic_social_share('https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3A%2F%2Fwww.codexworld.com%2Fcreate-temperature-widget-using-javascript-php-auto-location-live-weather-api%2F')" title="LinkedIn Share"><i class="icon-custom linkedin-round"></i></a></li>
+                                    </ul>
+                                </div>
+                            </div>
+							<div class="postvdo_bnr videoContainer img_center"><iframe width="870" height="392" src="https://www.youtube.com/embed/UMUHI-U5SxM" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>                            <div class="post_editor_content">
+								                                
+								<p><p>If you want to display <b>real-time temperature</b>, humidity, weather description, and day/night status on your website, this tutorial will help you build a fully functional <b>Temperature Widget using JavaScript and PHP</b>.</p>
+<p><b>This widget:</b><br />
+✔ Detects user location automatically via IP<br />
+✔ Fetches live weather data using the Open-Meteo API (no API key required)<br />
+✔ Displays:</p>
+<ul>
+<li>Current temperature in Celsius</li>
+<li>City / Country</li>
+<li>Weather description (e.g., Partly Cloudy)</li>
+<li>Humidity</li>
+<li>Current date &#038; time</li>
+<li>Day/Night indicator icon</li>
+</ul>
+<p>We’ll use:</p>
+<ul>
+<li>Frontend: HTML + CSS + JavaScript
+<ul>
+<li><b>HTML</b> for the widget structure</li>
+<li><b>CSS</b> for styling</li>
+<li><b>JavaScript</b> to fetch and display weather data dynamically</li>
+</ul>
+</li>
+<li>Backend: PHP
+<ul>
+<li><b>PHP</b> to handle server-side requests and fetch weather data from the API</li>
+</ul>
+</li>
+<li>Weather API: Open-Meteo (Free, No API Key Required)</li>
+</ul>
+<h2>📁 Project Structure Overview</h2>
+<p>Let’s start by creating the necessary files for our temperature widget. Below is the directory structure we will be working with:</p>
+<pre>temperature-widget/
+├── index.html
+├── script.js
+├── weather.php
+└── style.css
+</pre>
+<ol>
+<li><b>index.html</b>: This file will contain the HTML structure of the widget and link to the CSS and JavaScript files.</li>
+<li><b>style.css</b>: This file will contain the CSS styles to make the widget visually appealing and responsive.</li>
+<li><b>script.js</b>: This file will contain the JavaScript code to fetch weather data from the PHP backend and update the widget dynamically.</li>
+<li><b>weather.php</b>: This file will handle the server-side logic to fetch weather data from the Open-Meteo API based on the user&#8217;s location and return it as JSON.</li>
+</ol>
+<p><u>The widget will fetch weather data from the Open-Meteo API and display it in a user-friendly format. Below are the steps to create this widget:</u></p>
+<h2>Step 1: Create the HTML Structure (index.html)</h2>
+<p>First, we will create the basic HTML structure for our temperature widget. This will include a container for the widget, sections for the header, main content, and footer where we will display the weather information.</p>
+<pre style="color: rgb(95, 94, 78);"><span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"temp-widget"</span>&gt;</span>
+    <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"widget-header"</span>&gt;</span>
+        <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"location"</span>&gt;</span>Loading...<span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span>&gt;</span>
+        <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"day-night"</span>&gt;</span>🌞<span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span>&gt;</span>
+    <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">div</span>&gt;</span>
+    <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"widget-main"</span>&gt;</span>
+        <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"temperature"</span>&gt;</span>--<span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">sup</span>&gt;</span>°C<span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">sup</span>&gt;</span><span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span>&gt;</span>
+        <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"weather"</span>&gt;</span>--<span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span>&gt;</span>
+    <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">div</span>&gt;</span>
+    <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">div</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"widget-footer"</span>&gt;</span>
+        <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"humidity"</span>&gt;</span>Humidity: --%<span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span>&gt;</span>
+        <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span> <span class="hljs-attr">class</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"datetime"</span>&gt;</span>--<span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">span</span>&gt;</span>
+    <span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">div</span>&gt;</span>
+<span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">div</span>&gt;</span></pre>
+<p>Include JavaScript (<code>script.js</code>) to fetch and display weather data:</p>
+<pre style="color: rgb(95, 94, 78);"><span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;<span class="hljs-name" style="color: rgb(186, 98, 54);">script</span> <span class="hljs-attr">src</span>=<span class="hljs-string" style="color: rgb(125, 151, 38);">"script.js"</span>&gt;</span><span class="undefined"></span><span class="hljs-tag" style="color: rgb(186, 98, 54);">&lt;/<span class="hljs-name" style="color: rgb(186, 98, 54);">script</span>&gt;</span></pre>
+<h2>Step 2: Style the Widget with CSS (style.css)</h2>
+<p>Next, we will add CSS styles to make our temperature widget visually appealing and responsive. We will use a clean and modern design with a color scheme that complements the weather data being displayed. The CSS will also ensure that the widget looks good on both desktop and mobile devices.</p>
+<pre style="color: rgb(68, 68, 68);"><span class="hljs-selector-class" style="color: rgb(136, 0, 0);">.temp-widget</span> {
+    <span class="hljs-attribute" style="font-weight: 700;">background</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">#ffffff</span>;
+    <span class="hljs-attribute" style="font-weight: 700;">width</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">280px</span>;
+    <span class="hljs-attribute" style="font-weight: 700;">padding</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">20px</span>;
+    <span class="hljs-attribute" style="font-weight: 700;">border-radius</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">15px</span>;
+    <span class="hljs-attribute" style="font-weight: 700;">box-shadow</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">0</span> <span class="hljs-number" style="color: rgb(136, 0, 0);">8px</span> <span class="hljs-number" style="color: rgb(136, 0, 0);">20px</span> <span class="hljs-built_in" style="color: rgb(57, 115, 0);">rgba</span>(0,0,0,0.15);
+}
+
+<span class="hljs-selector-class" style="color: rgb(136, 0, 0);">.widget-header</span> {
+    <span class="hljs-attribute" style="font-weight: 700;">display</span>: flex;
+    <span class="hljs-attribute" style="font-weight: 700;">justify-content</span>: space-between;
+    <span class="hljs-attribute" style="font-weight: 700;">font-weight</span>: bold;
+}
+
+<span class="hljs-selector-class" style="color: rgb(136, 0, 0);">.widget-main</span> {
+    <span class="hljs-attribute" style="font-weight: 700;">text-align</span>: center;
+    <span class="hljs-attribute" style="font-weight: 700;">margin</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">20px</span> <span class="hljs-number" style="color: rgb(136, 0, 0);">0</span>;
+}
+
+<span class="hljs-selector-class" style="color: rgb(136, 0, 0);">.temperature</span> {
+    <span class="hljs-attribute" style="font-weight: 700;">font-size</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">40px</span>;
+    <span class="hljs-attribute" style="font-weight: 700;">font-weight</span>: bold;
+}
+
+<span class="hljs-selector-class" style="color: rgb(136, 0, 0);">.weather</span> {
+    <span class="hljs-attribute" style="font-weight: 700;">display</span>: block;
+    <span class="hljs-attribute" style="font-weight: 700;">margin-top</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">5px</span>;
+    <span class="hljs-attribute" style="font-weight: 700;">color</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">#555</span>;
+}
+
+<span class="hljs-selector-class" style="color: rgb(136, 0, 0);">.widget-footer</span> {
+    <span class="hljs-attribute" style="font-weight: 700;">display</span>: flex;
+    <span class="hljs-attribute" style="font-weight: 700;">justify-content</span>: space-between;
+    <span class="hljs-attribute" style="font-weight: 700;">font-size</span>: <span class="hljs-number" style="color: rgb(136, 0, 0);">14px</span>;
+}</pre>
+<h2>Step 3: Fetch and Display Weather Data with JavaScript (script.js)</h2>
+<p>Finally, we will write the JavaScript code to fetch weather data from our PHP backend (<code>weather.php</code>) and update the widget dynamically. The JavaScript will make an AJAX request to the PHP script, which will return the weather data in JSON format. We will then parse this data and update the HTML elements in our widget accordingly.</p>
+<pre style="color: rgb(68, 68, 68);"><span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.addEventListener(<span class="hljs-string" style="color: rgb(136, 0, 0);">'DOMContentLoaded'</span>, () =&gt; {
+    fetch(<span class="hljs-string" style="color: rgb(136, 0, 0);">'weather.php'</span>)
+        .then(response =&gt; response.json())
+        .then(data =&gt; {
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.location'</span>).textContent = data.location || <span class="hljs-string" style="color: rgb(136, 0, 0);">'Unknown'</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.temperature'</span>).innerHTML = <span class="hljs-string" style="color: rgb(136, 0, 0);">`<span class="hljs-subst" style="color: rgb(68, 68, 68);">${data.temperature ?? '--'}</span>&lt;sup&gt;°C&lt;/sup&gt;`</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.weather'</span>).textContent = data.weather || <span class="hljs-string" style="color: rgb(136, 0, 0);">'--'</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.humidity'</span>).textContent = <span class="hljs-string" style="color: rgb(136, 0, 0);">`Humidity: <span class="hljs-subst" style="color: rgb(68, 68, 68);">${data.humidity ?? '--'}</span>%`</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.datetime'</span>).textContent = data.datetime || <span class="hljs-string" style="color: rgb(136, 0, 0);">'--'</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.day-night'</span>).textContent = data.is_day ? <span class="hljs-string" style="color: rgb(136, 0, 0);">'🌞'</span> : <span class="hljs-string" style="color: rgb(136, 0, 0);">'🌜'</span>;
+        })
+        .catch(() =&gt; {
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.location'</span>).textContent = <span class="hljs-string" style="color: rgb(136, 0, 0);">'Error'</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.temperature'</span>).innerHTML = <span class="hljs-string" style="color: rgb(136, 0, 0);">'--&lt;sup&gt;°C&lt;/sup&gt;'</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.weather'</span>).textContent = <span class="hljs-string" style="color: rgb(136, 0, 0);">'--'</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.humidity'</span>).textContent = <span class="hljs-string" style="color: rgb(136, 0, 0);">'Humidity: --%'</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.datetime'</span>).textContent = <span class="hljs-string" style="color: rgb(136, 0, 0);">'--'</span>;
+            <span class="hljs-built_in" style="color: rgb(57, 115, 0);">document</span>.querySelector(<span class="hljs-string" style="color: rgb(136, 0, 0);">'.day-night'</span>).textContent = <span class="hljs-string" style="color: rgb(136, 0, 0);">'❓'</span>;
+        });
+});</pre>
+<h2>Step 4: Fetch Weather Data with PHP (weather.php)</h2>
+<p>In the <code>weather.php</code> file, we will write the PHP code to fetch weather data from the Open-Meteo API based on the user&#8217;s location. We will use the user&#8217;s IP address to determine their location and then make a request to the Open-Meteo API to retrieve the current weather data. Finally, we will return this data as JSON to be consumed by our JavaScript code in <code>script.js</code>.</p>
+<ul>
+<li>Auto-detect user location using IP address</li>
+<li>Fetch weather data from Open-Meteo API based on detected location</li>
+<li>Return weather data as JSON for frontend consumption</li>
+</ul>
+<pre><span style="color: #0000BB">&lt;?php <br /></span><span style="color: #FF8000">//&nbsp;Auto-detect&nbsp;IP&nbsp;address <br /></span><span style="color: #0000BB">$ip&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$_SERVER</span><span style="color: #007700">[</span><span style="color: #DD0000">'REMOTE_ADDR'</span><span style="color: #007700">]; <br /> <br /></span><span style="color: #FF8000">//&nbsp;Get&nbsp;location&nbsp;info&nbsp;from&nbsp;ip-api.com&nbsp;(free,&nbsp;no&nbsp;API&nbsp;key&nbsp;required) <br /></span><span style="color: #0000BB">$geo_url&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #DD0000">"http://ip-api.com/json/</span><span style="color: #007700">{</span><span style="color: #0000BB">$ip</span><span style="color: #007700">}</span><span style="color: #DD0000">?fields=status,message,country,regionName,city,lat,lon"</span><span style="color: #007700">; <br /></span><span style="color: #0000BB">$geo_response&nbsp;</span><span style="color: #007700">=&nbsp;@</span><span style="color: #0000BB">file_get_contents</span><span style="color: #007700">(</span><span style="color: #0000BB">$geo_url</span><span style="color: #007700">); <br /></span><span style="color: #0000BB">$geo_data&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$geo_response&nbsp;</span><span style="color: #007700">?&nbsp;</span><span style="color: #0000BB">json_decode</span><span style="color: #007700">(</span><span style="color: #0000BB">$geo_response</span><span style="color: #007700">,&nbsp;</span><span style="color: #0000BB">true</span><span style="color: #007700">)&nbsp;:&nbsp;</span><span style="color: #0000BB">null</span><span style="color: #007700">; <br /> <br />if&nbsp;(</span><span style="color: #0000BB">$geo_data&nbsp;</span><span style="color: #007700">&amp;&amp;&nbsp;</span><span style="color: #0000BB">$geo_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'status'</span><span style="color: #007700">]&nbsp;===&nbsp;</span><span style="color: #DD0000">'success'</span><span style="color: #007700">)&nbsp;{ <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$lat&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$geo_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'lat'</span><span style="color: #007700">]; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$lon&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$geo_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'lon'</span><span style="color: #007700">]; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$location&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$geo_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'city'</span><span style="color: #007700">]&nbsp;.&nbsp;</span><span style="color: #DD0000">',&nbsp;'&nbsp;</span><span style="color: #007700">.&nbsp;</span><span style="color: #0000BB">$geo_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'country'</span><span style="color: #007700">]; <br />}&nbsp;else&nbsp;{ <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #FF8000">//&nbsp;Fallback&nbsp;to&nbsp;New&nbsp;York&nbsp;if&nbsp;geolocation&nbsp;fails <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$lat&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">40.7128</span><span style="color: #007700">; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$lon&nbsp;</span><span style="color: #007700">=&nbsp;-</span><span style="color: #0000BB">74.0060</span><span style="color: #007700">; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$location&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #DD0000">'New&nbsp;York,&nbsp;USA'</span><span style="color: #007700">; <br />} <br /> <br /> <br /></span><span style="color: #FF8000">//&nbsp;Open-Meteo&nbsp;API&nbsp;(no&nbsp;API&nbsp;key&nbsp;required) <br /></span><span style="color: #0000BB">$weather_url&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #DD0000">"https://api.open-meteo.com/v1/forecast?latitude=</span><span style="color: #007700">{</span><span style="color: #0000BB">$lat</span><span style="color: #007700">}</span><span style="color: #DD0000">&amp;longitude=</span><span style="color: #007700">{</span><span style="color: #0000BB">$lon</span><span style="color: #007700">}</span><span style="color: #DD0000">&amp;current_weather=true&amp;hourly=relative_humidity_2m,weathercode"</span><span style="color: #007700">; <br /></span><span style="color: #0000BB">$weather_response&nbsp;</span><span style="color: #007700">=&nbsp;@</span><span style="color: #0000BB">file_get_contents</span><span style="color: #007700">(</span><span style="color: #0000BB">$weather_url</span><span style="color: #007700">); <br /></span><span style="color: #0000BB">$weather_data&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$weather_response&nbsp;</span><span style="color: #007700">?&nbsp;</span><span style="color: #0000BB">json_decode</span><span style="color: #007700">(</span><span style="color: #0000BB">$weather_response</span><span style="color: #007700">,&nbsp;</span><span style="color: #0000BB">true</span><span style="color: #007700">)&nbsp;:&nbsp;</span><span style="color: #0000BB">null</span><span style="color: #007700">; <br /> <br />if&nbsp;(</span><span style="color: #0000BB">$weather_data&nbsp;</span><span style="color: #007700">&amp;&amp;&nbsp;isset(</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'current_weather'</span><span style="color: #007700">]))&nbsp;{ <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$temperature&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'current_weather'</span><span style="color: #007700">][</span><span style="color: #DD0000">'temperature'</span><span style="color: #007700">]; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$is_day&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'current_weather'</span><span style="color: #007700">][</span><span style="color: #DD0000">'is_day'</span><span style="color: #007700">]&nbsp;==&nbsp;</span><span style="color: #0000BB">1</span><span style="color: #007700">; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$datetime&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">date</span><span style="color: #007700">(</span><span style="color: #DD0000">'l,&nbsp;H:i'</span><span style="color: #007700">,&nbsp;</span><span style="color: #0000BB">strtotime</span><span style="color: #007700">(</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'current_weather'</span><span style="color: #007700">][</span><span style="color: #DD0000">'time'</span><span style="color: #007700">])); <br />&nbsp;&nbsp;&nbsp;&nbsp; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #FF8000">//&nbsp;Get&nbsp;humidity&nbsp;from&nbsp;hourly&nbsp;data&nbsp;(nearest&nbsp;hour) <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$humidity&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #DD0000">'--'</span><span style="color: #007700">; <br />&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(isset(</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'hourly'</span><span style="color: #007700">][</span><span style="color: #DD0000">'time'</span><span style="color: #007700">])&nbsp;&amp;&amp;&nbsp;isset(</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'hourly'</span><span style="color: #007700">][</span><span style="color: #DD0000">'relative_humidity_2m'</span><span style="color: #007700">]))&nbsp;{ <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$now&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'current_weather'</span><span style="color: #007700">][</span><span style="color: #DD0000">'time'</span><span style="color: #007700">]; <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$idx&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">array_search</span><span style="color: #007700">(</span><span style="color: #0000BB">$now</span><span style="color: #007700">,&nbsp;</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'hourly'</span><span style="color: #007700">][</span><span style="color: #DD0000">'time'</span><span style="color: #007700">]); <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(</span><span style="color: #0000BB">$idx&nbsp;</span><span style="color: #007700">!==&nbsp;</span><span style="color: #0000BB">false</span><span style="color: #007700">)&nbsp;{ <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$humidity&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'hourly'</span><span style="color: #007700">][</span><span style="color: #DD0000">'relative_humidity_2m'</span><span style="color: #007700">][</span><span style="color: #0000BB">$idx</span><span style="color: #007700">]; <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} <br />&nbsp;&nbsp;&nbsp;&nbsp;} <br /> <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #FF8000">//&nbsp;Weather&nbsp;description&nbsp;from&nbsp;weathercode <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$weather_codes&nbsp;</span><span style="color: #007700">=&nbsp;[ <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">0&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Clear&nbsp;sky'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">1&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Mainly&nbsp;clear'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">2&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Partly&nbsp;cloudy'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">3&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Overcast'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">45&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Fog'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">48&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Depositing&nbsp;rime&nbsp;fog'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">51&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Light&nbsp;drizzle'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">53&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Drizzle'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">55&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Dense&nbsp;drizzle'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">56&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Freezing&nbsp;drizzle'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">57&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Dense&nbsp;freezing&nbsp;drizzle'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">61&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Slight&nbsp;rain'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">63&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Rain'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">65&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Heavy&nbsp;rain'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">66&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Freezing&nbsp;rain'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">67&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Heavy&nbsp;freezing&nbsp;rain'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">71&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Slight&nbsp;snow&nbsp;fall'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">73&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Snow&nbsp;fall'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">75&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Heavy&nbsp;snow&nbsp;fall'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">77&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Snow&nbsp;grains'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">80&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Slight&nbsp;rain&nbsp;showers'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">81&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Rain&nbsp;showers'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">82&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Violent&nbsp;rain&nbsp;showers'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">85&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Slight&nbsp;snow&nbsp;showers'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">86&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Heavy&nbsp;snow&nbsp;showers'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">95&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Thunderstorm'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">96&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Thunderstorm&nbsp;with&nbsp;hail'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">99&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #DD0000">'Thunderstorm&nbsp;with&nbsp;heavy&nbsp;hail'</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;]; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$weathercode&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$weather_data</span><span style="color: #007700">[</span><span style="color: #DD0000">'current_weather'</span><span style="color: #007700">][</span><span style="color: #DD0000">'weathercode'</span><span style="color: #007700">]; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$weather&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">$weather_codes</span><span style="color: #007700">[</span><span style="color: #0000BB">$weathercode</span><span style="color: #007700">]&nbsp;??&nbsp;</span><span style="color: #DD0000">'Unknown'</span><span style="color: #007700">; <br />}&nbsp;else&nbsp;{ <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$temperature&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #DD0000">'--'</span><span style="color: #007700">; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$weather&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #DD0000">'Unavailable'</span><span style="color: #007700">; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$humidity&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #DD0000">'--'</span><span style="color: #007700">; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$is_day&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">true</span><span style="color: #007700">; <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #0000BB">$datetime&nbsp;</span><span style="color: #007700">=&nbsp;</span><span style="color: #0000BB">date</span><span style="color: #007700">(</span><span style="color: #DD0000">'l,&nbsp;H:i'</span><span style="color: #007700">); <br />} <br /> <br /></span><span style="color: #FF8000">//&nbsp;Return&nbsp;data&nbsp;as&nbsp;JSON <br /></span><span style="color: #0000BB">header</span><span style="color: #007700">(</span><span style="color: #DD0000">'Content-Type:&nbsp;application/json'</span><span style="color: #007700">); <br />echo&nbsp;</span><span style="color: #0000BB">json_encode</span><span style="color: #007700">([ <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #DD0000">'location'&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #0000BB">$location</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #DD0000">'temperature'&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #0000BB">$temperature</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #DD0000">'weather'&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #0000BB">$weather</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #DD0000">'humidity'&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #0000BB">$humidity</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #DD0000">'is_day'&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #0000BB">$is_day</span><span style="color: #007700">, <br />&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color: #DD0000">'datetime'&nbsp;</span><span style="color: #007700">=&gt;&nbsp;</span><span style="color: #0000BB">$datetime <br /></span><span style="color: #007700">]); <br /></span><span style="color: #0000BB">?&gt;</span></pre>
+<h2>🎯 Final Output</h2>
+<p>Once you have completed the above steps, your temperature widget should be fully functional and display real-time weather information based on the user&#8217;s location. The widget will show the current temperature, weather description, humidity, date &#038; time, and a day/night indicator icon.</p>
+<ul>
+<li>🌡️ Current temperature (°C)</li>
+<li>📍 Auto-detected city &#038; country</li>
+<li>🌤 Weather condition</li>
+<li>💧 Humidity</li>
+<li>🕒 Date &#038; time</li>
+<li>🌞/🌜 Day or Night indicator</li>
+</ul>
+<p>All fully dynamic and automatic.</p>
+<h2>📌 Use Cases of Weather Widget</h2>
+<ul>
+<li><b>Personal Blogs:</b> Display local weather conditions to enhance user engagement.</li>
+<li><b>Travel Websites:</b> Show current weather at popular destinations to help travelers plan their trips.</li>
+<li><b>News Portals:</b> Provide real-time weather updates alongside news articles.</li>
+<li><b>Event Pages:</b> Inform attendees about the weather forecast for outdoor events.</li>
+</ul>
+<h2>🚀 Conclusion</h2>
+<p>In this tutorial, we have successfully created a real-time temperature widget using JavaScript and PHP. This widget automatically detects the user&#8217;s location, fetches live weather data from the Open-Meteo API, and displays it in a visually appealing format. You can easily customize the design and functionality of the widget to suit your website&#8217;s needs. This is a great way to enhance user experience by providing relevant and timely information. Happy coding!</p>
+</p>
+								
+                                <div class="tags_list post_taglist" id="post-btm-section">
+																			<ul>
+											<li><a href="https://www.codexworld.com/tag/ip-address/" title="Tag: IP Address" class="tags-block">IP Address</a></li><li><a href="https://www.codexworld.com/tag/javascript/" title="Tag: JavaScript" class="tags-block">JavaScript</a></li><li><a href="https://www.codexworld.com/tag/open-meteo-api/" title="Tag: Open-Meteo API" class="tags-block">Open-Meteo API</a></li><li><a href="https://www.codexworld.com/tag/php/" title="Tag: PHP" class="tags-block">PHP</a></li><li><a href="https://www.codexworld.com/tag/temperature-widget/" title="Tag: Temperature Widget" class="tags-block">Temperature Widget</a></li><li><a href="https://www.codexworld.com/tag/weather/" title="Tag: Weather" class="tags-block">Weather</a></li>										</ul>
+									                                </div>
+                                <div class="post-btm-info">
+                                    <p class="donateTxt">Looking for expert assistance to implement or extend this script’s functionality? <a href="javascript:void(0);" style="color:#f92d50;font-style: italic;" data-bs-toggle="modal" data-bs-target="#requestModal">Submit a Service Request</a></p>
+                                    <!--<p class="askTxt">If you have any questions about this script, submit it to our QA community - <a href="https://www.codexqa.com/questions/ask?reflink=" class="ask-qa" title="Ask questions about this script" target="_blank">Ask Question</a></p>-->
+                                </div>
+
+								<div class="releted_howtoguides">
+									</ul>																	</div>
+                            </div>
+							                            <div class="bttm_links">
+								<a id="LiveDemo" class="basic_btn demodwm" href="https://demos.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/" target="_blank" ><i class="material-icons-outlined">visibility</i> View Demo</a><a id="DownloadProject" class="basic_btn demodwm paydwn-btn" href="https://www.codexworld.com/downloads/create-temperature-widget-using-javascript-php-auto-location-live-weather-api"><i class="material-icons-outlined">file_download</i> Download Source Code</a>                            </div>
+														<div class="details-page-ad-bottom"><!-- CodexWorld_PageTop_Responsive -->
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-5750766974376423"
+     data-ad-slot="2558361600"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script></div>
+							
+
+                            <div class="post_navigateArea">
+                                <div class="prev_nav navigate_item">
+								                                    <a title="ChatGPT API Integration in PHP" href="https://www.codexworld.com/chatgpt-api-integration-in-php/">
+                                        <span class="smal_txtnav">Previous</span>
+                                        <div class="nav_text">
+                                            <i class="material-icons-outlined">arrow_back</i>
+                                            <span>ChatGPT API Integration in PHP</span>
+                                        </div>
+                                    </a>
+								                                </div>
+                                <div class="next_nav navigate_item">
+								                                    <a title="Passwordless Login System in PHP (Magic Link via Email)" href="https://www.codexworld.com/passwordless-login-php-magic-link-email-authentication/">
+                                        <span class="smal_txtnav">Next</span>
+                                        <div class="nav_text">
+                                            <span>Passwordless Login System in PHP (Magic Link via Email)</span>
+                                            <i class="material-icons-outlined">arrow_forward</i>
+                                        </div>
+                                    </a>
+								                                </div>
+                            </div>
+							<!--<div class="multiplex-ads-single-btm"></div>-->
+                            <div class="releted_postouter">
+                                <div class="pnl_hdng">
+                                    <h3>RELATED TUTORIALS</h3>
+                                </div>
+                                <div class="post_releted_outer">
+                                    <div class="row">
+																							<div class="col-lg-4 col-sm-6">
+														<div class="post_item">
+															<div class="releted_postpic">
+																<figure><img width="320" height="180" src="https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld-320x180.png" class="attachment- img-responsive related-post-img wp-post-image wp-post-image" alt="php-hacks-tips-tricks-every-programmer-should-know-codexworld" decoding="async" fetchpriority="high" srcset="https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld-320x180.png 320w, https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld-300x169.png 300w, https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld-1024x576.png 1024w, https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld-768x432.png 768w, https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld-350x197.png 350w, https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld-380x214.png 380w, https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld-200x112.png 200w, https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld-346x195.png 346w, https://www.codexworld.com/wp-content/uploads/2016/09/php-hacks-tips-tricks-every-programmer-should-know-codexworld.png 1366w" sizes="(max-width: 320px) 100vw, 320px" /></figure>
+																<div class="post_read_morebtn">
+																	<a href="https://www.codexworld.com/php-tips-tricks-hacks-every-programmer-should-know/" class="border_btn">Read more</a>
+																</div>
+															</div>
+															<div class="releted_post_text">
+																<a href="https://www.codexworld.com/php-tips-tricks-hacks-every-programmer-should-know/" rel="bookmark">Some PHP Hacks Every Programmer Should Know</a>
+															</div>
+														</div>
+													</div>
+																							<div class="col-lg-4 col-sm-6">
+														<div class="post_item">
+															<div class="releted_postpic">
+																<figure><img width="320" height="180" src="https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld-320x180.png" class="attachment- img-responsive related-post-img wp-post-image wp-post-image" alt="store-visitor-log-in-the-database-with-php-mysql-codexworld" decoding="async" srcset="https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld-320x180.png 320w, https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld-300x169.png 300w, https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld-1024x576.png 1024w, https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld-768x432.png 768w, https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld-350x197.png 350w, https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld-380x214.png 380w, https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld-200x112.png 200w, https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld-346x195.png 346w, https://www.codexworld.com/wp-content/uploads/2021/06/store-visitor-log-in-the-database-with-php-mysql-codexworld.png 1366w" sizes="(max-width: 320px) 100vw, 320px" /></figure>
+																<div class="post_read_morebtn">
+																	<a href="https://www.codexworld.com/store-visitor-log-in-the-database-with-php-mysql/" class="border_btn">Read more</a>
+																</div>
+															</div>
+															<div class="releted_post_text">
+																<a href="https://www.codexworld.com/store-visitor-log-in-the-database-with-php-mysql/" rel="bookmark">Storing Visitor Log in the Database with PHP and MySQL</a>
+															</div>
+														</div>
+													</div>
+																							<div class="col-lg-4 col-sm-6">
+														<div class="post_item">
+															<div class="releted_postpic">
+																<figure><img width="320" height="180" src="https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld-320x180.png" class="attachment- img-responsive related-post-img wp-post-image wp-post-image" alt="add-event-to-google-calendar-using-php-codexworld" decoding="async" srcset="https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld-320x180.png 320w, https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld-300x169.png 300w, https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld-1024x576.png 1024w, https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld-768x432.png 768w, https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld-350x197.png 350w, https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld-380x214.png 380w, https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld-200x112.png 200w, https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld-346x195.png 346w, https://www.codexworld.com/wp-content/uploads/2022/01/add-event-to-google-calendar-using-php-codexworld.png 1366w" sizes="(max-width: 320px) 100vw, 320px" /></figure>
+																<div class="post_read_morebtn">
+																	<a href="https://www.codexworld.com/add-event-to-google-calendar-using-php/" class="border_btn">Read more</a>
+																</div>
+															</div>
+															<div class="releted_post_text">
+																<a href="https://www.codexworld.com/add-event-to-google-calendar-using-php/" rel="bookmark">Add Event to Google Calendar using PHP</a>
+															</div>
+														</div>
+													</div>
+																				                                    </div>
+                                </div>
+                            </div>
+							<!-- You can start editing here. -->
+<div class="post_comments_area">
+		<!-- If comments are open, but there are no comments. -->
+	</div>
+<div class="replay_comments_form comment-respond page-content">
+	<div class="pnl_hdng boxedtitle page-title"><h3>Leave a reply</h3></div>
+	<div class="form_outer">
+		<div class="commnts_fillOuter">
+				<div id="respond" class="comment-respond">
+		<h3 id="reply-title" class="comment-reply-title"> <small><a rel="nofollow" id="cancel-comment-reply-link" href="/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/#respond" style="display:none;">Cancel</a></small></h3><form action="https://www.codexworld.com/wp-comments-post.php" method="post" id="commentform" class="row comment-form"><div class="col-md-12"><div class="input_fill comments_fill"><label class="required" for="comment">Comment<span>*</span></label><textarea  id="comment" name="comment" class="form-control" aria-required="true" required></textarea></div></div><div class="col-lg-4"><div class="input_fill">
+						<label class="required" for="author">Your Name<span>*</span></label>
+						<input id="author" name="author" type="text" class="form-control" value="" size=""  aria-required="true" required /></div></div>
+<div class="col-lg-4"><div class="input_fill">
+						<label class="required" for="email">Your Email<span>*</span></label>
+						<input id="email" name="email" type="email" class="form-control" value="" size=""  aria-required="true" required /></div></div>
+<div class="col-lg-4"><div class="input_fill">
+						<label class="required" for="url">Your Website</label>
+						<input id="url" name="url" type="text" class="form-control"value="" size="" />
+						</div></div>
+<p class="comment-subscription-form"><input type="checkbox" name="subscribe_comments" id="subscribe_comments" value="subscribe" style="width: auto; -moz-appearance: checkbox; -webkit-appearance: checkbox;" /> <label class="subscribe-label" id="subscribe-label" for="subscribe_comments">Notify me of follow-up comments by email.</label></p><p class="comment-subscription-form"><input type="checkbox" name="subscribe_blog" id="subscribe_blog" value="subscribe" style="width: auto; -moz-appearance: checkbox; -webkit-appearance: checkbox;" /> <label class="subscribe-label" id="subscribe-blog-label" for="subscribe_blog">Notify me of new posts by email.</label></p><div class="g-recaptcha" data-sitekey="6LfQ474iAAAAACmLVuVHlz1ni0CuRUFrNu8EoDTY"></div>
+					<div class="col-md-12">
+						<div class="input_fill submit_fill">
+							<input name="submit" type="submit" id="submit" class="basic_btn" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='6049' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='0' />
+
+						</div>
+					</div></form>	</div><!-- #respond -->
+			</div>
+	</div>
+</div>
+                        </div>
+                       
+                    </div>
+										                </div>
+
+
+                <div class="col-lg-4" id="rightSideBr">
+    <div class="blog_rightpnl">
+        <div class="blog_subscriptionbx" style="background-color:#6622CB;"><div class="news_hdng"><h2 style="font-size: 18px;text-transform: initial;">Need Cost-Effective Web or App Development?</h2><h5 style="font-size: 15px;">We provide affordable web and mobile app development services for startups and businesses—without compromising code quality, security, or scalability.</h5></div><div class="news_fill"><a href="https://www.codexworld.com/contact/" class="basic_btn webd subscribe_btn subscribeBtnHome">Discuss Your Project →</a><p style="margin-top: 10px;color: #ffffff;font-size: 13px;text-align: center;">💰 Budget-friendly • 🌍 Global clients • 🚀 Production-ready solutions</p></div></div></div><div class="postpnl_item widget-sidebar adsense_widget"><!-- CodexWorld_SideBar_Responsive -->
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-5750766974376423"
+     data-ad-slot="1548532268"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script></div><div class="postpnl_item widget-sidebar"><div class="pnl_hdng"><h3>TRENDING TUTORIALS</h3></div><div class="postpnl_outer popular_post_widget"><ul class="SidebarBox_list st-list">  <li><a title="Secure Registration and Login System with PHP and MySQL" href="https://www.codexworld.com/registration-login-system-php-mysql-session/">Secure Registration and Login System with PHP and MySQL</a></li>
+    <li><a title="Login with Google Account using PHP and MySQL" href="https://www.codexworld.com/login-with-google-api-using-php/">Login with Google Account using PHP and MySQL</a></li>
+    <li><a title="Facebook OAuth Login Integration in PHP" href="https://www.codexworld.com/login-with-facebook-using-php/">Facebook OAuth Login Integration in PHP</a></li>
+    <li><a title="Convert HTML to PDF using JavaScript" href="https://www.codexworld.com/convert-html-to-pdf-using-javascript-jspdf/">Convert HTML to PDF using JavaScript</a></li>
+    <li><a title="Upload and Store Image File in Database using PHP and MySQL" href="https://www.codexworld.com/upload-store-image-file-in-database-using-php-mysql/">Upload and Store Image File in Database using PHP and MySQL</a></li>
+    <li><a title="Create Short URL using PHP URL Shortener" href="https://www.codexworld.com/php-url-shortener-library-create-short-url/">Create Short URL using PHP URL Shortener</a></li>
+    <li><a title="Multi-select Dropdown List with Checkbox using jQuery" href="https://www.codexworld.com/multi-select-dropdown-list-with-checkbox-jquery/">Multi-select Dropdown List with Checkbox using jQuery</a></li>
+    <li><a title="Store and Retrieve Image from MySQL Database using PHP" href="https://www.codexworld.com/store-retrieve-image-from-database-mysql-php/">Store and Retrieve Image from MySQL Database using PHP</a></li>
+  </ul></div></div><div class="postpnl_item widget-sidebar adsense_widget"><a href="https://www.codexworld.com/scripts/php-admin-panel/"><img src="https://www.codexworld.com/wp-content/uploads/2024/06/php-admin-panel-script-ads-codexworld.png"/></a></div><div class="postpnl_item widget-sidebar"><div class="pnl_hdng"><h3>TOPICS<a href="https://www.codexworld.com/tutorial-topics/" class="widgetAllCat">all topics</a></h3></div><div class="catagory_list tabCategory"><ul class="list-unstyled">  <li><a title="PHP" href="https://www.codexworld.com/tutorials/php/">PHP</a></li>
+    <li><a title="CodeIgniter" href="https://www.codexworld.com/tutorials/codeigniter/">CodeIgniter</a></li>
+    <li><a title="WordPress" href="https://www.codexworld.com/tutorials/wordpress/">WordPress</a></li>
+    <li><a title="JavaScript" href="https://www.codexworld.com/tutorials/javascript/">JavaScript</a></li>
+    <li><a title="GoogleMap" href="https://www.codexworld.com/tutorials/googlemap/">GoogleMap</a></li>
+    <li><a title="HTML&amp;CSS" href="https://www.codexworld.com/tutorials/html-css/">HTML&amp;CSS</a></li>
+    <li><a title="Drupal" href="https://www.codexworld.com/tutorials/drupal/">Drupal</a></li>
+    <li><a title="Web Development" href="https://www.codexworld.com/tutorials/web-development/">Web Development</a></li>
+    <li><a title="CakePHP" href="https://www.codexworld.com/tutorials/cakephp/">CakePHP</a></li>
+    <li><a title="Bootstrap" href="https://www.codexworld.com/tutorials/bootstrap/">Bootstrap</a></li>
+    <li><a title="Laravel" href="https://www.codexworld.com/tutorials/laravel/">Laravel</a></li>
+    <li><a title="PayPal" href="https://www.codexworld.com/tutorials/paypal/">PayPal</a></li>
+  </ul></div></div><div class="postpnl_item widget-sidebar"><div class="pnl_hdng"><h3>LATEST HOW TO GUIDES</h3></div><div class="postpnl_outer latest_howto_widget"><ul class="SidebarBox_list st-list">  <li><a title="How to check if a string contains specific words in PHP" href="https://www.codexworld.com/how-to/check-if-a-string-contains-specific-words-in-php/">How to check if a string contains specific words in PHP</a></li>
+    <li><a title="How to install PostgreSQL server on Windows" href="https://www.codexworld.com/how-to/install-postgresql-server-on-windows/">How to install PostgreSQL server on Windows</a></li>
+    <li><a title="How to convert timestamp to time ago format in PHP" href="https://www.codexworld.com/how-to/convert-timestamp-to-time-ago-format-in-php/">How to convert timestamp to time ago format in PHP</a></li>
+    <li><a title="How to Hide an Alert Message After a Specific Time (5 seconds) using JavaScript?" href="https://www.codexworld.com/how-to/hide-an-alert-message-after-a-specific-time-5-seconds-using-javascript/">How to Hide an Alert Message After a Specific Time (5 seconds) using JavaScript?</a></li>
+    <li><a title="How to Add Full Screen Control to OpenStreetMap using JavaScript" href="https://www.codexworld.com/how-to/add-full-screen-control-to-openstreetmap-using-javascript/">How to Add Full Screen Control to OpenStreetMap using JavaScript</a></li>
+  </ul></div></div><div class="postpnl_item widget-sidebar adsense_widget adsSt_widget" id="adsSt_widget-pos"><div id="adsSt_widget-container"><!-- CodexWorld-Sidebar-Bottom -->
+<ins class="adsbygoogle"
+     style="display:inline-block;width:300px;height:600px"
+     data-ad-client="ca-pub-5750766974376423"
+     data-ad-slot="3898322682"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script></div></div>    </div>
+</div>            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Request Modal -->
+<div class="modal fade" id="requestModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header" style="border-bottom: 2px solid #f0f0f0; padding: 1.5rem 2rem;">
+                <h4 class="modal-title" id="myModalLabel" style="font-size: 1.25rem; font-weight: 700; color: #333;">
+                    <i class="material-icons-outlined" style="font-size: 24px; vertical-align: middle; margin-right: 0.75rem; color: #007bff;">construction</i>Need Help Implementing This Solution?
+                </h4>
+				<!--<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>-->
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="modal-body" style="1rem 2rem 2rem 2rem">
+				<div style="margin-bottom: 1.5rem;">
+					<h5 style="font-size: 1.15rem; font-weight: 600; color: #333; margin-bottom: 0.5rem;">Our development team can integrate, customize, or scale this for your project.</h5>
+					<p style="color: #666; font-size: 0.95rem; line-height: 1.6; margin: 0;">If you'd like our experts to implement this feature in your web or mobile app, share a few details below. We'll review your request and respond within 1 business day.</p>
+				</div>
+            	<div class="reqStatusMsg" style="margin-bottom: 1rem;"></div>
+                <form class="form-horizontal" role="form" id="requestForm">
+					<div class="mb-4">
+                        <label for="reqName" class="form-label" style="font-weight: 600; color: #333; font-size: 0.95rem; margin-bottom: 0.5rem; display: block;">
+							<i class="material-icons-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 0.5rem;">person</i>Full Name
+						</label>
+                        <input type="text" class="form-control" id="reqName" name="name" placeholder="John Doe" required style="border: 1px solid #ddd; border-radius: 0.375rem; padding: 0.75rem 1rem; font-size: 0.95rem; transition: all 0.3s ease;"/>
+                        <small class="text-danger d-none" id="nameError" style="display: block; margin-top: 0.375rem; font-size: 0.85rem;"></small>
+                    </div>
+					<div class="mb-4">
+						<label class="form-label" for="reqEmail" style="font-weight: 600; color: #333; font-size: 0.95rem; margin-bottom: 0.5rem; display: block;">
+							<i class="material-icons-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 0.5rem;">mail</i>Email Address
+						</label>
+						<input type="email" class="form-control" id="reqEmail" name="email" placeholder="your@email.com" required style="border: 1px solid #ddd; border-radius: 0.375rem; padding: 0.75rem 1rem; font-size: 0.95rem; transition: all 0.3s ease;"/>
+						<small class="text-danger d-none" id="emailError" style="display: block; margin-top: 0.375rem; font-size: 0.85rem;"></small>
+					</div>
+					<div class="mb-4">
+						<label class="form-label" for="reqMessage" style="font-weight: 600; color: #333; font-size: 0.95rem; margin-bottom: 0.5rem; display: block;">
+							<i class="material-icons-outlined" style="font-size: 18px; vertical-align: middle; margin-right: 0.5rem;">message</i>Project Details
+						</label>
+						<textarea class="form-control" id="reqMessage" name="message" placeholder="Describe your project requirements and implementation details..." required style="border: 1px solid #ddd; border-radius: 0.375rem; padding: 0.75rem 1rem; font-size: 0.95rem; min-height: 120px; resize: vertical; transition: all 0.3s ease;"></textarea>
+						<small class="text-danger d-none" id="messageError" style="display: block; margin-top: 0.375rem; font-size: 0.85rem;"></small>
+						<small style="color: #999; font-size: 0.85rem; display: block; margin-top: 0.375rem;">Minimum 25 characters</small>
+					</div>
+                </form>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="modal-footer" style="padding: 1.5rem 2rem; border-top: 1px solid #f0f0f0;">
+				<a href="https://www.codexworld.com/services" style="color: #007bff; text-decoration: none; font-weight: 500; margin-right: auto;">Explore Our Services →</a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="padding: 0.5rem 1.5rem; border-radius: 0.375rem;">Cancel</button>
+                <button type="button" class="btn btn-primary" id="submitRequestBtn" onclick="submitRequest()" style="padding: 0.5rem 2rem; border-radius: 0.375rem; font-weight: 600; background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); border: none; box-shadow: 0 2px 8px rgba(0, 123, 255, 0.25); transition: all 0.3s ease;">Submit Request</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript">
+function submitRequest(){
+	// Clear previous error messages
+	jQuery('.reqStatusMsg').html('');
+	jQuery('.text-danger').addClass('d-none').html('');
+	
+	var emailRegex = /^[A-Z0-9._%+-]+@([A-Z0-9-]+\.)+[A-Z]{2,4}$/i;
+	var name = jQuery('#reqName').val().trim();
+	var email = jQuery('#reqEmail').val().trim();
+	var message = jQuery('#reqMessage').val().trim();
+	var postTitle = 'Create a Temperature Widget using JavaScript and PHP (Auto Location + Live Weather API)';
+	var postLink = 'https://www.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/';
+	var hasError = false;
+	
+	// Validate name
+	if(name === ''){
+		jQuery('#nameError').html('Please enter your name.').removeClass('d-none');
+		jQuery('#reqName').focus();
+		hasError = true;
+	}
+	
+	// Validate email
+	if(email === ''){
+		jQuery('#emailError').html('Please enter your email.').removeClass('d-none');
+		if(!hasError) jQuery('#reqEmail').focus();
+		hasError = true;
+	}else if(!emailRegex.test(email)){
+		jQuery('#emailError').html('Please enter a valid email address.').removeClass('d-none');
+		if(!hasError) jQuery('#reqEmail').focus();
+		hasError = true;
+	}
+	
+	// Validate message
+	if(message === ''){
+		jQuery('#messageError').html('Please enter your message.').removeClass('d-none');
+		if(!hasError) jQuery('#reqMessage').focus();
+		hasError = true;
+	}else if(message.length < 25){
+		jQuery('#messageError').html('Message must be at least 25 characters long.').removeClass('d-none');
+		if(!hasError) jQuery('#reqMessage').focus();
+		hasError = true;
+	}
+	
+	if(hasError){
+		return false;
+	}
+	
+	// Show loading state
+	var submitBtn = jQuery('#submitRequestBtn');
+	var originalText = submitBtn.text();
+	submitBtn.prop('disabled', true).text('Submitting...');
+	
+	// Submit form via AJAX
+	jQuery.ajax({
+		type:'POST',
+		url:'https://www.codexworld.com/wp-content/themes/techblog/ajax_request.php',
+		data:{
+			name: name,
+			email: email,
+			message: message,
+			postTitle: postTitle,
+			postLink: postLink,
+			requestSubmit: 1
+		},
+		success:function(msg){
+			if(msg == 'ok'){
+				// Clear form
+				jQuery('#requestForm')[0].reset();
+				// Show success message
+				jQuery('.reqStatusMsg').html('<div class="alert alert-success" role="alert">Thanks! We’ve received your request.<br>Our team is reviewing your details and will get back to you shortly to discuss next steps.</div>');
+				// Reset button
+				setTimeout(function(){
+					submitBtn.prop('disabled', false).text(originalText);
+					// Close modal after 3 seconds
+					var requestModal = document.getElementById('requestModal');
+					if(requestModal){
+						var modal = new bootstrap.Modal(requestModal);
+						modal.hide();
+					}
+				}, 3000);
+			}else{
+				jQuery('.reqStatusMsg').html('<div class="alert alert-danger" role="alert">An error occurred while submitting your request. Please try again.</div>');
+				submitBtn.prop('disabled', false).text(originalText);
+			}
+		},
+		error:function(){
+			jQuery('.reqStatusMsg').html('<div class="alert alert-danger" role="alert">Network error. Please try again.</div>');
+			submitBtn.prop('disabled', false).text(originalText);
+		}
+	});
+}
+</script>
+
+<a href="javascript:void(0);" id="backToTop_HR" class="back-to-top actbtn" title="Submit Request" data-bs-toggle="modal" data-bs-target="#requestModal">
+    <i class="material-icons-outlined">construction </i> Need this implemented in your project? Request Implementation Help →
+</a>
+<footer class="footer_sec" id="footerArea">
+    <div class="footer_top">
+        <div class="container-fluid">
+            <div class="top_outer">
+                <div class="row">
+                    <div class="col-lg-4">
+                        <div class="ftr_logoArea">
+                            <div class="ftr_logo">
+                                <a href="https://www.codexworld.com/"><img src="https://www.codexworld.com/wp-content/uploads/2014/09/codexworld-logo.png" alt="CodexWorld" /></a>
+                            </div>
+                            <div class="ftr_para">
+                                <p>CodexWorld is the most popular Programming & Web Development website aiming to provide the best online resources for web application developers and designers.</p>
+                            </div>
+                            <div class="ftr_social">
+                                <ul>
+                                <li>
+                                    <a href="https://www.facebook.com/codexworld" target="_blank" title="Follow CodexWorld on Facebook">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06h40.42V6.26S260.43 0 225.36 0c-73.22 0-121.08 44.38-121.08 124.72v70.62H22.89V288h81.39v224h100.17V288z"/></svg>
+                                    </a>
+                                </li>
+                                 <li>
+                                    <a href="https://twitter.com/codexworldweb" target="_blank" title="Follow CodexWorld on Twitter">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M459.37 151.716c.325 4.548.325 9.097.325 13.645 0 138.72-105.583 298.558-298.558 298.558-59.452 0-114.68-17.219-161.137-47.106 8.447.974 16.568 1.299 25.34 1.299 49.055 0 94.213-16.568 130.274-44.832-46.132-.975-84.792-31.188-98.112-72.772 6.498.974 12.995 1.624 19.818 1.624 9.421 0 18.843-1.3 27.614-3.573-48.081-9.747-84.143-51.98-84.143-102.985v-1.299c13.969 7.797 30.214 12.67 47.431 13.319-28.264-18.843-46.781-51.005-46.781-87.391 0-19.492 5.197-37.36 14.294-52.954 51.655 63.675 129.3 105.258 216.365 109.807-1.624-7.797-2.599-15.918-2.599-24.04 0-57.828 46.782-104.934 104.934-104.934 30.213 0 57.502 12.67 76.67 33.137 23.715-4.548 46.456-13.32 66.599-25.34-7.798 24.366-24.366 44.833-46.132 57.827 21.117-2.273 41.584-8.122 60.426-16.243-14.292 20.791-32.161 39.308-52.628 54.253z"/></svg>
+                                    </a>
+                                </li>
+                                 <li>
+                                    <a href="https://www.youtube.com/codexworld" target="_blank" title="Subscribe CodexWorld on YouTube">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><path d="M549.655 124.083c-6.281-23.65-24.787-42.276-48.284-48.597C458.781 64 288 64 288 64S117.22 64 74.629 75.486c-23.497 6.322-42.003 24.947-48.284 48.597-11.412 42.867-11.412 132.305-11.412 132.305s0 89.438 11.412 132.305c6.281 23.65 24.787 41.5 48.284 47.821C117.22 448 288 448 288 448s170.78 0 213.371-11.486c23.497-6.321 42.003-24.171 48.284-47.821 11.412-42.867 11.412-132.305 11.412-132.305s0-89.438-11.412-132.305zm-317.51 213.508V175.185l142.739 81.205-142.739 81.201z"/></svg>
+                                    </a>
+                                </li>
+                                 <li>
+                                    <a href="https://www.linkedin.com/company/codexworld" target="_blank" title="Follow CodexWorld on LinkedIn">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M100.28 448H7.4V148.9h92.88zM53.79 108.1C24.09 108.1 0 83.5 0 53.8a53.79 53.79 0 0 1 107.58 0c0 29.7-24.1 54.3-53.79 54.3zM447.9 448h-92.68V302.4c0-34.7-.7-79.2-48.29-79.2-48.29 0-55.69 37.7-55.69 76.7V448h-92.78V148.9h89.08v40.8h1.3c12.4-23.5 42.69-48.3 87.88-48.3 94 0 111.28 61.9 111.28 142.3V448z"/></svg>
+                                    </a>
+                                </li>
+
+                            </ul>
+                            <div class="app-dwn-links" style="margin-top: 10px">
+                                <a href="https://play.google.com/store/apps/details?id=com.codexworld" target="_blank" title="Download CodexWorld Android App">
+                                    <img src="https://www.codexworld.com/wp-content/themes/techblog/images/google-play.svg" alt="CodexWorld Android App" width="120" />
+                                </a>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-md-3 col-6">
+                        <div class="ftr_items">
+                            <h3>ABOUT CodexWorld</h3>
+                            <div class="ftr_links">
+                                <ul>
+                                    <li><a href="https://www.codexworld.com/about-us" title="About Us"><i class="material-icons-outlined"> radio_button_checked</i><span>About Us</span></a></li>
+                                    <li><a href="https://www.codexworld.com/contact" title="Contact Us"><i class="material-icons-outlined"> radio_button_checked</i><span>Contact Us</span></a></li>
+                                    <li><a href="https://www.codexworld.com/terms-conditions" title="Terms and Conditions"><i class="material-icons-outlined"> radio_button_checked</i><span>Terms & Conditions</span></a></li>
+                                    <li><a href="https://www.codexworld.com/privacy-policy" title="Privacy Policy"><i class="material-icons-outlined"> radio_button_checked</i><span>Privacy Policy</span></a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <!--<div class="col-lg-2 col-md-3 col-6">
+                        <div class="ftr_items">
+                            <h3>Contact</h3>
+                            <div class="ftr_links">
+                                <ul>
+                                    <li><a href="https://www.codexworld.com/contact" title="Contact Us"><i class="material-icons-outlined"> radio_button_checked</i><span>Contact Us</span></a></li>
+                                    <li><a href="https://www.codexworld.com/advertise" title="Advertise on CodexWorld"><i class="material-icons-outlined"> radio_button_checked</i><span>Advertise</span></a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>-->
+                    <div class="col-lg-2 col-md-3 col-6">
+                        <div class="ftr_items">
+                            <h3>Services</h3>
+                            <div class="ftr_links">
+                                <ul>
+                                    <li><a href="https://www.codexworld.com/web-development/" title="Web Development Service"><i class="material-icons-outlined"> radio_button_checked</i><span>Web Development</span></a></li>
+                                    <li><a href="https://www.codexworld.com/mobile-app-development/" title="Mobile App Development Service"><i class="material-icons-outlined"> radio_button_checked</i><span>App Development</span></a></li>
+                                    <li><a href="https://www.codexworld.com/maintenance-support/" title="Maintenance & Support Service"><i class="material-icons-outlined"> radio_button_checked</i><span>Maintenance & Support</span></a></li>
+                                </ul>
+
+                            </div>
+                        </div>
+                    </div>
+        
+                    <div class="col-lg-2 col-md-3 col-6">
+                        <div class="ftr_items">
+                            <h3>Extra Links</h3>
+                            <div class="ftr_links">
+                                <ul>
+                                    <li><a href="https://www.geocords.com/" title="GPS Coordinates Finder"><i class="material-icons-outlined"> radio_button_checked</i><span>Geo Tools</span></a></li>
+                                    <li><a href="https://www.qrnative.com/" title="Online QR Code Generator"><i class="material-icons-outlined"> qr_code</i><span>QR Code Generator</span></a></li>
+                                    <li><a href="http://www.xwebtools.com/" title="Web development tools"><i class="material-icons-outlined"> radio_button_checked</i><span>Online Tools</span></a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-2 col-md-3 col-6">
+                        <div class="ftr_items">
+                            <h3>Subscribe to our newsletter</h3>
+                            <!--<p>Get the freshest tutorials and resources for developers and designers in your inbox each week.</p>-->
+                            <form class="emailSubscribeFormHome" onsubmit="return false;">
+                                <input type="email" id="subinput" name="email" class="form-control" onblur="if (this.value == &quot;&quot;) {this.value = &quot;Enter your email...&quot;;}" onfocus="if (this.value == &quot;Enter your email...&quot;) {this.value = &quot;&quot;}" value="Enter your email...">
+                                <button class="basic_btn subscribe_btn subscribeBtnHome" onclick="emailSubscribeHome()">Subscribe</button>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer_bttm">
+        <div class="container-fluid">
+            <div class="copyright_outer">
+                <div class="copyright_text">
+                    <p>        Copyright &copy; 2026 <a href="https://www.codexworld.com/" title="Web &amp; Mobile App Development Company">CodexWorld</a>. All rights reserved.
+</p>
+                </div>
+                <div class="privacy_links">
+                    <ul>
+                        <li>
+                            <a href="https://www.codexworld.com/terms-conditions" title="Terms and Conditions">
+                                <i class="material-icons-outlined">gavel</i>
+                                 <span>terms & condition</span>
+                             </a>
+                        </li>
+                        <li>
+                            <a href="https://www.codexworld.com/privacy-policy" title="Privacy Policy">
+                                <i class="material-icons-outlined">verified_user</i>
+                                 <span>privacy policy</span>
+                             </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
+<!--<a href="javascript:void(0);" id="scroll" title="Scroll to Top" style="display: none;">Top<span></span></a>-->
+<a href="javascript:void(0);" id="backToTop" class="back-to-top">
+    <i class="material-icons-outlined">keyboard_double_arrow_up </i>
+</a>
+
+<script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/techblog/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+<script id="jetpack-stats-js-before">
+_stq = window._stq || [];
+_stq.push([ "view", {"v":"ext","blog":"91409221","post":"6049","tz":"0","srv":"www.codexworld.com","j":"1:16.3.1"} ]);
+_stq.push([ "clickTrackerInit", "91409221", "6049" ]);
+//# sourceURL=jetpack-stats-js-before
+</script>
+<script data-wp-strategy="defer" defer fetchpriority="low" id="jetpack-stats-js" src="https://stats.wp.com/e-202645.js"></script>
+<script id="wp-emoji-settings" type="application/json">
+{"baseUrl":"https://s.w.org/images/core/emoji/17.0.2/72x72/","ext":".png","svgUrl":"https://s.w.org/images/core/emoji/17.0.2/svg/","svgExt":".svg","source":{"concatemoji":"https://www.codexworld.com/wp-includes/js/wp-emoji-release.min.js?ver=c57c5adc63fe22274ff5f6f023f9b2b9"}}
+</script>
+<script type="module">
+/*! This file is auto-generated */
+var e="script#wp-emoji-settings",t=document.querySelector(e);if(!(t instanceof HTMLScriptElement))throw new Error("Element missing: "+e);const r=JSON.parse(t.text),s=(window._wpemojiSettings=r,"wpEmojiSettingsSupports"),o=["flag","emoji"];function i(e){try{var t={supportTests:e,timestamp:(new Date).valueOf()};sessionStorage.setItem(s,JSON.stringify(t))}catch(e){}}function c(e,t,n){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);t=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(n,0,0);const r=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);return t.every((e,t)=>e===r[t])}function p(e,t){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);var n=e.getImageData(16,16,1,1);for(let e=0;e<n.data.length;e++)if(0!==n.data[e])return!1;return!0}function u(e,t,n,r){switch(t){case"flag":return n(e,"\ud83c\udff3\ufe0f\u200d\u26a7\ufe0f","\ud83c\udff3\ufe0f\u200b\u26a7\ufe0f")?!1:!n(e,"\ud83c\udde8\ud83c\uddf6","\ud83c\udde8\u200b\ud83c\uddf6")&&!n(e,"\ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f","\ud83c\udff4\u200b\udb40\udc67\u200b\udb40\udc62\u200b\udb40\udc65\u200b\udb40\udc6e\u200b\udb40\udc67\u200b\udb40\udc7f");case"emoji":return!r(e,"\ud83e\u1fac8")}return!1}function f(e,t,n,r){let a;const s=(a="undefined"!=typeof WorkerGlobalScope&&self instanceof WorkerGlobalScope?new OffscreenCanvas(300,150):document.createElement("canvas")).getContext("2d",{willReadFrequently:!0}),o=(s.textBaseline="top",s.font="600 32px Arial",{});return e.forEach(e=>{o[e]=t(s,e,n,r)}),o}function a(e){var t=document.createElement("script");t.src=e,t.defer=!0,document.head.appendChild(t)}r.supports={everything:!0,everythingExceptFlag:!0},new Promise(t=>{let n=function(){try{var e=JSON.parse(sessionStorage.getItem(s));if("object"==typeof e&&"number"==typeof e.timestamp&&(new Date).valueOf()<e.timestamp+604800&&"object"==typeof e.supportTests)return e.supportTests}catch(e){}return null}();if(!n){if("undefined"!=typeof Worker&&"undefined"!=typeof OffscreenCanvas&&"undefined"!=typeof URL&&URL.createObjectURL&&"undefined"!=typeof Blob)try{var e="postMessage("+f.toString()+"("+[JSON.stringify(o),u.toString(),c.toString(),p.toString()].join(",")+"));",r=new Blob([e],{type:"text/javascript"});const a=new Worker(URL.createObjectURL(r),{name:"wpTestEmojiSupports"});return void(a.onmessage=e=>{i(n=e.data),a.terminate(),t(n)})}catch(e){}i(n=f(o,u,c,p))}t(n)}).then(e=>{for(const n in e)r.supports[n]=e[n],r.supports.everything=r.supports.everything&&r.supports[n],"flag"!==n&&(r.supports.everythingExceptFlag=r.supports.everythingExceptFlag&&r.supports[n]);var t;r.supports.everythingExceptFlag=r.supports.everythingExceptFlag&&!r.supports.flag,r.supports.everything||((t=r.source||{}).concatemoji?a(t.concatemoji):t.wpemoji&&t.twemoji&&(a(t.twemoji),a(t.wpemoji)))});
+//# sourceURL=https://www.codexworld.com/wp-includes/js/wp-emoji-loader.min.js
+</script>
+
+<!-- Request Modal -->
+<div class="modal fade" id="hireModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h4 class="modal-title">
+                    Connect with our Support Team
+                </h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="modal-body hireUsModal">
+				<p style="font-size: 15px;font-family: cursive;">Do you want support for the script installation or customization? Submit your request for customization of our scripts, support for the existing web application, and new development service.</p>
+            	<p class="hireStatusMsg"></p>
+                <form class="form-horizontal" role="form">
+                    <div class="mb-3 row">
+                        <label for="hireName" class="col-sm-2 col-form-label">Name</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control" id="hireName" placeholder="Your Name" required=""/>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="hireEmail" class="col-sm-2 col-form-label">Email</label>
+                        <div class="col-sm-10">
+                            <input type="email" class="form-control" id="hireEmail" placeholder="Your Email" required=""/>
+                        </div>
+                    </div>
+                    <div class="mb-3 row">
+                        <label for="hireMessage" class="col-sm-3 col-form-label">Requirements</label>
+                        <div class="col-sm-9">
+                            <textarea class="form-control" id="hireMessage" placeholder="Your Requirements" rows="6"></textarea>
+                        </div>
+                    </div>
+                                  </form>
+				<p style="font-size: 14px;font-style: italic;margin-bottom: 0;">You can connect with the support team directly via email at <b>support@codexworld.com</b> for any inquiry/help.</p>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="modal-footer" style="margin-top: 0;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="submitHireRequest();" id="submitHireRequestBtn">Submit</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript">
+function submitHireRequest(){
+	jQuery('.hireStatusMsg').html('');
+	var reg = /^[A-Z0-9._%+-]+@([A-Z0-9-]+\.)+[A-Z]{2,4}$/i;
+	var name = jQuery('#hireName').val();
+	var email = jQuery('#hireEmail').val();
+	var message = jQuery('#hireMessage').val();
+	var postTitle = 'Hire Us Request';
+	var postLink = 'https://www.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/';
+	if(name.trim() == ''){
+		alert('Please enter your name.');
+		jQuery('#hireName').focus();
+		return false;	
+	}else if(email.trim() == ''){
+		alert('Please enter your email.');
+		jQuery('#hireEmail').focus();
+		return false;	
+	}else if(email.trim() != '' && !reg.test(email)){
+		alert('Please enter valid email.');
+		jQuery('#hireEmail').focus();
+		return false;	
+	}else if(message.trim() == ''){
+		alert('Please enter the summary of your requirement.');
+		jQuery('#hireMessage').focus();
+		return false;	
+	}else if(message.length < 20){
+		alert('Please enter your requirement in details.');
+		jQuery('#hireMessage').focus();
+		return false;	
+	}else{
+		jQuery.ajax({
+			type:'post',
+			url:'https://www.codexworld.com/wp-content/themes/techblog/ajax_request.php',
+			data:'name='+name+'&email='+email+'&message='+message+'&postTitle='+postTitle+'&postLink='+postLink+'&requestSubmit=1',
+			beforeSend: function () {
+                jQuery('#submitHireRequestBtn').attr("disabled","disabled");
+                jQuery('.hireUsModal').css('opacity', '.5');
+            },
+			success:function(msg){
+				if(msg == 'ok'){
+					jQuery('#hireName').val('');
+					jQuery('#hireEmail').val('');
+					jQuery('#hireMessage').val('');
+					jQuery('.hireStatusMsg').html('<span style="color:#34A853;font-size:16px;">Your request has been submitted successfully! Our support team will get in touch with you soon.</span>');	
+				}else{
+					jQuery('.hireStatusMsg').html('<span style="color:#EA4335;font-size:16px;">Some problem occurred, please try again.</span>');
+				}
+				
+				jQuery('#submitHireRequestBtn').removeAttr("disabled");
+                jQuery('.hireUsModal').css('opacity', '');
+			}
+		});
+	}
+}
+</script>
+
+<script type="text/javascript">
+function emailSubscribeHome(){
+		jQuery('.emailSubsMsgHome').remove();
+    var reg = /^[A-Z0-9._%+-]+@([A-Z0-9-]+\.)+[A-Z]{2,4}$/i;
+		var regName = /^[a-zA-Z]+ [a-zA-Z]+$/;
+    //var name = jQuery('#subsName').val();
+		//var nameLower = name.toLowerCase();
+		var name = '';
+    var email = jQuery('#subinput').val();
+		/*if(name.trim() == '' ){
+			alert('Please enter your name.');
+        	jQuery('#subsName').focus();
+			return false;
+		}else if (!regName.test(name)){
+			alert('Please enter valid name (first & last name).');
+			jQuery('#subsName').focus();
+			return false;
+		}else if (nameLower.indexOf("codex") >= 0 && nameLower.indexOf("world") >= 0){
+			alert('Please enter valid name (first & last name).');
+			jQuery('#subsName').focus();
+			return false;
+		}else */if(email.trim() == '' ){
+			alert('Please enter your email.');
+        	jQuery('#subinput').focus();
+			return false;
+		}else if(email.trim() != '' && !reg.test(email)){
+			alert('Please enter valid email.');
+        	jQuery('#subinput').focus();
+			return false;
+		}else{
+        jQuery.ajax({
+            type:'POST',
+            url:'https://www.codexworld.com/subscription/subscribe.php',
+            dataType: "json",
+            data:{subscribeEmail:1,referrer:'codex_sidebar',name:name,email:email},
+            beforeSend: function () {
+                jQuery('.subscribeBtnHome').attr("disabled","disabled");
+                jQuery('.emailSubscribeFormHome').css('opacity', '.5');
+            },
+            success:function(data){
+                if(data.status == 'ok'){
+                    //jQuery('#subsName').val('');
+                    jQuery('#subinput').val('');
+                    jQuery('.emailSubscribeFormHome').prepend('<p class="emailSubsMsgHome" style="color:#ffe900;">A verification link has been sent to your email address, please check your email and verify.</p>');
+                }else if(data.status == 'ae'){
+                    //jQuery('#subsName').val('');
+                    jQuery('#subinput').val('');
+                    jQuery('.emailSubscribeFormHome').prepend('<p class="emailSubsMsgHome" style="color:#ffe900;">Your email already exists in our subscribers list.</p>');
+                }else{
+                    jQuery('.emailSubscribeFormHome').prepend('<span class="emailSubsMsgHome" style="color:#ffe900;">Some problem occurred, please try again.</span>');
+                }
+                jQuery('.subscribeBtnHome').removeAttr("disabled");
+                jQuery('.emailSubscribeFormHome').css('opacity', '');
+            }
+        });
+    }
+}
+</script>
+<script type="text/javascript" async >function generic_social_share(url){window.open(url,'sharer','toolbar=0,status=0,width=648,height=395');return true;}</script>
+<script type="text/javascript" async >
+/*jQuery(document).ready(function(){
+    var stbox = jQuery(".adsSt_widget");
+    var stt = stbox.offset().top;
+    jQuery(document).scroll(function(){
+        var sta = jQuery(this).scrollTop();
+        if(sta > stt){
+            stbox.css({position:"fixed",top:40});
+        }else{
+            stbox.removeAttr("style");
+        }
+    });
+});*/
+</script>
+
+<script type='text/javascript' async >
+/*jQuery(document).ready(function(){ jQuery(window).scroll(function(){ if (jQuery(this).scrollTop() > 100) { jQuery('#scroll').fadeIn(); } else { jQuery('#scroll').fadeOut(); } }); jQuery('#scroll').click(function(){ jQuery("html, body").animate({ scrollTop: 0 }, 600); return false; }); });*/
+
+var btn = jQuery('#backToTop');
+jQuery(window).on('scroll', function() {
+    if (jQuery(window).scrollTop() > 300) {
+        btn.addClass('show');
+    } else {
+        btn.removeClass('show');
+    }
+});
+btn.on('click', function(e) {
+    e.preventDefault();
+    jQuery('html, body').animate({
+        scrollTop: 0
+    }, '300');
+});
+
+var btn_hr = jQuery('#backToTop_HR');
+jQuery(window).on('scroll', function() {
+    if (jQuery(window).scrollTop() > 300) {
+        btn_hr.addClass('show');
+    } else {
+        btn_hr.removeClass('show');
+    }
+});
+</script>
+
+<script type="text/javascript" async >
+/*$stick = jQuery('.adsSt_widget');
+jQuery(document).ready(function() {
+  function fixDiv() {
+    var $cache = jQuery('.adsSt_widget');
+    if (jQuery(window).scrollTop() > $stick.offset().top)
+      $cache.css({
+        'position': 'fixed',
+        'top': '20px'
+      });
+    else
+      $cache.css({
+        'position': 'relative',
+        'top': 'auto'
+      });
+  }
+  jQuery(window).scroll(fixDiv);
+  fixDiv();
+});*/
+</script>
+
+<script type='text/javascript'>
+var stickyadstatus = "";
+function fix_stickyad() {
+  document.getElementById("adsSt_widget-pos").style.position = "sticky";
+  var elem = document.getElementById("adsSt_widget-container");
+  if (!elem) { return false; }
+  var skyWidth = Number(cw_getStyleValue(document.getElementById("rightSideBr"), "width").replace("px", ""));  
+  
+  elem.style.width = skyWidth + "px";
+  if (window.innerWidth <= 992) {
+    elem.style.position = "";
+    elem.style.top = stickypos + "px";
+    return false;
+  }
+  var stickypos = document.getElementById("adsSt_widget-pos").offsetTop;
+  var docTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
+  var adHeight = Number(cw_getStyleValue(elem, "height").replace("px", ""));
+  if (stickyadstatus == "") {
+    if ((stickypos - docTop) < 60) {
+      elem.style.position = "fixed";
+      elem.style.top = "60px";
+      stickyadstatus = "sticky";
+      document.getElementById("adsSt_widget-pos").style.position = "sticky";
+
+    }
+  } else {
+    if ((docTop + 60) - stickypos < 0) {  
+      elem.style.position = "";
+      elem.style.top = stickypos + "px";
+      stickyadstatus = "";
+      document.getElementById("adsSt_widget-pos").style.position = "static";
+    }
+  }
+  if (stickyadstatus == "sticky") {
+    if ((docTop + adHeight + 60) > document.getElementById("footerArea").offsetTop) {
+      elem.style.position = "absolute";
+      elem.style.top = (document.getElementById("footerArea").offsetTop - (adHeight+25)) + "px";
+      document.getElementById("adsSt_widget-pos").style.position = "static";
+    } else {
+        elem.style.position = "fixed";
+        elem.style.top = "60px";
+        stickyadstatus = "sticky";
+        document.getElementById("adsSt_widget-pos").style.position = "sticky";
+    }
+  }
+}
+function cw_getStyleValue(elmnt,style) {
+  if (window.getComputedStyle) {
+    return window.getComputedStyle(elmnt,null).getPropertyValue(style);
+  } else {
+    return elmnt.currentStyle[style];
+  }
+}
+
+jQuery(document).ready(function() {
+    var elemStick = document.getElementById("adsSt_widget-container");
+    if(elemStick){
+        jQuery(window).scroll(fix_stickyad);
+    }
+});
+</script>
+
+<script src="https://www.codexworld.com/wp-content/themes/techblog/js/custom.js" type="text/javascript"></script>
+</body>
+</html>
+
+<!-- Dynamic page generated in 0.108 seconds. -->
+<!-- Cached page generated by WP-Super-Cache on 2026-11-02 22:10:08 -->
+
+<!-- Compression = gzip -->

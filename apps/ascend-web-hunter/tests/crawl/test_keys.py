@@ -110,6 +110,4 @@ async def test_job_writes_only_own_tenant_keys() -> None:
     }
     for name in tenant_names:
         assert any(re.fullmatch(shape, name) for shape in shapes), name
-    assert recrawl_scope(["https://example.com/"], []) == recrawl_scope(
-        ["https://example.com/"], []
-    )
+    assert recrawl_scope(["https://example.com/"], []) == recrawl_scope(["https://example.com/"], [])

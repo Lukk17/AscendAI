@@ -23,10 +23,7 @@ _SCHEMA: dict[str, Any] = {
     "required": ["name", "price"],
 }
 
-_HTML = (
-    "<html><body><h1 class='product'>Red Widget</h1>"
-    "<span class='price'>19.99</span></body></html>"
-)
+_HTML = "<html><body><h1 class='product'>Red Widget</h1><span class='price'>19.99</span></body></html>"
 
 
 class _FakeRedis:
@@ -235,6 +232,6 @@ def test_build_object_coerces_each_field() -> None:
 
 def test_build_object_without_properties_keeps_text() -> None:
     assert build_object(_HTML, {"name": "h1.product"}, {"type": "object"}) == {"name": "Red Widget"}
-    assert build_object(
-        _HTML, {"name": "h1.product"}, {"type": "object", "properties": {"name": "h1"}}
-    ) == {"name": "Red Widget"}
+    assert build_object(_HTML, {"name": "h1.product"}, {"type": "object", "properties": {"name": "h1"}}) == {
+        "name": "Red Widget"
+    }

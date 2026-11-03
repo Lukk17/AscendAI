@@ -79,7 +79,7 @@ Check the ascend-web-hunter server is reachable.
 curl -fsS http://localhost:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 
 Check Redis is reachable from the host's Docker context (this test seeds nothing but does inspect and clean up a
 key the call itself creates).
@@ -92,7 +92,7 @@ Expect `PONG`.
 
 Check the process-wide NoVNC flow lock is free. The service holds one shared headful browser, so any NoVNC flow
 started earlier in the same sweep, whether by another spec that escalates to the NoVNC tier or by a previous run of
-this test, makes this test's own call return HTTP 409 with `status="novnc_busy"` until that flow's window closes.
+this test, makes this test's own call return HTTP 409 with `code="novnc_busy"` until that flow's window closes.
 The live browser is the observable form of a held lock, because the monitor closes that browser and releases the
 lock in the same teardown block.
 
@@ -166,7 +166,9 @@ bru run "web-hunter/testing/session-establish.yml" --env ascend-local
 Do not run this test in parallel with test 8 ([8-session-clear-test.md](8-session-clear-test.md)). This test writes
 `session:example.net:e2e-establish`, not the `session:example.net:default` key test 8 seeds and clears, but test 8
 compares a scan of `session:*` before and after its run, so the key this test creates would appear in that scan and
-fail test 8's comparison. Safe to run in parallel with everything else in the suite.
+fail test 8's comparison. Its NoVNC flow holds one window slot until the monitor resolves, so not beside spec 20
+([20-concurrent-interventions-test.md](20-concurrent-interventions-test.md)), which fills every slot on purpose,
+or test 11's human window. Safe to run in parallel with everything else in the suite.
 
 ## Fixtures
 

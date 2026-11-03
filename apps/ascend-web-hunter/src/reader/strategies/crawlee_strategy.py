@@ -6,6 +6,7 @@ import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 import trafilatura
 from ascend_python_common.uri_guard import UnsafeUriError, check_fetch_uri
@@ -13,9 +14,13 @@ from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
     AdaptivePlaywrightPreNavCrawlingContext,
+    RenderingTypePrediction,
+    RenderingTypePredictor,
 )
+from crawlee.storage_clients import MemoryStorageClient
+from crawlee.storages import RequestQueue
 
-from src.api.exceptions import ChallengeDetectedException
+from src.api.exceptions import ChallengeDetectedException, ExtractionFailedError
 from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
 from src.reader.browser_guard import install_browser_guard, web_hunter_fetch_policy
@@ -32,7 +37,9 @@ from src.reader.strategies.base_strategy import BaseStrategy
 
 if TYPE_CHECKING:
     from bs4 import BeautifulSoup, Tag
-    from crawlee.crawlers import ParsedHttpCrawlingContext
+    from crawlee import Request
+    from crawlee.crawlers import ParsedHttpCrawlingContext, RenderingType
+    from crawlee.statistics import FinalStatistics
     from playwright.async_api import Response as PlaywrightResponse
 
     from src.validator.url_validator import URLValidator
@@ -40,6 +47,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _CRAWLEE_TIER = "crawlee"
+
+
+class _ClientOnlyRenderingTypePredictor(RenderingTypePredictor):
+    """Predict the browser rendering type for every request, so the static sub-crawler is never used."""
+
+    def predict(self, request: Request) -> RenderingTypePrediction:  # noqa: ARG002
+        return RenderingTypePrediction("client only", 0.0)
+
+    def store_result(self, request: Request, rendering_type: RenderingType) -> None:  # noqa: ARG002
+        return None
 
 
 def _response_summary(response: PlaywrightResponse) -> dict[str, Any]:
@@ -112,30 +129,53 @@ class CrawleeStrategy(BaseStrategy):
         storage_dir = await asyncio.to_thread(self._prepare_storage_dir, settings.CRAWLEE_STORAGE_DIR)
         os.environ["CRAWLEE_STORAGE_DIR"] = storage_dir
 
-        crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
-            max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
-            playwright_crawler_specific_kwargs=playwright_kwargs,
+        request_manager = await RequestQueue.open(
+            name=f"read-{uuid4().hex}",
+            storage_client=MemoryStorageClient(),
         )
-
-        @crawler.router.default_handler
-        async def request_handler(context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag]) -> None:
-            await self._handle_crawlee_request(context, result_container, last_response)
-
-        @crawler.pre_navigation_hook
-        async def install_guard(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
-            result_container["refused_navigations"] = await install_browser_guard(
-                context.page.context, self.url_validator
+        try:
+            crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
+                max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
+                rendering_type_predictor=_ClientOnlyRenderingTypePredictor(),
+                request_manager=request_manager,
+                playwright_crawler_specific_kwargs=playwright_kwargs,
             )
-            context.page.on("response", lambda response: last_response.update(_response_summary(response)))
 
-        await self._run_crawler_bounded(crawler, url)
+            @crawler.router.default_handler
+            async def request_handler(
+                context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag],
+            ) -> None:
+                await self._handle_crawlee_request(context, result_container, last_response)
+
+            @crawler.pre_navigation_hook
+            async def install_guard(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+                result_container["refused_navigations"] = await install_browser_guard(
+                    context.page.context, self.url_validator
+                )
+                context.page.on(
+                    "response", lambda response: last_response.update(_response_summary(response))
+                )
+
+            final_statistics = await self._run_crawler_bounded(crawler, url)
+        finally:
+            await request_manager.drop()
         refused_navigations: list[str] = result_container.get("refused_navigations", [])
         if refused_navigations:
-            logger.warning(
-                "CrawleeStrategy: Blocked navigation detected post-render on %s", url
-            )
+            logger.warning("CrawleeStrategy: Blocked navigation detected post-render on %s", url)
 
             raise UnsafeUriError(f"browser request refused: {refused_navigations[0]}")
+        if final_statistics.requests_finished < 1:
+            logger.warning(
+                "CrawleeStrategy: the crawl handled no request for %s (failed %d of %d)",
+                url,
+                final_statistics.requests_failed,
+                final_statistics.requests_total,
+            )
+
+            raise ExtractionFailedError(
+                f"CrawleeStrategy: the crawl handled no request for {url} "
+                f"(failed {final_statistics.requests_failed} of {final_statistics.requests_total})"
+            )
         html: str = result_container.get("html", "")
         status: int = result_container.get("status", 200)
         headers: dict[str, str] = result_container.get("headers", {})
@@ -170,7 +210,7 @@ class CrawleeStrategy(BaseStrategy):
     async def _run_crawler_bounded(
         crawler: AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag],
         url: str,
-    ) -> None:
+    ) -> FinalStatistics:
         """Run the crawler with a hard wall-clock bound so this tier can never hang forever.
 
         Crawlee's autoscaler blocks all work indefinitely whenever it considers the
@@ -181,11 +221,17 @@ class CrawleeStrategy(BaseStrategy):
         returned". Elapsed time is therefore checked explicitly after the call returns,
         so a permanently-overloaded autoscaler still fails this tier instead of silently
         returning empty content after burning the whole read budget.
+
+        Returns:
+            The final statistics of the crawl.
+
+        Raises:
+            TimeoutError: when the crawl exceeded its wall-clock budget.
         """
         crawl_timeout = settings.EXTRACT_TIMEOUT * 2
         started = time.perf_counter()
         try:
-            await asyncio.wait_for(crawler.run([url]), timeout=crawl_timeout)
+            final_statistics = await asyncio.wait_for(crawler.run([url]), timeout=crawl_timeout)
         except TimeoutError as exc:
             raise TimeoutError(
                 f"CrawleeStrategy: tier exceeded its {crawl_timeout:.0f}s budget for {url}"
@@ -198,6 +244,8 @@ class CrawleeStrategy(BaseStrategy):
                 f"(ran {elapsed:.1f}s; Crawlee's autoscaler likely reports the system as "
                 "permanently memory-overloaded)"
             )
+
+        return final_statistics
 
     @staticmethod
     async def _handle_crawlee_request(

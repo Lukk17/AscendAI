@@ -21,9 +21,7 @@ from src.crawl.job_service import job_service
 def _ctx(tenant: str | None) -> Any:
     if tenant is None:
         return SimpleNamespace(request_context=None)
-    return SimpleNamespace(
-        request_context=SimpleNamespace(meta={"ascend.ai/tenant_id": tenant})
-    )
+    return SimpleNamespace(request_context=SimpleNamespace(meta={"ascend.ai/tenant_id": tenant}))
 
 
 def _ns(**kwargs: Any) -> Any:
@@ -74,9 +72,7 @@ async def test_submit_returns_same_fields_as_rest_twin(
     client: AsyncClient, fake_redis: FakeRedis, stub_guard: AsyncMock
 ) -> None:
     # given a job submitted over REST
-    rest_submit = (
-        await client.post("/api/v1/crawl/jobs", json={"seeds": ["https://example.com/"]})
-    ).json()
+    rest_submit = (await client.post("/api/v1/crawl/jobs", json={"seeds": ["https://example.com/"]})).json()
 
     # when the MCP twin submits the same request
     mcp_submit = await crawl_submit(seeds=["https://example.com/"])
@@ -91,9 +87,9 @@ async def test_status_returns_same_fields_as_rest_twin(
     client: AsyncClient, fake_redis: FakeRedis, stub_guard: AsyncMock
 ) -> None:
     # given a job submitted over REST
-    job_id = (
-        await client.post("/api/v1/crawl/jobs", json={"seeds": ["https://example.com/"]})
-    ).json()["job_id"]
+    job_id = (await client.post("/api/v1/crawl/jobs", json={"seeds": ["https://example.com/"]})).json()[
+        "job_id"
+    ]
     rest_status = (await client.get(f"/api/v1/crawl/jobs/{job_id}")).json()
 
     # when the MCP twin reads it
@@ -121,15 +117,15 @@ async def test_cancel_returns_same_fields_as_rest_twin(
     client: AsyncClient, fake_redis: FakeRedis, stub_guard: AsyncMock
 ) -> None:
     # given a job submitted over REST
-    job_id = (
-        await client.post("/api/v1/crawl/jobs", json={"seeds": ["https://example.com/"]})
-    ).json()["job_id"]
+    job_id = (await client.post("/api/v1/crawl/jobs", json={"seeds": ["https://example.com/"]})).json()[
+        "job_id"
+    ]
     rest_cancel = (await client.delete(f"/api/v1/crawl/jobs/{job_id}")).json()
 
     # given a second job for the MCP cancel
-    second_id = (
-        await client.post("/api/v1/crawl/jobs", json={"seeds": ["https://example.com/"]})
-    ).json()["job_id"]
+    second_id = (await client.post("/api/v1/crawl/jobs", json={"seeds": ["https://example.com/"]})).json()[
+        "job_id"
+    ]
 
     # when the MCP twin cancels it
     mcp_cancel = await crawl_cancel_job(second_id)
@@ -139,13 +135,9 @@ async def test_cancel_returns_same_fields_as_rest_twin(
     assert mcp_cancel["state"] == "cancelled"
 
 
-async def test_submit_honours_depth_and_budget(
-    fake_redis: FakeRedis, stub_guard: AsyncMock
-) -> None:
+async def test_submit_honours_depth_and_budget(fake_redis: FakeRedis, stub_guard: AsyncMock) -> None:
     # when
-    submitted = await crawl_submit(
-        seeds=["https://example.com/"], max_depth=3, page_budget=10
-    )
+    submitted = await crawl_submit(seeds=["https://example.com/"], max_depth=3, page_budget=10)
     status = await crawl_job_status(submitted["job_id"])
 
     # then
@@ -179,9 +171,7 @@ async def test_unsafe_seed_answers_unsafe_uri_tool_error(fake_redis: FakeRedis) 
     assert await crawl_list_jobs() == {"jobs": []}
 
 
-async def test_tools_scope_by_meta_tenant(
-    fake_redis: FakeRedis, stub_guard: AsyncMock
-) -> None:
+async def test_tools_scope_by_meta_tenant(fake_redis: FakeRedis, stub_guard: AsyncMock) -> None:
     # given a job of tenant acme
     submitted = await crawl_submit(seeds=["https://example.com/"], ctx=_ctx("acme"))
 
@@ -193,9 +183,7 @@ async def test_tools_scope_by_meta_tenant(
 
     # then the other tenant's list hides it
     assert await crawl_list_jobs(ctx=_ctx("globex")) == {"jobs": []}
-    assert (await crawl_job_status(submitted["job_id"], ctx=_ctx("acme")))["job_id"] == submitted[
-        "job_id"
-    ]
+    assert (await crawl_job_status(submitted["job_id"], ctx=_ctx("acme")))["job_id"] == submitted["job_id"]
 
 
 async def test_tools_refuse_invalid_meta_tenant(fake_redis: FakeRedis) -> None:

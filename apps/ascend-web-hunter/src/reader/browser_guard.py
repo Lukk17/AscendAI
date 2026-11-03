@@ -150,9 +150,7 @@ def _record_or_raise(
     refused_navigations.append(url or route.request.url)
 
 
-async def handle_guarded_web_socket(
-    websocket: WebSocketRoute, url_validator: URLValidator
-) -> None:
+async def handle_guarded_web_socket(websocket: WebSocketRoute, url_validator: URLValidator) -> None:
     """Check a page-opened WebSocket the same way: blocklisted or refused URLs
     are closed before the browser connects, the rest are forwarded."""
     url: str = websocket.url

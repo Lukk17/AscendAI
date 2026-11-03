@@ -116,9 +116,7 @@ class RecrawlStore:
             return None
         return entry if isinstance(entry, dict) else None
 
-    async def write(
-        self, tenant_id: str, scope: str, url: str, entry: dict[str, Any]
-    ) -> None:
+    async def write(self, tenant_id: str, scope: str, url: str, entry: dict[str, Any]) -> None:
         key = self.key(tenant_id, scope)
         await self._client.hset(key, normalize_url(url), json.dumps(entry, sort_keys=True))
         await self._client.expire(key, settings.CRAWL_JOB_RETENTION_SECONDS)

@@ -88,9 +88,7 @@ async def test_status_returns_state_counts_and_keys(
 
 
 @pytest.mark.asyncio
-async def test_status_unknown_answers_problem_404(
-    client: AsyncClient, fake_redis: FakeRedis
-) -> None:
+async def test_status_unknown_answers_problem_404(client: AsyncClient, fake_redis: FakeRedis) -> None:
     # when
     resp = await client.get("/api/v1/crawl/jobs/nope")
 
@@ -136,9 +134,7 @@ async def test_cancel_moves_waiting_to_cancelled(
 
 
 @pytest.mark.asyncio
-async def test_cancel_unknown_answers_problem_404(
-    client: AsyncClient, fake_redis: FakeRedis
-) -> None:
+async def test_cancel_unknown_answers_problem_404(client: AsyncClient, fake_redis: FakeRedis) -> None:
     # when
     resp = await client.delete("/api/v1/crawl/jobs/nope")
 
@@ -148,9 +144,7 @@ async def test_cancel_unknown_answers_problem_404(
 
 
 @pytest.mark.asyncio
-async def test_request_outside_bounds_answers_validation(
-    client: AsyncClient, fake_redis: FakeRedis
-) -> None:
+async def test_request_outside_bounds_answers_validation(client: AsyncClient, fake_redis: FakeRedis) -> None:
     # when
     resp = await client.post("/api/v1/crawl/jobs", json={"seeds": []})
 
@@ -170,14 +164,10 @@ async def test_other_tenant_cannot_read_job(
     missing = await client.get(f"/api/v1/crawl/jobs/{job_id}")
     assert missing.status_code == 404
     assert missing.json()["code"] == "job_not_found"
-    other_status = await client.get(
-        f"/api/v1/crawl/jobs/{job_id}", headers={"X-Ascend-Tenant": "globex"}
-    )
+    other_status = await client.get(f"/api/v1/crawl/jobs/{job_id}", headers={"X-Ascend-Tenant": "globex"})
     assert other_status.status_code == 404
     assert other_status.json()["code"] == "job_not_found"
-    other_cancel = await client.delete(
-        f"/api/v1/crawl/jobs/{job_id}", headers={"X-Ascend-Tenant": "globex"}
-    )
+    other_cancel = await client.delete(f"/api/v1/crawl/jobs/{job_id}", headers={"X-Ascend-Tenant": "globex"})
     assert other_cancel.status_code == 404
     assert other_cancel.json()["code"] == "job_not_found"
 
@@ -203,9 +193,7 @@ async def test_missing_and_default_tenant_both_run_as_default(
 ) -> None:
     # given
     first = (await _submit(client)).json()["job_id"]
-    second = (
-        await _submit(client, headers={"X-Ascend-Tenant": "default"})
-    ).json()["job_id"]
+    second = (await _submit(client, headers={"X-Ascend-Tenant": "default"})).json()["job_id"]
 
     # when
     resp = await client.get("/api/v1/crawl/jobs")

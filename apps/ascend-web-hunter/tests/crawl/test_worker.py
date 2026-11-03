@@ -1,4 +1,5 @@
 import asyncio
+import json
 from itertools import pairwise
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -153,9 +154,7 @@ def _make_worker(
         return ticks["now"]
 
     probe = AsyncMock(return_value=ConditionalProbe(None, None, None))
-    monkeypatch.setattr(
-        "src.crawl.worker.fetcher.head_validators", AsyncMock(return_value=(None, None))
-    )
+    monkeypatch.setattr("src.crawl.worker.fetcher.head_validators", AsyncMock(return_value=(None, None)))
     robots = RobotsStore(_empty_robots)
     w = WorkerHarness(
         redis,
@@ -174,9 +173,7 @@ async def _empty_robots(url: str) -> str:
     return ""
 
 
-async def _submit(
-    redis: FakeRedis, seeds: list[str], **overrides: Any
-) -> tuple[CrawlJobService, JobRecord]:
+async def _submit(redis: FakeRedis, seeds: list[str], **overrides: Any) -> tuple[CrawlJobService, JobRecord]:
     svc = CrawlJobService()
     svc._client = redis
     fields: dict[str, Any] = {"seeds": seeds}
@@ -300,9 +297,7 @@ async def test_sitemap_urls_seed_frontier(
         if url.endswith("/robots.txt"):
             return "User-agent: *\nSitemap: https://example.com/sitemap.xml\n"
         if url.endswith("sitemap.xml"):
-            return (
-                "<urlset><url><loc>https://example.com/from-sitemap</loc></url></urlset>"
-            )
+            return "<urlset><url><loc>https://example.com/from-sitemap</loc></url></urlset>"
         return ""
 
     worker._robots._fetch = fetch
@@ -551,9 +546,7 @@ async def test_max_two_pages_read_at_once(monkeypatch: pytest.MonkeyPatch) -> No
                     ]
                 ),
             )
-    worker = Worker(
-        redis, reader=reader, robots=RobotsStore(_empty_robots), clock_ms=lambda: NOW
-    )
+    worker = Worker(redis, reader=reader, robots=RobotsStore(_empty_robots), clock_ms=lambda: NOW)
 
     # when two tasks sweep together
     stop = asyncio.Event()
@@ -600,9 +593,7 @@ async def test_run_forever_waits_idle_between_sweeps(
     assert max(gaps) >= 0.04
 
 
-async def test_run_once_survives_broken_redis(
-    worker: WorkerHarness, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_run_once_survives_broken_redis(worker: WorkerHarness, monkeypatch: pytest.MonkeyPatch) -> None:
     # given a client that fails every read
     async def boom(*args: Any, **kwargs: Any) -> Any:
         raise RuntimeError("down")
@@ -706,8 +697,16 @@ async def test_finish_error_is_logged(
 
     monkeypatch.setattr(worker._frontier, "finish", boom)
     await worker._finish(
-        "acme", record.job_id, "m", record, "example.com", "0\thttps://example.com/",
-        outcome="ok", page_line="{}", links=[], skipped=0,
+        "acme",
+        record.job_id,
+        "m",
+        record,
+        "example.com",
+        "0\thttps://example.com/",
+        outcome="ok",
+        page_line="{}",
+        links=[],
+        skipped=0,
     )
 
 
@@ -742,9 +741,7 @@ async def test_process_claim_error_finishes_failed(
     assert stored.state == "succeeded"
 
 
-async def test_extract_failure_modes(
-    worker: WorkerHarness, redis: FakeRedis, reader: FakeReader
-) -> None:
+async def test_extract_failure_modes(worker: WorkerHarness, redis: FakeRedis, reader: FakeReader) -> None:
     # given pages with failing reads
     reader.pages["https://example.com/error-status"] = {"content": "", "links": {}, "status": "error"}
     reader.pages["https://example.com/no-content"] = {"links": {}, "status": "success"}
@@ -802,6 +799,8 @@ async def test_extract_format_modes(
     ) -> dict[str, Any]:
         if "plain" in url:
             return {"content": "formatted body", "status": "success"}
+        if "wrapped" in url:
+            return {"content": {"name": "Red Widget"}, "status": "success"}
         return {"title": "t", "status": "success"}
 
     async def schema_bad(
@@ -819,7 +818,7 @@ async def test_extract_format_modes(
     monkeypatch.setattr(reader, "read", schema_ok)
     _, record = await _submit(
         redis,
-        ["https://example.com/plain", "https://example.com/dump"],
+        ["https://example.com/plain", "https://example.com/wrapped", "https://example.com/dump"],
         output_format="schema",
         extraction_schema={"type": "object"},
     )
@@ -827,9 +826,9 @@ async def test_extract_format_modes(
     # when
     await _drain(worker)
 
-    # then both pages are stored, one from content and one dumped
+    # then all three pages are stored: flat content, wrapped content, and a dump
     stored = await _stored(redis, record.job_id)
-    assert stored.counts.fetched == 2
+    assert stored.counts.fetched == 3
 
     # when formatted reads fail
     monkeypatch.setattr(reader, "read", schema_bad)
@@ -856,9 +855,10 @@ async def test_domain_delay_variants(worker: WorkerHarness, monkeypatch: pytest.
             return self._delay
 
     # when respect is off the floor applies without any fetch
-    assert await worker._domain_delay_ms(
-        JobRecord(job_id="j", tenant_id="a", request=record), "example.com"
-    ) >= 0
+    assert (
+        await worker._domain_delay_ms(JobRecord(job_id="j", tenant_id="a", request=record), "example.com")
+        >= 0
+    )
 
     # when rules are missing or carry no delay the floor applies
     async def none_rules(job_id: str, url: str) -> Any:
@@ -917,7 +917,9 @@ async def test_corrupt_recrawl_entry_reads_unconditionally(
     recrawl = RecrawlStore(redis)
     scope = recrawl_scope(["https://example.com/"], [])
     await recrawl.write(
-        "acme", scope, "https://example.com/",
+        "acme",
+        scope,
+        "https://example.com/",
         {"hash": "x", "page_key": 5, "etag": 6, "last_modified": 7},
     )
     probe = worker.probe_mock
@@ -980,9 +982,7 @@ def test_seed_domains_groups_by_registrable_domain() -> None:
     ]
 
 
-async def test_is_disallowed_error_allows(
-    worker: WorkerHarness, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_is_disallowed_error_allows(worker: WorkerHarness, monkeypatch: pytest.MonkeyPatch) -> None:
     # given rules that fail
     async def boom(job_id: str, url: str) -> Any:
         raise RuntimeError("down")
@@ -1205,9 +1205,7 @@ async def test_fresh_write_captures_head_validators(
     # given HEAD answers validators on a fresh crawl
     from src.crawl.result_store import RecrawlStore, recrawl_scope
 
-    monkeypatch.setattr(
-        "src.crawl.worker.fetcher.head_validators", AsyncMock(return_value=('"h"', "Wed"))
-    )
+    monkeypatch.setattr("src.crawl.worker.fetcher.head_validators", AsyncMock(return_value=('"h"', "Wed")))
     _, first = await _submit(redis, ["https://example.com/"])
     await _drain(worker)
 
@@ -1232,3 +1230,111 @@ async def test_fresh_write_captures_head_validators(
     assert seen == {"etag": '"h"', "last_modified": "Wed"}
     stored = await _stored(redis, second.job_id)
     assert stored.counts.unchanged == 1
+
+
+async def test_recrawl_304_requeues_seed_links(
+    worker: WorkerHarness, redis: FakeRedis, reader: FakeReader
+) -> None:
+    # given a first crawl where the seed links a child page
+    reader.pages["https://example.com/"] = {
+        "content": "home",
+        "links": {1: "https://example.com/child"},
+        "status": "success",
+    }
+    _, first = await _submit(redis, ["https://example.com/"])
+    await _drain(worker)
+    stored_first = await _stored(redis, first.job_id)
+    assert stored_first.counts.fetched == 2
+    worker.probe_mock.return_value = ConditionalProbe(304, '"v1"', None)
+    _, second = await _submit(redis, ["https://example.com/"])
+
+    # when the identical scope recrawls with 304 on every page
+    await _drain(worker)
+
+    # then the seed copy-forward requeues the child instead of ending discovery
+    stored = await _stored(redis, second.job_id)
+    assert stored.counts.unchanged == 2
+    assert stored.counts.fetched == 0
+
+
+async def test_recrawl_legacy_entry_without_links_falls_back_to_fetch(
+    worker: WorkerHarness, redis: FakeRedis, reader: FakeReader, results: FakeResults
+) -> None:
+    # given a first crawl and a legacy recrawl entry without stored links
+    from src.crawl.result_store import RecrawlStore, recrawl_scope
+
+    reader.pages["https://example.com/"] = {
+        "content": "home",
+        "links": {1: "https://example.com/child"},
+        "status": "success",
+    }
+    _, first = await _submit(redis, ["https://example.com/"])
+    await _drain(worker)
+    recrawl = RecrawlStore(redis)
+    scope = recrawl_scope(["https://example.com/"], [])
+    entry = await recrawl.read("acme", scope, "https://example.com/")
+    assert entry is not None
+    entry.pop("links", None)
+    await recrawl.write("acme", scope, "https://example.com/", entry)
+    copies_before = len(results.copy_calls)
+    worker.probe_mock.return_value = ConditionalProbe(304, '"v1"', None)
+    _, second = await _submit(redis, ["https://example.com/"])
+
+    # when the seed recrawls with a 304 but no stored links
+    await _drain(worker)
+
+    # then the seed falls back to a full fetch yet still discovers the child
+    stored = await _stored(redis, second.job_id)
+    assert stored.counts.fetched == 1
+    assert stored.counts.unchanged == 1
+    assert len(results.copy_calls) == copies_before + 1
+
+
+async def test_budget_with_non_empty_frontier_finalizes_instead_of_stalling(
+    worker: WorkerHarness, redis: FakeRedis, results: FakeResults
+) -> None:
+    # given three seeds with a page budget of one
+    _, record = await _submit(
+        redis,
+        [
+            "https://example.com/",
+            "https://example.com/a",
+            "https://example.com/b",
+        ],
+        page_budget=1,
+    )
+
+    # when the worker drains the job
+    await _drain(worker, limit=10)
+
+    # then the job reaches succeeded instead of stalling in running
+    stored = await _stored(redis, record.job_id)
+    assert stored.state == "succeeded"
+    assert stored.counts.fetched == 1
+    assert await worker._frontier.list_runnable() == []
+    assert len(results.index_writes) == 1
+
+
+async def test_budget_succeeded_claim_finalizes_job(
+    worker: WorkerHarness, redis: FakeRedis, results: FakeResults
+) -> None:
+    # given a job already at its budget with queued URLs and no claims
+    _, record = await _submit(
+        redis,
+        ["https://example.com/", "https://example.com/a"],
+        page_budget=1,
+    )
+    raw = await redis.get(job_key("acme", record.job_id))
+    assert raw is not None
+    payload: dict[str, Any] = json.loads(raw)
+    payload["counts"]["fetched"] = 1
+    await redis.set(job_key("acme", record.job_id), json.dumps(payload))
+
+    # when the worker sweeps and the claim finds the budget bound
+    assert await worker.run_once() is False
+
+    # then the job finalizes instead of stalling in running
+    stored = await _stored(redis, record.job_id)
+    assert stored.state == "succeeded"
+    assert await worker._frontier.list_runnable() == []
+    assert len(results.index_writes) == 1

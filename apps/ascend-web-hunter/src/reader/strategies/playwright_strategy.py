@@ -74,9 +74,7 @@ class PlaywrightStrategy(BaseStrategy):
                     as_login_verdict(assess(200, "", None, await self._context_cookie_names(context)))
                 )
 
-            response_status, initial_headers = await self._initial_navigation(
-                page, url, refused_navigations
-            )
+            response_status, initial_headers = await self._initial_navigation(page, url, refused_navigations)
             poll_start = time.perf_counter()
             extract_deadline = poll_start + settings.EXTRACT_TIMEOUT
             challenge_deadline = poll_start + settings.CHALLENGE_CLEAR_WAIT_SECONDS

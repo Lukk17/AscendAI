@@ -3,6 +3,7 @@ import json
 import logging
 import random
 import time
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Literal, cast
 from urllib.parse import urljoin, urlparse
@@ -30,7 +31,12 @@ from src.observability.metrics import (
 )
 from src.reader import tier_memory
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
-from src.reader.cloudflare.challenge_signals import assess, log_verdict, record_verdict
+from src.reader.cloudflare.challenge_signals import (
+    ChallengeVerdict,
+    assess,
+    log_verdict,
+    record_verdict,
+)
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.document_router import route_document
 from src.reader.extraction import extract_structured, extract_tables, extract_text_with_fallback
@@ -57,6 +63,10 @@ logger = logging.getLogger(__name__)
 
 NOVNC_STRATEGY_NAME = "6-novnc"
 SESSION_EXPIRED_STATUS = "session_expired"
+
+_challenge_verdict: ContextVar[ChallengeVerdict | None] = ContextVar(
+    "web_reader_challenge_verdict", default=None
+)
 
 TierName = Literal[
     "1-beautifulsoup",
@@ -363,9 +373,7 @@ class WebReader:
 
         return None
 
-    def _cached_unless_screenshot(
-        self, key: str, fmt: str, url: str
-    ) -> dict[str, Any] | None:
+    def _cached_unless_screenshot(self, key: str, fmt: str, url: str) -> dict[str, Any] | None:
         if fmt == "screenshot":
             return None
         cached = self._cache_get(key)
@@ -376,9 +384,7 @@ class WebReader:
         return cached
 
     @staticmethod
-    def _only_screenshot_capable(
-        strategies: dict[str, BaseStrategy], fmt: str
-    ) -> dict[str, BaseStrategy]:
+    def _only_screenshot_capable(strategies: dict[str, BaseStrategy], fmt: str) -> dict[str, BaseStrategy]:
         if fmt != "screenshot":
             return strategies
         capable = {
@@ -420,9 +426,7 @@ class WebReader:
             self._cache_put(key, result)
 
     @staticmethod
-    async def _screenshot_result(
-        name: str, strategy: BaseStrategy, url: str
-    ) -> dict[str, Any] | None:
+    async def _screenshot_result(name: str, strategy: BaseStrategy, url: str) -> dict[str, Any] | None:
         """Base64 PNG from the browser tier that served the read (design D7)."""
         capture = getattr(strategy, "screenshot_page", None)
         if capture is None:
@@ -525,6 +529,7 @@ class WebReader:
         tier: TierName | None = None,
         extraction_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        _challenge_verdict.set(None)
         if await self._session_expired(url, profile):
             return self._create_session_expired_response(url, profile)
 
@@ -553,7 +558,12 @@ class WebReader:
                 break
 
             result = await self._execute_strategy(
-                name, strategy, url, output_format=fmt, extraction_schema=extraction_schema
+                name,
+                strategy,
+                url,
+                output_format=fmt,
+                extraction_schema=extraction_schema,
+                escalate_failures=tier is None and fmt != "schema",
             )
             if result:
                 self._cache_result(key, fmt, result)
@@ -584,6 +594,7 @@ class WebReader:
         output_format: OutputFormat | None = None,
         tier: TierName | None = None,
     ) -> dict[str, Any]:
+        _challenge_verdict.set(None)
         if await self._session_expired(url, profile):
             return self._create_session_expired_response(url, profile)
 
@@ -611,7 +622,7 @@ class WebReader:
                 budget_exhausted = True
                 break
 
-            html = await self._execute_html_strategy(name, strategy, url)
+            html = await self._execute_html_strategy(name, strategy, url, escalate_failures=tier is None)
             if html:
                 content, links = annotate_links(html, url, link_filter)
                 if self.validator.validate(content):
@@ -647,6 +658,14 @@ class WebReader:
     # Internal execution helpers
     # ------------------------------------------------------------------
 
+    @staticmethod
+    async def _novnc_or_tier_html(name: str, strategy: BaseStrategy, url: str) -> str:
+        verdict = _challenge_verdict.get()
+        if name == NOVNC_STRATEGY_NAME and verdict is not None:
+            return await cast("NoVNCStrategy", strategy).get_html(url, verdict)
+
+        return await strategy.get_html(url)
+
     async def _extract_with_schema(
         self,
         name: str,
@@ -663,14 +682,14 @@ class WebReader:
             if replay_valid(replayed, extraction_schema):
                 await tier_memory.record(url, name)
 
-                return {**replayed, "status": "success", "mode": name, "recipe": "replay"}
+                return {"content": replayed, "status": "success", "mode": name, "recipe": "replay"}
             await recipe_delete(domain, digest)
         text = extract_text_with_fallback(page_html)
         data, fresh = await run_schema_model(text, extraction_schema)
         await recipe_store_put(domain, digest, fresh)
         await tier_memory.record(url, name)
 
-        return {**data, "status": "success", "mode": name, "recipe": "model"}
+        return {"content": data, "status": "success", "mode": name, "recipe": "model"}
 
     async def _format_result(
         self,
@@ -728,6 +747,7 @@ class WebReader:
         url: str,
         output_format: str | None = None,
         extraction_schema: dict[str, Any] | None = None,
+        escalate_failures: bool = False,
     ) -> dict[str, Any] | None:
         started = time.perf_counter()
         dlabel = domain_label(url)
@@ -738,7 +758,7 @@ class WebReader:
             if output_format == "screenshot":
                 return await self._execute_screenshot_format(name, strategy, url, started, dlabel)
 
-            html = await strategy.get_html(url)
+            html = await self._novnc_or_tier_html(name, strategy, url)
             if not html:
                 self._record_strategy_outcome(name, "empty", dlabel, time.perf_counter() - started)
                 logger.info("Strategy %s returned empty HTML.", name)
@@ -754,7 +774,8 @@ class WebReader:
             return await self._format_result(
                 name, url, html, output_format, extraction_schema, started, dlabel
             )
-        except ChallengeDetectedException:
+        except ChallengeDetectedException as exc:
+            _challenge_verdict.set(exc.verdict)
             self._record_strategy_outcome(name, "challenge_detected", dlabel, time.perf_counter() - started)
             logger.info(
                 "Strategy %s detected a challenge on %s; falling through to the next tier.", name, url
@@ -773,7 +794,16 @@ class WebReader:
             self._record_strategy_outcome(name, "novnc_busy", dlabel, time.perf_counter() - started)
 
             raise
-        except (ExtractionFailedError, ExtractionNotConfiguredError, ScreenshotUnavailableError):
+        except ExtractionFailedError as exc:
+            self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
+            if not escalate_failures:
+                raise
+            logger.info(
+                "Strategy %s could not fetch %s (%s); falling through to the next tier.", name, url, exc
+            )
+
+            return None
+        except (ExtractionNotConfiguredError, ScreenshotUnavailableError):
             self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
 
             raise
@@ -788,13 +818,14 @@ class WebReader:
         name: str,
         strategy: BaseStrategy,
         url: str,
+        escalate_failures: bool = False,
     ) -> str:
         started = time.perf_counter()
         dlabel = domain_label(url)
 
         try:
             logger.info("--- Strategy %s STARTED ---", name)
-            html = await strategy.get_html(url)
+            html = await self._novnc_or_tier_html(name, strategy, url)
             if html:
                 if not ChallengeDetector.is_content_accepted(200, html):
                     verdict = assess(200, html)
@@ -820,7 +851,21 @@ class WebReader:
             self._record_strategy_outcome(name, "novnc_busy", dlabel, time.perf_counter() - started)
 
             raise
-        except ChallengeDetectedException:
+        except ExtractionFailedError as exc:
+            self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
+            if not escalate_failures:
+                raise
+            logger.info(
+                "Strategy %s could not fetch %s (%s); falling through to the next tier.", name, url, exc
+            )
+
+            return ""
+        except ExtractionNotConfiguredError:
+            self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
+
+            raise
+        except ChallengeDetectedException as exc:
+            _challenge_verdict.set(exc.verdict)
             self._record_strategy_outcome(name, "challenge_detected", dlabel, time.perf_counter() - started)
             logger.info(
                 "Strategy %s detected a challenge on %s; falling through to the next tier.", name, url

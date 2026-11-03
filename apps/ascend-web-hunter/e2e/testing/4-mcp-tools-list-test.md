@@ -32,7 +32,7 @@ Check the ascend-web-hunter server is reachable.
 curl -fsS http://localhost:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 
 ## Reset state
 

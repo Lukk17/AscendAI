@@ -12,7 +12,12 @@ from src.observability.domain_label import domain_label
 from src.observability.metrics import STRATEGY_ATTEMPTS_TOTAL
 from src.reader.browser_guard import install_browser_guard
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
-from src.reader.cloudflare.challenge_signals import assess, log_verdict, record_verdict
+from src.reader.cloudflare.challenge_signals import (
+    ChallengeVerdict,
+    assess,
+    log_verdict,
+    record_verdict,
+)
 from src.reader.cloudflare.cookie_manager import PRODUCED_BY_NOVNC, cookie_manager
 from src.reader.fingerprint import get_default_fingerprint
 from src.reader.novnc.flow_registry import NoVNCFlow, flow_key_for, novnc_flow_registry
@@ -36,6 +41,43 @@ def _timeout_outcome(intervention_type: str, last_page_blocked: bool) -> str:
     """Label a monitor timeout as 'rejected' when the last observed page was
     still an actively known block page, or 'timeout' when inconclusive."""
     return "rejected" if intervention_type == "captcha" and last_page_blocked else "timeout"
+
+
+_BROWSER_GONE_OUTCOME = "browser_closed"
+
+_BROWSER_GONE_MARKERS = (
+    "target closed",
+    "target crashed",
+    "context closed",
+    "browser closed",
+    "browser has been closed",
+    "connection closed",
+    "page crashed",
+)
+
+
+class _BrowserGoneError(Exception):
+    """The flow's Chromium died mid-poll, so the slot must be released."""
+
+
+def _looks_like_browser_gone(exc: BaseException) -> bool:
+    message = str(exc).lower()
+
+    return any(marker in message for marker in _BROWSER_GONE_MARKERS)
+
+
+def _is_browser_gone(browser: Any, page: Any) -> bool:
+    """True when the flow's Chromium is observably dead.
+
+    Either the connection is down or its only page is closed. Both probes
+    read local flags, so an absent probe is skipped, never treated as death.
+    """
+    is_connected = getattr(browser, "is_connected", None)
+    if callable(is_connected) and is_connected() is False:
+        return True
+    is_closed = getattr(page, "is_closed", None)
+
+    return bool(callable(is_closed) and is_closed() is True)
 
 
 def _window_to_dict(flow: NoVNCFlow) -> dict[str, int]:
@@ -143,9 +185,21 @@ async def _poll_once(
 
         return await _poll_login(page, url, storage_state, profile, flow), True
     except Exception as e:
+        if _looks_like_browser_gone(e):
+            raise _BrowserGoneError("flow browser is gone") from e
         logger.debug("NoVNC Strategy: Transient error syncing session cookies: %s", e)
 
         return False, True
+
+
+def _log_browser_closed(flow: NoVNCFlow, outcome: str) -> None:
+    if outcome == _BROWSER_GONE_OUTCOME:
+        logger.warning(
+            "NoVNC Strategy: browser closed for %s flow_id=%s slot=%s; releasing slot",
+            flow.url,
+            flow.flow_id,
+            flow.window.slot,
+        )
 
 
 async def _monitor_for_cookies(flow: NoVNCFlow) -> None:
@@ -200,9 +254,18 @@ async def _monitor_for_cookies(flow: NoVNCFlow) -> None:
             start_time = loop.time()
             last_page_blocked = True
             while loop.time() - start_time < settings.NOVNC_TIMEOUT_SECONDS:
-                resolved, last_page_blocked = await _poll_once(
-                    page, context, flow.url, flow.intervention_type, flow.profile, flow
-                )
+                if _is_browser_gone(browser, page):
+                    outcome = _BROWSER_GONE_OUTCOME
+
+                    break
+                try:
+                    resolved, last_page_blocked = await _poll_once(
+                        page, context, flow.url, flow.intervention_type, flow.profile, flow
+                    )
+                except _BrowserGoneError:
+                    outcome = _BROWSER_GONE_OUTCOME
+
+                    break
                 if resolved:
                     outcome = "resolved"
 
@@ -223,6 +286,7 @@ async def _monitor_for_cookies(flow: NoVNCFlow) -> None:
                     flow.flow_id,
                     flow.window.slot,
                 )
+            _log_browser_closed(flow, outcome)
     except asyncio.CancelledError:
         outcome = "cancelled"
         raise
@@ -255,8 +319,11 @@ class NoVNCStrategy(BaseStrategy):
     async def extract(self, url: str) -> str:
         return await self.get_html(url)
 
-    async def get_html(self, url: str) -> str:
-        intervention_type = "login" if ChallengeDetector.is_login_redirect_url(url) else "captcha"
+    async def get_html(self, url: str, last_verdict: ChallengeVerdict | None = None) -> str:
+        if last_verdict is not None:
+            intervention_type = last_verdict.intervention_type
+        else:
+            intervention_type = "login" if ChallengeDetector.is_login_redirect_url(url) else "captcha"
         effective_profile = self.profile or settings.SESSION_DEFAULT_PROFILE
         key = flow_key_for(url, effective_profile)
 

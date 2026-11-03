@@ -19,9 +19,7 @@ _MCP_GUARD = "src.api.mcp.mcp_server.check_fetch_uri"
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tier", ["4a-patchright", "4b-camoufox"])
-async def test_rest_read_starts_the_chain_at_the_patched_tier(
-    client: AsyncClient, tier: str
-) -> None:
+async def test_rest_read_starts_the_chain_at_the_patched_tier(client: AsyncClient, tier: str) -> None:
     # given
     result = {"content": "X", "status": "success", "mode": tier}
 

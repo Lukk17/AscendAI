@@ -210,7 +210,7 @@ async def test_non_websocket_scheme_url_is_checked_as_is() -> None:
 
 
 @pytest.mark.asyncio
-async def test_blocklisted_websocket_is_closed() -> None:    # given
+async def test_blocklisted_websocket_is_closed() -> None:  # given
     websocket = _make_websocket("wss://example.com/ads/socket")
 
     # when
@@ -339,9 +339,7 @@ async def test_allowed_redirect_hop_is_followed_and_final_fulfilled() -> None:
     # when
     with patch(
         "src.reader.browser_guard.check_fetch_uri",
-        new=AsyncMock(
-            return_value=FetchTarget(url="https://example.com/", host="example.com", port=443)
-        ),
+        new=AsyncMock(return_value=FetchTarget(url="https://example.com/", host="example.com", port=443)),
     ):
         await handle_guarded_route(route, _make_validator(), refused)
 
@@ -392,9 +390,7 @@ async def test_redirect_without_location_is_fulfilled() -> None:
     # when
     with patch(
         "src.reader.browser_guard.check_fetch_uri",
-        new=AsyncMock(
-            return_value=FetchTarget(url="https://example.com/odd", host="example.com", port=443)
-        ),
+        new=AsyncMock(return_value=FetchTarget(url="https://example.com/odd", host="example.com", port=443)),
     ):
         await handle_guarded_route(route, _make_validator())
 
@@ -415,9 +411,7 @@ async def test_too_many_redirects_aborts() -> None:
         patch(
             "src.reader.browser_guard.check_fetch_uri",
             new=AsyncMock(
-                return_value=FetchTarget(
-                    url="https://example.com/loop", host="example.com", port=443
-                )
+                return_value=FetchTarget(url="https://example.com/loop", host="example.com", port=443)
             ),
         ),
         patch("src.reader.browser_guard.settings.FETCH_MAX_REDIRECT_HOPS", 0),

@@ -75,9 +75,7 @@ async def _seed_service(service: LoginService) -> None:
             },
         )
     if resp.status_code != 200:
-        sys.stderr.write(
-            f"[seed] {service.name}: import failed with {resp.status_code}: {resp.text}\n"
-        )
+        sys.stderr.write(f"[seed] {service.name}: import failed with {resp.status_code}: {resp.text}\n")
         raise SystemExit(1)
     sys.stdout.write(f"[seed] {service.name}: session seeded under profile 'e2e'.\n")
 

@@ -159,9 +159,7 @@ async def test_collect_sitemap_urls_skips_failures() -> None:
         return "<urlset><url><loc>https://example.com/a</loc></url></urlset>"
 
     # when
-    urls = await collect_sitemap_urls(
-        ["https://example.com/bad.xml", "https://example.com/empty.xml"], fetch
-    )
+    urls = await collect_sitemap_urls(["https://example.com/bad.xml", "https://example.com/empty.xml"], fetch)
 
     # then
     assert urls == []

@@ -9,7 +9,7 @@ Copy this file to `../runs/<UTC-timestamp>_3-read-example-com-tasks.md` before s
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 - [ ] Outbound HTTPS works: `curl -fsS https://www.example.com/` returns HTTP 200 with `"This domain is for use in documentation examples"`
 
 ### Reset state

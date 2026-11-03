@@ -22,7 +22,7 @@ sequenceDiagram
     Lifespan->>Lifespan: log_startup_banner()
     Lifespan-->>Uvicorn: yield (service ready)
     Docker->>Uvicorn: GET /health
-    Uvicorn-->>Docker: 200 {"status":"ok"}
+    Uvicorn-->>Docker: 200 {"status":"ok","service":"ascend-web-hunter","version":"..."}
 ```
 
 The blocklist load is a hard failure only in the packaging-defect sense: if the vendored file is missing or fails

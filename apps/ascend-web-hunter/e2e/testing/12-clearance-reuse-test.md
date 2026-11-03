@@ -20,6 +20,11 @@ automated, against the real `https://www.scrapingcourse.com/cloudflare-challenge
    proves nothing about reuse. A different address on the same site misses the cache and has to go through the site
    again, so a success there that is faster than the cold read is the stored clearance doing its job.
 
+When Call 1 is answered by the human-help tier (HTTP 428) or by the busy refusal (HTTP 409), the site has rated
+this address and refused the automated tiers. The run then records an environment gate, skips the capture check and
+Call 2, and passes without exercising reuse. A 428 on Call 2 is still a FAIL, because there the cold read already
+succeeded and the stored clearance was expected to be reused.
+
 A 428 on Call 2 is a FAIL. It is register defect A61 in
 [../../../../docs/DEFECT_REGISTER.md](../../../../docs/DEFECT_REGISTER.md) until its fix lands: a stored session
 routes the read straight to the browser tiers, whose fingerprint is not the one the `cf_clearance` cookie was
@@ -59,7 +64,7 @@ Check the ascend-web-hunter server is reachable.
 curl -fsS http://localhost:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 
 Check Redis is reachable from the host's Docker context (the reset and the capture check use the session key).
 
@@ -189,7 +194,9 @@ Unix:
 
 - Call 1: HTTP `200`, `status="success"`, and one of `content`, `text` or `markdown` is a string of at least 50
   characters. The `mode` and the `responseTime` from step 2 are recorded in the run record. A duration in the tens
-  of seconds is normal for a browser-tier solve.
+  of seconds is normal for a browser-tier solve. Alternatively HTTP `428` with `code`
+  `human_intervention_required` and a non-empty `vnc_url`, or HTTP `409` with `code` `novnc_busy`: that is the
+  environment gate, and steps 3 to 5 are skipped with the body recorded.
 - Capture check: `session:scrapingcourse.com:default` exists and its `waf` entry carries a cookie named
   `cf_clearance`. On the 2026-09-10 read the `auth` entry also carried six site cookies, none of which are asserted.
 - Call 2: HTTP `200`, `status="success"`, one of `content`, `text` or `markdown` is a string of at least 50
@@ -217,10 +224,12 @@ None, and no secrets. The two URLs are hardcoded in the two Bruno requests.
 ## Concurrency
 
 - Mutates: Redis, the ascend-web-hunter session store, key `session:scrapingcourse.com:default`, and the reader's
-  in-process read cache for `scrapingcourse.com`. On the A61 failure path Call 2 also opens the single shared NoVNC
-  browser for `NOVNC_TIMEOUT_SECONDS` (600 s by default).
+  in-process read cache for `scrapingcourse.com`. On the A61 failure path Call 2 also holds one NoVNC window
+  slot for `NOVNC_TIMEOUT_SECONDS` (600 s by default).
 - Conflicts with: test 6, which reads the same site and stores under the same session key, so a concurrent run
   would hand this spec a clearance it did not obtain or wipe the one it did. Tests 8 and 10, which compare or
   extend the `session:*` key scan, since this spec's key would appear in it. Test 7's reset flushes every
-  `session:*` key and would wipe the capture between the two calls.
+  `session:*` key and would wipe the capture between the two calls, and spec 20
+  ([20-concurrent-interventions-test.md](20-concurrent-interventions-test.md)) fills every window slot on
+  purpose, so never beside it.
 - Serial: false against tests 1, 2, 3, 4, 5 and 9. Runs after test 6. No human.

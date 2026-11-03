@@ -188,7 +188,7 @@ and `.env`. The most-used variables:
 | `CHALLENGE_WEIGHT_THIN_TEXT` | `20`                       | Weight of the thin_text signal |
 | `CHALLENGE_WEIGHT_FEW_LINKS` | `20`                       | Weight of the few_links signal |
 | `CHALLENGE_WEIGHT_NO_ARTICLE` | `20`                      | Weight of the no_article signal |
-| `CHALLENGE_WEIGHT_RICH_CONTENT` | `-60`                  | Weight of the rich_content guard signal |
+| `CHALLENGE_WEIGHT_RICH_CONTENT` | `-70`                  | Weight of the rich_content guard signal |
 | `CHALLENGE_WEIGHT_MANY_LINKS` | `-20`                    | Weight of the many_links guard signal |
 | `CHALLENGE_WEIGHT_PHRASE_TITLE` | `60`                   | Weight of the phrase_title signal |
 | `CHALLENGE_WEIGHT_PHRASE_BODY` | `30`                    | Weight of the phrase_body signal |

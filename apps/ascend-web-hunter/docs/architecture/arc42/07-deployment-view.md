@@ -37,11 +37,15 @@ host bridge network or a shared Docker network depending on deployment configura
 
 ### Healthcheck wiring
 
-The `GET /health` endpoint (`src/main.py:56-58`) returns `{"status": "ok"}` as long as the process is alive.
-There is no separate readiness probe. The blocklist loads from the vendored `src/assets/fanboy-annoyance.txt`
-eagerly at module import time, before the process can even reach the point of serving `/health`; a missing or
-corrupt vendored file is a packaging defect that prevents the process from starting at all, not something the
-health check needs to model. See [ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md).
+The `GET /health` endpoint returns `{"status": "ok", "service": "ascend-web-hunter", "version": "..."}` as long as the
+process is alive, and the compose healthcheck probes that path.
+`GET /ready` is the separate readiness probe. It runs three checks through the shared library, Redis, SearXNG and the
+SearXNG circuit breaker, and answers 200 with `status` `ready` only when every check reports `ok` or `skipped`,
+otherwise 503 with `status` `not-ready` and the failing check named. The blocklist is not one of those checks: it loads
+from the vendored `src/assets/fanboy-annoyance.txt` eagerly at module import time, before the process can even reach
+the point of serving either path, so a missing or corrupt vendored file is a packaging defect that prevents the
+process from starting at all, not something a probe needs to model. See
+[ADR-008](../decisions/ADR-008-blocklist-vendored-not-fetched.md).
 
 ---
 

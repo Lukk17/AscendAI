@@ -73,9 +73,7 @@ class CamoufoxStrategy(BaseStrategy):
                         url,
                     )
                     raise ChallengeDetectedException(
-                        as_login_verdict(
-                            assess(200, "", None, await self._context_cookie_names(context))
-                        )
+                        as_login_verdict(assess(200, "", None, await self._context_cookie_names(context)))
                     )
 
                 response_status, initial_headers = await self._initial_navigation(
@@ -93,14 +91,10 @@ class CamoufoxStrategy(BaseStrategy):
                         await page.wait_for_timeout(settings.NETWORKIDLE_POLL_MS)
                         continue
 
-                    verdict = await self._assess_content(
-                        page, url, response_status, initial_headers, content
-                    )
+                    verdict = await self._assess_content(page, url, response_status, initial_headers, content)
 
                     if verdict.wall and verdict.intervention_type == "login":
-                        logger.warning(
-                            "CamoufoxStrategy: Login wall detected on %s (early exit)", url
-                        )
+                        logger.warning("CamoufoxStrategy: Login wall detected on %s (early exit)", url)
 
                         raise ChallengeDetectedException(verdict)
 
@@ -118,9 +112,7 @@ class CamoufoxStrategy(BaseStrategy):
                         continue
 
                     try:
-                        await page.wait_for_load_state(
-                            "networkidle", timeout=settings.NETWORKIDLE_POLL_MS
-                        )
+                        await page.wait_for_load_state("networkidle", timeout=settings.NETWORKIDLE_POLL_MS)
                         break
                     except PlaywrightError:
                         pass
@@ -154,9 +146,7 @@ class CamoufoxStrategy(BaseStrategy):
         """One verdict over the rendered content, then the refusal check: a
         page whose script navigated to a refused address fails the tier even
         when the rendered content itself looks clean."""
-        verdict = await self._assess_content(
-            page, url, response_status, initial_headers, content
-        )
+        verdict = await self._assess_content(page, url, response_status, initial_headers, content)
 
         if verdict.wall and verdict.intervention_type == "login":
             logger.warning(
@@ -168,16 +158,12 @@ class CamoufoxStrategy(BaseStrategy):
             raise ChallengeDetectedException(verdict)
 
         if not verdict.accepted:
-            logger.warning(
-                "CamoufoxStrategy: WAF/Cloudflare block detected post-render on %s", url
-            )
+            logger.warning("CamoufoxStrategy: WAF/Cloudflare block detected post-render on %s", url)
 
             raise ChallengeDetectedException(verdict)
 
         if refused_navigations:
-            logger.warning(
-                "CamoufoxStrategy: Blocked navigation detected post-render on %s", url
-            )
+            logger.warning("CamoufoxStrategy: Blocked navigation detected post-render on %s", url)
 
             raise UnsafeUriError(f"browser request refused: {refused_navigations[0]}")
 
@@ -237,9 +223,7 @@ class CamoufoxStrategy(BaseStrategy):
             await page.evaluate(f"window.scrollBy(0, {settings.SCROLL_STEP_PX})")
             await page.wait_for_timeout(settings.SCROLL_PAUSE_MS)
 
-    async def _create_context(
-        self, browser: Any, url: str, proxy: dict[str, str] | None
-    ) -> BrowserContext:
+    async def _create_context(self, browser: Any, url: str, proxy: dict[str, str] | None) -> BrowserContext:
         """Camoufox draws a complete Firefox identity per context, so no stored
         user agent is ever injected: a Chromium UA would contradict the drawn
         fingerprint, and even a Firefox one would disagree with the generated

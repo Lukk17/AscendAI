@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 from src.reader.extraction import (
     _ensemble_score,
+    _readability_extract,
+    _trafilatura_structured,
     extract_embedded_metadata,
     extract_structured,
     extract_tables,
@@ -15,6 +17,8 @@ _FIXTURES = Path(__file__).parent.parent / "fixtures"
 _BOOKS_LISTING_HTML = (_FIXTURES / "books_toscrape_index.html").read_text(encoding="utf-8")
 _ARTICLE_HTML = (_FIXTURES / "gnu_free_sw_article.html").read_text(encoding="utf-8")
 _PRODUCT_HTML = (_FIXTURES / "embedded_product.html").read_text(encoding="utf-8")
+_READABILITY_WINS_HTML = (_FIXTURES / "ensemble_readability_wins.html").read_text(encoding="utf-8")
+_TIE_HTML = (_FIXTURES / "ensemble_tie.html").read_text(encoding="utf-8")
 
 _GOOD_HTML = """
 <html>
@@ -94,6 +98,40 @@ def test_ensemble_prefers_readability_when_trafilatura_fails() -> None:
     # then
     assert result["source"] == "readability"
     assert "Test Article" in result["content"]
+
+
+def test_ensemble_prefers_readability_on_the_aside_page() -> None:
+    """Trafilatura drops the aside, readability keeps it, so readability outscores it."""
+    # when
+    result = extract_structured(_READABILITY_WINS_HTML)
+
+    # then
+    assert result["source"] == "readability"
+    assert "Visiting hours" in result["content"]
+
+
+def test_ensemble_readability_win_scores_rank_unmocked() -> None:
+    """Pin the fixture property: on the aside page the readability score is higher."""
+    # when
+    traf = _trafilatura_structured(_READABILITY_WINS_HTML)
+    read_content: str = _readability_extract(_READABILITY_WINS_HTML).get("content", "")
+
+    # then
+    assert traf is not None
+    assert _ensemble_score(read_content) > _ensemble_score(traf.get("content", ""))
+
+
+def test_ensemble_tie_goes_to_trafilatura_on_the_tie_fixture() -> None:
+    """Both extractors return the same short note, so the scores tie and trafilatura wins."""
+    # when
+    traf = _trafilatura_structured(_TIE_HTML)
+    read_content: str = _readability_extract(_TIE_HTML).get("content", "")
+    result = extract_structured(_TIE_HTML)
+
+    # then
+    assert traf is not None
+    assert _ensemble_score(read_content) == _ensemble_score(traf.get("content", ""))
+    assert result["source"] == "trafilatura"
 
 
 def test_ensemble_tie_goes_to_trafilatura() -> None:

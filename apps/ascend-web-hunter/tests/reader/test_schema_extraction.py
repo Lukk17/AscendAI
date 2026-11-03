@@ -72,6 +72,38 @@ async def test_valid_answer_is_returned_with_selectors() -> None:
 
 
 @pytest.mark.asyncio
+async def test_authorization_header_uses_configured_key() -> None:
+    # given
+    seen: dict[str, Any] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json={"choices": [{"message": {"content": _VALID_BODY}}]})
+
+    # when
+    with patch("src.reader.schema_extraction.settings.EXTRACTION_LLM_API_KEY", "unit-key"):
+        await run_model(_PAGE_TEXT, _SCHEMA, client=_stub_client(handle))
+
+    # then
+    assert seen["auth"] == "Bearer unit-key"
+
+
+@pytest.mark.asyncio
+async def test_think_prefixed_answer_is_accepted() -> None:
+    # given
+    seen: dict[str, Any] = {}
+    body = "<think>need the name and price selectors</think>" + _VALID_BODY
+    client = _stub_client(_completion_handler(body, seen))
+
+    # when
+    data, selectors = await run_model(_PAGE_TEXT, _SCHEMA, client=client)
+
+    # then
+    assert data == {"name": "Red Widget", "price": 19.99}
+    assert selectors == {"name": "h1.product", "price": ".price"}
+
+
+@pytest.mark.asyncio
 async def test_non_json_answer_is_extraction_failed() -> None:
     # given
     seen: dict[str, Any] = {}

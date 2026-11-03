@@ -6,15 +6,19 @@ from prometheus_client import generate_latest
 from src.observability import metrics
 
 
-def test_search_results_total_registered() -> None:
+def test_search_results_returned_registered() -> None:
     # given
-    metrics.SEARCH_RESULTS_TOTAL.labels(outcome="success").inc(3)
+    from prometheus_client import Histogram
+
+    metrics.SEARCH_RESULTS_RETURNED.labels(engine="searxng", outcome="ok").observe(3)
 
     # when
     payload = generate_latest().decode()
 
     # then
-    assert "ascendwebhunter_search_results_total" in payload
+    assert isinstance(metrics.SEARCH_RESULTS_RETURNED, Histogram)
+    assert "search_results_returned" in payload
+    assert "ascendwebhunter_search_results_total" not in payload
 
 
 def test_strategy_counters_registered() -> None:

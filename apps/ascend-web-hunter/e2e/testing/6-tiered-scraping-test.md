@@ -9,21 +9,26 @@ rotate WAFs and go down, so refine it as real targets are discovered.
 | Row | Tier / strategy | URL | Canary assertion | In automated gate |
 | :-- | :-------------- | :-- | :--------------- | :---------------- |
 | 1 | `curl_cffi` - static article | `https://en.wikipedia.org/wiki/Web_scraping` | content (lowercased) contains `"web scraping"` | yes |
-| 2 | Browser tier - Cloudflare WAF | `https://www.scrapingcourse.com/cloudflare-challenge` | `status="success"`, content contains `"cloudflare challenge"` (a browser tier bypassed the challenge) | yes |
+| 2 | Browser tier - Cloudflare WAF | `https://www.scrapingcourse.com/cloudflare-challenge` | `status="success"` with `"cloudflare challenge"` in the content, or HTTP 428 with a `vnc_url` when the site rates and gates this address | yes |
 | 3 | Playwright - JS-rendered | `https://quotes.toscrape.com/js/` | content contains `"The world as we have created it"`, and the serving `mode` is a browser tier | yes |
-| 4 | NoVNC - hard CAPTCHA | *TBD* | human solves CAPTCHA, content returned | **no - manual / best-effort** |
-| 5-8 | real-world categories | *TBD* (job board, news article, product page, docs page) | per-site, defined when added | no - added later |
+| 4 | NoVNC - hard CAPTCHA | covered by spec 11, `11-captcha-solve-and-capture-test.md` (owner decision 65.26 of 2026-10-04) | human solves CAPTCHA, content returned | no - manual, run in spec 11 |
+| 5-8 | real-world categories | covered by spec 7 Part 1, `7-authenticated-realworld-scraping-test.md` (owner decision 65.26 of 2026-10-04) | per-site, as spec 7 defines | no - run in spec 7 |
 
 Row 2's target, scrapingcourse.com, rates the caller's address. After several challenge solves from one address in a
 day it can refuse headless browsers for a while. A row 2 failure after a tens-of-seconds browser-tier solve is
 a cool-down case, not a stack defect: rerun the spec after about 40 minutes, and do not probe the address in between,
-because every attempt counts against the rating.
+because every attempt counts against the rating. When the address stays rated, the row accepts HTTP 428 with a
+non-empty `vnc_url` in place of the solved page, because that is the service answering correctly with the human-help
+tier rather than returning the block page as content. Measured 2026-11-03, after days of no probing, the address was
+still gated and the row answered 428.
 
 - `POST /api/v2/web/read` returns HTTP 200 with `status="success"` and a non-empty content field
-  (`content` / `text` / `markdown`) for each gated row (1, 2, 3).
+  (`content` / `text` / `markdown`) for each gated row (1, 2, 3), or, for row 2 only, HTTP 428 with `code`
+  `human_intervention_required` and a non-empty `vnc_url`.
 - **Row 1 (static):** the content field, lowercased, contains `"web scraping"`.
-- **Row 2 (Cloudflare):** `status="success"` and a content field of length ≥ 50 - proves the Cloudflare challenge
-  was solved rather than the bot-block interstitial being returned.
+- **Row 2 (Cloudflare):** either `status="success"` and a content field of length ≥ 50 containing
+  `"cloudflare challenge"`, which proves the challenge was solved rather than the block interstitial returned, or the
+  428 human-help body when the address is rated.
 - **Row 3 (JavaScript):** the content field contains `"The world as we have created it"` and the response's `mode`
   names a browser-executing tier. The phrase is absent from the page's raw markup once inline `<script>` blocks are
   stripped, so its presence in extracted prose means a browser ran the page's JavaScript.
@@ -47,7 +52,7 @@ Check the ascend-web-hunter server is reachable.
 curl -fsS http://localhost:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 
 Check outbound HTTPS to the static target works from this host (independently of the container).
 

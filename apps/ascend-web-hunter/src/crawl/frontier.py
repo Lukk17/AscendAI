@@ -7,10 +7,13 @@ ascend-web-hunter instances share one frontier with no lost update:
   and the ``crawl_runnable`` member together.
 - ``CLAIM_SCRIPT`` takes back expired claims, then refuses when the job is
   not claimable or pops one URL atomically with the in-flight counter, the
-  crawl delay and the page budget held for all instances together.
+  crawl delay and the page budget held for all instances together. When the
+  page budget is already reached and no claim is left, it moves the job to
+  ``succeeded`` instead of leaving it in ``running`` with queued URLs.
 - ``FINISH_SCRIPT`` removes the claim, appends the page line, counts the
   page, queues only unseen links and moves the job to ``succeeded`` when no
-  queue and no claim is left.
+  queue and no claim is left, or when the page budget is reached and no
+  claim is left even with queued URLs still waiting.
 - ``CANCEL_SCRIPT`` moves a waiting or running job to ``cancelled`` and
   deletes its frontier keys.
 - ``MARK_SCRIPT`` moves a job to ``failed`` with an error and deletes its
@@ -122,6 +125,13 @@ end
 job['claim_expiries'] = exps
 local done = job['counts']['fetched'] + job['counts']['unchanged'] + job['counts']['failed']
 if done >= tonumber(ARGV[3]) then
+  if redis.call('ZCARD', KEYS[4]) == 0 then
+    job['state'] = 'succeeded'
+    job['updated_at'] = ARGV[9]
+    redis.call('SETEX', KEYS[1], ARGV[6], cjson.encode(job))
+    redis.call('ZREM', KEYS[6], ARGV[7])
+    return {'budget', 'succeeded'}
+  end
   redis.call('SETEX', KEYS[1], ARGV[6], cjson.encode(job))
   return {'budget'}
 end
@@ -226,7 +236,13 @@ redis.call('EXPIRE', KEYS[3], ARGV[5])
 job['pending'] = job['pending'] - 1
 job['updated_at'] = ARGV[11]
 local final = 'running'
-if job['pending'] <= 0 then
+local _done = job['counts']['fetched'] + job['counts']['unchanged'] + job['counts']['failed']
+local _budget = nil
+if job['request'] ~= nil and job['request']['page_budget'] ~= nil then
+  _budget = tonumber(job['request']['page_budget'])
+end
+local _claims_left = redis.call('ZCARD', KEYS[3])
+if job['pending'] <= 0 or (_budget ~= nil and _done >= _budget and _claims_left == 0) then
   job['state'] = 'succeeded'
   redis.call('ZREM', KEYS[5], ARGV[12])
   final = 'succeeded'

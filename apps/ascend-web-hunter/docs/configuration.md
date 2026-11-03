@@ -82,7 +82,7 @@ remembered tier for `TIER_MEMORY_TTL_SECONDS`.
 | `BREAKER_FAILURE_THRESHOLD` | `3` | Consecutive failures before a circuit breaker opens |
 | `BREAKER_RECOVERY_TIMEOUT_SECONDS` | `60.0` | Seconds after which an open breaker moves to half-open and allows one probe |
 | `DOMAIN_METRIC_CARDINALITY_CAP` | `50` | Maximum distinct registrable-domain label values tracked in `STRATEGY_ATTEMPTS_TOTAL`; further domains bucket under `other` |
-| `CRAWLEE_STORAGE_DIR` | `.crawlee_storage` | Out-of-tree directory for Crawlee request queues and key-value stores |
+| `CRAWLEE_STORAGE_DIR` | `.crawlee_storage` | Out-of-tree directory for Crawlee key-value stores and crawler state; each read keeps its request queue in memory |
 | `CRAWLEE_MEMORY_MBYTES` | unset | Explicit memory budget in MB for Crawlee's autoscaler; when unset Crawlee infers a budget from total system memory |
 | `PROXY_URL` | empty | Optional outbound proxy URL for all fetch tiers |
 | `READ_CACHE_TTL_SECONDS` | `300` | TTL in seconds for the read-result cache-aside entries |
@@ -131,7 +131,7 @@ scoring ensemble result wins, with ties going to trafilatura. Changed by
 | `CHALLENGE_WEIGHT_THIN_TEXT` | `20` | Weight of the thin_text signal. Added by `detect-challenge-walls-in-any-language`. |
 | `CHALLENGE_WEIGHT_FEW_LINKS` | `20` | Weight of the few_links signal. Added by `detect-challenge-walls-in-any-language`. |
 | `CHALLENGE_WEIGHT_NO_ARTICLE` | `20` | Weight of the no_article signal. Added by `detect-challenge-walls-in-any-language`. |
-| `CHALLENGE_WEIGHT_RICH_CONTENT` | `-60` | Weight of the rich_content guard signal. Added by `detect-challenge-walls-in-any-language`. |
+| `CHALLENGE_WEIGHT_RICH_CONTENT` | `-70` | Weight of the rich_content guard signal. Added by `detect-challenge-walls-in-any-language`. |
 | `CHALLENGE_WEIGHT_MANY_LINKS` | `-20` | Weight of the many_links guard signal. Added by `detect-challenge-walls-in-any-language`. |
 | `CHALLENGE_WEIGHT_PHRASE_TITLE` | `60` | Weight of the phrase_title signal. Added by `detect-challenge-walls-in-any-language`. |
 | `CHALLENGE_WEIGHT_PHRASE_BODY` | `30` | Weight of the phrase_body signal. Added by `detect-challenge-walls-in-any-language`. |

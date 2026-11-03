@@ -91,9 +91,7 @@ async def test_submit_writes_queues_seen_and_runnable_together(
     assert await fake_redis.zscore(RUNNABLE_KEY, runnable_member("acme", record.job_id)) is not None
 
 
-async def test_submit_checks_every_seed(
-    service: CrawlJobService, stub_guard: AsyncMock
-) -> None:
+async def test_submit_checks_every_seed(service: CrawlJobService, stub_guard: AsyncMock) -> None:
     # given
     fields: dict[str, Any] = {"seeds": ["https://one.example/", "https://two.example/"]}
     request = CrawlRequest(**fields)
@@ -121,9 +119,7 @@ async def test_submit_refuses_unsafe_seed_and_creates_no_job(
     assert await service.list_jobs("acme") == []
 
 
-async def test_submit_refuses_opt_out_seed(
-    service: CrawlJobService, public_guard: None
-) -> None:
+async def test_submit_refuses_opt_out_seed(service: CrawlJobService, public_guard: None) -> None:
     # when / then
     with pytest.raises(ValueError, match="respect_robots=false is refused"):
         await service.submit_job("acme", _request(respect_robots=False))
@@ -138,9 +134,7 @@ async def test_get_missing_returns_none(service: CrawlJobService) -> None:
     assert record is None
 
 
-async def test_get_corrupt_returns_none(
-    service: CrawlJobService, fake_redis: FakeRedis
-) -> None:
+async def test_get_corrupt_returns_none(service: CrawlJobService, fake_redis: FakeRedis) -> None:
     # given
     await fake_redis.set(job_key("acme", "bad"), "not-json{{{", ex=60)
     # when
@@ -173,9 +167,7 @@ async def test_get_returns_record_after_lua_round_trip(
     assert record.request.exclude_patterns == []
 
 
-async def test_list_returns_only_own_tenant(
-    service: CrawlJobService, stub_guard: AsyncMock
-) -> None:
+async def test_list_returns_only_own_tenant(service: CrawlJobService, stub_guard: AsyncMock) -> None:
     # given
     first = await service.submit_job("acme", _request())
     second = await service.submit_job("acme", _request())
@@ -228,9 +220,7 @@ async def test_list_empty_returns_empty(service: CrawlJobService) -> None:
     assert records == []
 
 
-async def test_cancel_waiting_moves_to_cancelled(
-    service: CrawlJobService, stub_guard: AsyncMock
-) -> None:
+async def test_cancel_waiting_moves_to_cancelled(service: CrawlJobService, stub_guard: AsyncMock) -> None:
     # given
     submitted = await service.submit_job("acme", _request())
 
@@ -261,9 +251,7 @@ async def test_cancel_deletes_frontier_keys(
     assert await fake_redis.zscore(RUNNABLE_KEY, runnable_member("acme", submitted.job_id)) is None
 
 
-async def test_cancel_terminal_returns_unchanged(
-    service: CrawlJobService, fake_redis: FakeRedis
-) -> None:
+async def test_cancel_terminal_returns_unchanged(service: CrawlJobService, fake_redis: FakeRedis) -> None:
     # given
     record = JobRecord(
         job_id="done1",

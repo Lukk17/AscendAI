@@ -67,7 +67,7 @@ def _html_reader() -> tuple[WebReader, dict[str, int], Any]:
     reader = WebReader()
     counter = {"calls": 0}
 
-    async def _execute_html(name: str, strategy: Any, url: str) -> str:
+    async def _execute_html(name: str, strategy: Any, url: str, **_kwargs: Any) -> str:
         counter["calls"] += 1
 
         return _ARTICLE_HTML

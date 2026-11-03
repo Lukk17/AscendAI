@@ -712,9 +712,7 @@ async def test_get_stored_session_producer_falls_back_to_auth_when_waf_expired()
     # given
     m = _fresh()
     waf_only_state = _state([_cookie("cf_clearance")])
-    await m.save_storage_state(
-        "https://example.com", waf_only_state, "UA", produced_by=PRODUCED_BY_NOVNC
-    )
+    await m.save_storage_state("https://example.com", waf_only_state, "UA", produced_by=PRODUCED_BY_NOVNC)
     auth_only_state = _state([_cookie("li_at")])
     await m.save_storage_state("https://example.com", auth_only_state, "UA", produced_by=PRODUCED_BY_NOVNC)
 

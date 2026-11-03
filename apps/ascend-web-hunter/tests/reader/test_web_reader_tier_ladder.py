@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from ascend_python_common.uri_guard import UnsafeUriError
 
+from src.api.exceptions import ExtractionFailedError, ExtractionNotConfiguredError
 from src.reader.strategies.base_strategy import BaseStrategy
 from src.reader.web_reader import TIER_ORDER, WebReader
 
@@ -28,6 +29,14 @@ def _stub_strategies(winners: dict[str, str]) -> dict[str, BaseStrategy]:
         strategies[name] = stub
 
     return strategies
+
+
+def _raising_strategy(error: Exception) -> BaseStrategy:
+    """A tier whose get_html raises *error*."""
+    stub = MagicMock()
+    stub.get_html = AsyncMock(side_effect=error)
+
+    return stub
 
 
 @pytest.mark.asyncio
@@ -97,7 +106,7 @@ async def test_explicit_tier_starts_at_patchright() -> None:
 
 
 @pytest.mark.asyncio
-async def test_explicit_tier_starts_at_camoufox() -> None:    # when
+async def test_explicit_tier_starts_at_camoufox() -> None:  # when
     selected = await WebReader()._select_strategies(_URL, heavy_mode=False, tier="4b-camoufox")
 
     # then
@@ -135,9 +144,7 @@ async def test_stored_session_starts_at_the_browser_tiers() -> None:
 @pytest.mark.asyncio
 async def test_remembered_tier_is_the_start_point() -> None:
     # when
-    with patch(
-        "src.reader.web_reader.tier_memory.get", new=AsyncMock(return_value="5-crawlee_adaptive")
-    ):
+    with patch("src.reader.web_reader.tier_memory.get", new=AsyncMock(return_value="5-crawlee_adaptive")):
         selected = await WebReader()._select_strategies(_URL, heavy_mode=False)
 
     # then
@@ -147,9 +154,7 @@ async def test_remembered_tier_is_the_start_point() -> None:
 @pytest.mark.asyncio
 async def test_caller_tier_outranks_memory() -> None:
     # when
-    with patch(
-        "src.reader.web_reader.tier_memory.get", new=AsyncMock(return_value="5-crawlee_adaptive")
-    ):
+    with patch("src.reader.web_reader.tier_memory.get", new=AsyncMock(return_value="5-crawlee_adaptive")):
         selected = await WebReader()._select_strategies(_URL, heavy_mode=False, tier="1-beautifulsoup")
 
     # then
@@ -226,3 +231,99 @@ async def test_unsafe_uri_from_tier_propagates_from_read_with_links() -> None:
     ):
         with pytest.raises(UnsafeUriError):
             await WebReader().read_with_links(_URL)
+
+
+@pytest.mark.asyncio
+async def test_crawlee_refusal_never_opens_the_novnc_window() -> None:
+    """A crawlee read the guard refused answers unsafe_uri and stops the ladder."""
+    # given
+    stubs = _stub_strategies({"6-novnc": _ARTICLE_HTML})
+    stubs["5-crawlee_adaptive"] = _raising_strategy(
+        UnsafeUriError("browser request refused: http://169.254.169.254/")
+    )
+
+    # when / then
+    with patch.object(WebReader, "_build_strategies", return_value=stubs):
+        with pytest.raises(UnsafeUriError):
+            await WebReader().read(_URL, tier="5-crawlee_adaptive")
+
+    stubs["6-novnc"].get_html.assert_not_awaited()  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_extraction_failed_from_tier_propagates_from_read_with_links() -> None:
+    """A tier that could not read the page is fatal on the read-with-links path too."""
+    # given
+    stubs = _stub_strategies({"6-novnc": _ARTICLE_HTML})
+    stubs["5-crawlee_adaptive"] = _raising_strategy(
+        ExtractionFailedError("CrawleeStrategy: the crawl handled no request for the page")
+    )
+
+    # when / then
+    with patch.object(WebReader, "_build_strategies", return_value=stubs):
+        with pytest.raises(ExtractionFailedError):
+            await WebReader().read_with_links(_URL, tier="5-crawlee_adaptive")
+
+
+@pytest.mark.asyncio
+async def test_extraction_not_configured_from_a_tier_stays_fatal_on_the_ladder() -> None:
+    """A schema request with no model configured is a caller error, not a tier to skip."""
+    # given
+    stubs = _stub_strategies({"6-novnc": _ARTICLE_HTML})
+    stubs["5-crawlee_adaptive"] = _raising_strategy(
+        ExtractionNotConfiguredError("schema extraction needs EXTRACTION_LLM_BASE_URL")
+    )
+
+    # when / then
+    with (
+        patch.object(WebReader, "_build_strategies", return_value=stubs),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+        patch("src.reader.web_reader.tier_memory.get", new=AsyncMock(return_value=None)),
+        patch("src.reader.web_reader.tier_memory.record", new=AsyncMock()),
+    ):
+        with pytest.raises(ExtractionNotConfiguredError):
+            await WebReader().read_with_links(_URL)
+
+
+@pytest.mark.asyncio
+async def test_extraction_failed_from_a_tier_falls_through_to_the_next_on_the_ladder() -> None:
+    """An unpinned ladder read keeps climbing after a tier that could not fetch the page."""
+    # given
+    stubs = _stub_strategies({"6-novnc": _ARTICLE_HTML})
+    stubs["5-crawlee_adaptive"] = _raising_strategy(
+        ExtractionFailedError("CrawleeStrategy: the crawl handled no request for the page")
+    )
+
+    # when
+    with (
+        patch.object(WebReader, "_build_strategies", return_value=stubs),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+        patch("src.reader.web_reader.tier_memory.get", new=AsyncMock(return_value=None)),
+        patch("src.reader.web_reader.tier_memory.record", new=AsyncMock()),
+    ):
+        result = await WebReader().read(_URL)
+
+    # then
+    assert result["mode"] == "6-novnc"
+
+
+@pytest.mark.asyncio
+async def test_extraction_failed_from_a_tier_falls_through_on_read_with_links() -> None:
+    """The read-with-links ladder keeps climbing after a tier that could not fetch the page."""
+    # given
+    stubs = _stub_strategies({"6-novnc": _ARTICLE_HTML})
+    stubs["5-crawlee_adaptive"] = _raising_strategy(
+        ExtractionFailedError("CrawleeStrategy: the crawl handled no request for the page")
+    )
+
+    # when
+    with (
+        patch.object(WebReader, "_build_strategies", return_value=stubs),
+        patch("src.validator.content_validator.ContentValidator.validate", return_value=True),
+        patch("src.reader.web_reader.tier_memory.get", new=AsyncMock(return_value=None)),
+        patch("src.reader.web_reader.tier_memory.record", new=AsyncMock()),
+    ):
+        result = await WebReader().read_with_links(_URL)
+
+    # then
+    assert result["mode"] == "6-novnc"

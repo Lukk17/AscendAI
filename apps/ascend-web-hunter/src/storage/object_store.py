@@ -44,23 +44,17 @@ class ObjectStore:
 
     async def put_json(self, bucket: str, key: str, payload: dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")
-        await asyncio.to_thread(
-            self._client.put_object, Bucket=bucket, Key=key, Body=body
-        )
+        await asyncio.to_thread(self._client.put_object, Bucket=bucket, Key=key, Body=body)
 
     async def put_text(self, bucket: str, key: str, text: str) -> None:
-        await asyncio.to_thread(
-            self._client.put_object, Bucket=bucket, Key=key, Body=text.encode("utf-8")
-        )
+        await asyncio.to_thread(self._client.put_object, Bucket=bucket, Key=key, Body=text.encode("utf-8"))
 
     async def put_bytes(self, bucket: str, key: str, body: bytes) -> None:
         await asyncio.to_thread(self._client.put_object, Bucket=bucket, Key=key, Body=body)
 
     async def get_text(self, bucket: str, key: str) -> str | None:
         try:
-            response = await asyncio.to_thread(
-                self._client.get_object, Bucket=bucket, Key=key
-            )
+            response = await asyncio.to_thread(self._client.get_object, Bucket=bucket, Key=key)
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
                 return None

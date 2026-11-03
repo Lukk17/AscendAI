@@ -9,7 +9,7 @@ Copy this file to `../runs/<UTC-timestamp>_13-structured-extraction-tasks.md` be
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 - [ ] Fake site reachable: `curl -fsS http://127.0.0.1:7031/__requests` returns a request list
 
 ### Reset state

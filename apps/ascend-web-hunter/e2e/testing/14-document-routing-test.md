@@ -41,7 +41,7 @@ Check the ascend-web-hunter server is reachable.
 curl -fsS http://localhost:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 
 Check the three routing targets are reachable from the host: docling-serve, ascend-ocr and
 ascend-audio-scribe all answer their health endpoint.
@@ -58,7 +58,8 @@ curl -fsS http://localhost:7022/health
 curl -fsS http://localhost:7017/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}` from each.
+Expect HTTP 200 from each. docling-serve answers exactly `{"status":"ok"}`, and ascend-ocr and ascend-audio-scribe
+answer `status` `ok` with `service` naming the service and a non-empty `version`.
 
 Check the fake site is reachable from the host.
 

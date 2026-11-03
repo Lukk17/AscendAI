@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.proxy.proxy_provider import ProxyProvider
+from tests.reader.crawlee_test_support import final_statistics
 
 
 def test_proxy_disabled_by_default() -> None:
@@ -149,7 +150,7 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
         playwright_kwargs = kwargs.get("playwright_crawler_specific_kwargs", {})
         captured_ctx_options.update(playwright_kwargs.get("browser_new_context_options", {}))
         mock_crawler = MagicMock()
-        mock_crawler.run = AsyncMock()
+        mock_crawler.run = AsyncMock(return_value=final_statistics(1))
         mock_crawler.router.default_handler = lambda f: f
         mock_crawler.pre_navigation_hook = lambda f: f
         return mock_crawler
@@ -290,7 +291,7 @@ async def test_crawlee_strategy_injects_storage_state_when_present() -> None:
         playwright_kwargs = kwargs.get("playwright_crawler_specific_kwargs", {})
         captured_ctx_options.update(playwright_kwargs.get("browser_new_context_options", {}))
         mock_crawler = MagicMock()
-        mock_crawler.run = AsyncMock()
+        mock_crawler.run = AsyncMock(return_value=final_statistics(1))
         mock_crawler.router.default_handler = lambda f: f
         mock_crawler.pre_navigation_hook = lambda f: f
         return mock_crawler

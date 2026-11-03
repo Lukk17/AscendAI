@@ -23,19 +23,25 @@ solve leaves behind. This spec has no human step and runs fully automated.
   `vnc_url`. This is the documented interactive-challenge contract (`api/exception_handlers.py`).
 - **hard-fail** - a non-2xx the SSRF / host guard fail-closes with (e.g. HTTP `400` for an unresolvable host).
 - busy, not a verdict: HTTP `409`, body `code="novnc_busy"` with a `holder_url`, and a `Retry-After` header,
-  meaning another row's NoVNC intervention still holds the single shared browser. The runner reads the
+  meaning every NoVNC window slot is held. The runner reads the
   `Retry-After` header and the `holder_url` from the folder run's JSON output file (see Run), waits that many
   seconds, and re-runs only that row's own request file, up to 3 attempts in total, recording each attempt and
   the `holder_url` from each 409 body in the run record. Only after the third 409 is the row a FAIL.
+- a `409` on a best-effort row is itself a FAIL unless the run genuinely saturated `NOVNC_MAX_CONCURRENT_FLOWS`
+  at that moment, with the listing reporting `active_flows` equal to `max_concurrent_flows`. On the 2026-09-10
+  run, rows n, o, p and t answered `409` while another row's intervention held the only window, so a busy
+  answer proved nothing about the row's own target and hid real regressions behind retries. A `409` with a free
+  window slot is a defect in the row or the service, not congestion: record it as a FAIL at once instead of
+  retrying it.
 
 ### Part 1 - Real-world URL matrix (single-call verdict)
 
 | # | URL | Forces | Expected | Gate |
 | :- | :-- | :----- | :------- | :--- |
 | **Easy - curl_cffi static + extraction** | | | | |
-| a | `https://example.com/` | static fetch | success (`"example domain"`) | **gated** |
+| a | `https://example.com/` | static fetch | success (`"documentation examples"`, measured 2026-10-28) | **gated** |
 | b | `https://en.wikipedia.org/wiki/Web_scraping` | static article | success (`"web scraping"`) | **gated** |
-| c | `https://books.toscrape.com/` | scraping sandbox | success | **gated** |
+| c | `https://books.toscrape.com/` | scraping sandbox | success (`"in stock"`, measured 2026-10-28) | **gated** |
 | d | `https://news.ycombinator.com/` | minimal static HTML | success | **gated** |
 | **Medium - Playwright JS render** | | | | |
 | e | `https://quotes.toscrape.com/js/` | JS sandbox | success (`"The world as we have created it"`) | **gated** |
@@ -63,8 +69,23 @@ solve leaves behind. This spec has no human step and runs fully automated.
 | w | `{{scrap_url_amazon_com}}` (amazon.com product) | click-through interstitial | success or intervention | best-effort + content-gated |
 | x | `{{scrap_url_amazon_uk}}` (amazon.co.uk product) | click-through interstitial | success or intervention | best-effort + content-gated |
 | y | `{{scrap_url_amazon_se}}` (amazon.se product) | click-through interstitial | success or intervention | best-effort + content-gated |
+| **Challenge walls in other languages** | | | | |
+| aa | `https://www.amazon.de/errors/validateCaptcha` | validateCaptcha page (German) | intervention | **gated** |
+| ab | `https://www.amazon.fr/errors/validateCaptcha` | validateCaptcha page (French) | intervention | **gated** |
+| ac | `https://www.amazon.it/errors/validateCaptcha` | validateCaptcha page (Italian) | intervention | **gated** |
+| ad | `https://www.amazon.es/errors/validateCaptcha` | validateCaptcha page (Spanish) | intervention | **gated** |
+| ae | `https://www.amazon.co.jp/errors/validateCaptcha` | validateCaptcha page (Japanese) | intervention | **gated** |
+| **Widgets that are not walls** | | | | |
+| af | `https://friendlycaptcha.com/` | catalogue widget + 786-word page | success | **gated** |
+| ag | `https://www.mtcaptcha.com/` | catalogue widget + 702-word page | success | **gated** |
+| ah | `https://www.hcaptcha.com/` | catalogue widget + 442-word page | success | **gated** |
+| **Wikipedia in other languages (live guard check on non-Latin scripts)** | | | | |
+| ai | `https://ja.wikipedia.org/wiki/日本` | Japanese article (infobox canary `君が代`, measured 2026-10-26) | success (`"君が代"`) | **gated** |
+| aj | `https://ar.wikipedia.org/wiki/مصر` | Arabic article (infobox canary `جمهورية مصر العربية`, measured 2026-10-26) | success (`"جمهورية مصر العربية"`) | **gated** |
+| **Tier-pinned live check (moved from task 6.2)** | | | | |
+| ak | `https://nowsecure.nl` | tier `4a-patchright` | success or intervention | best-effort |
 
-> **Gated rows** (a, b, c, d, e, q) hard-assert their verdict. **Best-effort rows** assert only that the response is a
+> **Gated rows** (a, b, c, d, e, q, aa, ab, ac, ad, ae, af, ag, ah, ai, aj) hard-assert their verdict. **Best-effort rows** assert only that the response is a
 > *valid terminal verdict* - either (`200` + `success` + content) **or** (`428` + `human_intervention_required` +
 > `vnc_url`) - never gated on which; a malformed/5xx/empty response fails them. The login behavior is fully covered by
 > Part 2 (saucedemo, a real login + real session); LinkedIn/indeed stay here as best-effort rows (real scripted login
@@ -114,11 +135,15 @@ monitor to time out, and do not stall the sweep waiting on a human. The mandator
 spec 11 ([11-captcha-solve-and-capture-test.md](11-captcha-solve-and-capture-test.md)), whose whole point is the
 human solve.
 
-**Dependency on the pending anti-bot fix.** Rows v, w, x and y assert behaviour the currently deployed build does not
-have on the interstitial path: a live probe of each locale's `/errors/validateCaptcha` through
-`POST /api/v2/web/read` returns HTTP `200` with `status="success"` and the interstitial as `content`. Whenever a run
-of v/w/x/y lands on an interstitial rather than the real product page, the row will FAIL until the fix that converts
-that case into an honest `428` is deployed. Row u needs no fix - Allegro's block page already escalates to
+**Intervention handling on rows aa to ae.** Each of rows aa to ae returns `428` and spawns a NoVNC monitor
+that holds a headful browser for `NOVNC_TIMEOUT_SECONDS` (600 s by default). These rows are gated on the
+intervention verdict, and **no human is expected to solve them**: record each `vnc_url` in the run record,
+leave the monitors to time out, and do not stall the sweep waiting on a human.
+
+**The pending anti-bot fix is this change.** Rows v, w, x and y use the scored challenge verdict this change
+adds: an interstitial on the locale path answers HTTP `428` with `code="human_intervention_required"` and a
+non-empty `vnc_url`, never HTTP `200` with `status="success"` carrying the interstitial as content. Rows v, w, x
+and y stay best-effort and content-gated. Row u needs no fix - Allegro's block page already escalates to
 intervention.
 
 ### Part 2 - Login → session reuse (saucedemo, AUTOMATED, 2 calls)
@@ -132,7 +157,8 @@ the login-reuse behavior in CI.
   in") and has **none** of the authenticated-inventory product descriptions. This proves the read hit the login wall
   *before* any login is attempted.
 - **Seed:** run the harness `e2e/harness/seed_authenticated_session.py` - scripted login with saucedemo's hardcoded
-  public credentials → capture `storage_state` → store under `session:saucedemo.com:e2e` (the key uses the
+  public credentials → capture `storage_state` → import it over HTTP with `POST /api/v2/web/session/import` and
+  `profile=e2e` (the service stores it under `session:saucedemo.com:e2e`; the key uses the
   *registrable* domain; `www.` is stripped).
 - **Call 2 - after login (fresh request):** read the same URL with `profile=e2e`. Expect HTTP 200, `status="success"`,
   and content containing an **auth-only product description** (e.g. `"ringspun combed cotton"`, `"quarter-zip fleece"`,
@@ -155,7 +181,19 @@ Check the ascend-web-hunter server is reachable.
 curl -fsS http://localhost:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
+
+Check the matrix runs with a cap of at least 5, so the window of spec 11 or of spec 20
+([20-concurrent-interventions-test.md](20-concurrent-interventions-test.md)) cannot starve it. The cap is
+`NOVNC_MAX_CONCURRENT_FLOWS`, which the sibling change `open-several-novnc-windows-at-once` provides and which
+is built before this change.
+
+```bash
+curl -fsS http://localhost:7021/api/v2/session/interventions
+```
+
+Expect a body with `active_flows` `0` and `max_concurrent_flows` at least `5`. This is the one cap rule of
+spec 7.
 
 Part 2 (saucedemo) needs no credentials: saucedemo's public demo credentials are hardcoded in the harness.
 
@@ -227,7 +265,10 @@ bru run "web-hunter/testing/realworld" --env ascend-local -o "/tmp/realworld-run
 ```
 
 Part 1, retry of a busy row. For each entry in that JSON whose response is HTTP `409` with `code="novnc_busy"`,
-read the `Retry-After` header and the body's `holder_url` from the entry, wait the `Retry-After` seconds, then
+first confirm the run genuinely saturated the cap: the listing must have reported `active_flows` equal to
+`max_concurrent_flows` at that moment. A `409` with a free window slot is a FAIL at once (see Contract), never
+a retry. For a saturated `409`, read the `Retry-After` header and the body's `holder_url` from the entry, wait
+the `Retry-After` seconds, then
 re-run only that row's own request file (`web-hunter/testing/realworld/realworld-<row>-<site>.yml`, for example
 `realworld-u-allegro-product.yml`) with the same `-o <file> -f json` flags into its own file, up to 3 attempts in
 total. Record each attempt and each 409 body's `holder_url` in the run record. The row is a FAIL only after its
@@ -235,7 +276,7 @@ third 409.
 
 ## Expected
 
-- **Part 1:** gated rows (a, b, c, d, e, q) match their verdict exactly - a-e are `200`/`success` (+ canary where
+- **Part 1:** gated rows (a, b, c, d, e, q, aa, ab, ac, ad, ae, af, ag, ah, ai, aj) match their verdict exactly - a-e are `200`/`success` (+ canary where
   noted), q is the `400` hard-fail. Best-effort rows each return a valid terminal verdict (`200`/`success`/content
   **or** `428`/`human_intervention_required`/`vnc_url`); which one is recorded, not failed. A `409` with
   `code="novnc_busy"` is not a verdict: the runner reads its `Retry-After` header and `holder_url` from the
@@ -246,6 +287,8 @@ third 409.
   `content` contains the row's product-identity canary (`er-cbn1` for u, `B09D14YFR9` for v, `9780132350884` for
   w/x/y) and none of the row's interstitial / block-page markers. A `200`/`success` carrying an interstitial fails
   the row.
+- **Part 1, tier-pinned row (ak):** read with tier `4a-patchright`; a valid terminal verdict as above
+  (HTTP `200`/`success`/content **or** HTTP `428`/`human_intervention_required`/`vnc_url`), never a 5xx.
 - **Part 2 - login reuse:** Call 1 (anon) content has **no** auth-only inventory markers; Call 2 (after login)
   returns `status="success"` with an auth-only product description.
 
@@ -262,10 +305,14 @@ The login-and-seed harness is a Playwright script under `e2e/harness/`.
 ## Concurrency
 
 - Mutates: Redis, the ascend-web-hunter session store, keys for the matrix domains (including `allegro.pl`,
-  `amazon.pl`, `amazon.com`, `amazon.co.uk` and `amazon.se` from the retail anti-bot rows) and `saucedemo.com`
+  `amazon.pl`, `amazon.com`, `amazon.co.uk` and `amazon.se` from the retail anti-bot rows, and the five rows
+  aa to ae mutating the session keys for five Amazon marketplaces: `amazon.de`, `amazon.fr`,
+  `amazon.it`, `amazon.es` and `amazon.co.jp`) and `saucedemo.com`
   (`e2e` profile).
 - Conflicts with: test 6 and any test sharing a target domain's session key, and test 11, because this spec's reset
-  flushes every `session:*` key (which would wipe test 11's democaptcha capture between its two calls) and row u's
-  428 holds the single NoVNC browser test 11's human needs. Within this test, Part 2's sequence (anon, then seed,
+  flushes every `session:*` key (which would wipe test 11's democaptcha capture between its two calls). Row u's
+  428 holds one NoVNC window slot test 11's human may need, and the matrix must not run beside spec 20
+  ([20-concurrent-interventions-test.md](20-concurrent-interventions-test.md)), which fills every window slot on
+  purpose. Within this test, Part 2's sequence (anon, then seed,
   then authed) is strictly ordered.
 - Serial: false vs non-overlapping tests. No human step, so every part may fan out across e2e-runner subagents.

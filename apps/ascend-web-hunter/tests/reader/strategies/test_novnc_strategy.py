@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.api.exceptions import HumanInterventionRequiredException
+from src.reader.cloudflare.challenge_signals import ChallengeVerdict
 from src.reader.novnc.flow_registry import NoVNCFlowRegistry, flow_key_for, novnc_flow_registry
 from src.reader.strategies.novnc_strategy import NoVNCStrategy
 from tests.reader.novnc.test_flow_registry import FakeRedis
@@ -86,6 +87,33 @@ async def test_novnc_get_html_raises_captcha_intervention_when_no_login_url() ->
 
     # then
     assert exc.value.intervention_type == "captcha"
+
+
+@pytest.mark.asyncio
+async def test_novnc_get_html_prefers_login_verdict_over_plain_url() -> None:
+    # given a plain URL with no login redirect markers and a login wall verdict
+    strategy = NoVNCStrategy()
+    verdict = ChallengeVerdict(
+        score=130,
+        threshold=100,
+        signals=(),
+        vendor=None,
+        wall=True,
+        has_content=False,
+        intervention_type="login",
+    )
+
+    # when
+    with (
+        patch("src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL", "http://vnc"),
+        patch("src.reader.strategies.novnc_strategy.asyncio.create_task", side_effect=_discard_coro),
+    ):
+        with pytest.raises(HumanInterventionRequiredException) as exc:
+            await strategy.get_html("http://test.com", verdict)
+
+    # then the flow and the 428 carry the verdict type, not the URL fallback
+    assert exc.value.intervention_type == "login"
+    assert novnc_flow_registry.local()[0].intervention_type == "login"
 
 
 @pytest.mark.asyncio

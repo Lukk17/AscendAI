@@ -78,6 +78,16 @@ async def _unsubscribe(pubsub: Any) -> None:
         logger.warning("read_cache_purge: unsubscribe failed")
 
 
+async def _close(pubsub: Any) -> None:
+    aclose = getattr(pubsub, "aclose", None)
+    if aclose is None:
+        return
+    try:
+        await aclose()
+    except Exception:
+        logger.warning("read_cache_purge: close failed")
+
+
 async def run_subscriber(
     reader: PurgeReader,
     get_client: ClientFactory,
@@ -92,9 +102,15 @@ async def run_subscriber(
             continue
         try:
             pubsub = client.pubsub()
+        except Exception:
+            logger.warning("read_cache_purge: subscribe failed, retrying")
+            await _wait_reconnect(stop)
+            continue
+        try:
             await pubsub.subscribe(READ_CACHE_PURGE_CHANNEL)
         except Exception:
             logger.warning("read_cache_purge: subscribe failed, retrying")
+            await _close(pubsub)
             await _wait_reconnect(stop)
             continue
         if not first_connection:
@@ -113,4 +129,5 @@ async def run_subscriber(
             logger.warning("read_cache_purge: connection lost, retrying")
         finally:
             await _unsubscribe(pubsub)
+            await _close(pubsub)
         await _wait_reconnect(stop)

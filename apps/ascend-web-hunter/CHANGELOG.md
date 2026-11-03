@@ -9,16 +9,37 @@ bump it before every release. The `version` in `pyproject.toml` is a cosmetic la
 release workflow does not read; if the two ever disagree, this file wins for release
 purposes.
 
-## [0.0.13] - <release date>
+## [0.0.15] - <release date>
 
 ### Added
 - Polling crawl jobs (`POST /api/v1/crawl/jobs`, status, list, cancel, plus the `crawl_submit`,
   `crawl_job_status`, `crawl_list_jobs` and `crawl_cancel_job` MCP tools) over a shared Redis
-  frontier: several instances share one crawl through Lua claim scripts with per-domain politeness,
-  results land in Floci under `tenant/<tenantId>/`, recrawls copy unchanged pages forward
-  server-side. Every seed, discovered link, redirect hop, robots.txt and sitemap fetch passes the
-  same SSRF guard and connect-time pinning as a single read. Tests run the Lua scripts through
-  `fakeredis` (Lua support via `lupa`).
+  frontier, recorded as ADR-019 (design D14): several instances share one crawl through Lua claim
+  scripts with per-domain politeness, results land in Floci under `tenant/<tenantId>/`, recrawls
+  copy unchanged pages forward server-side.
+
+### Fixed
+- The `5-crawlee_adaptive` tier reads a URL again on every call. Each read now opens its own
+  in-memory Crawlee request queue and drops it when the crawl ends, because the shared default
+  queue on disk came back with the URL already handled, so the crawl processed zero requests and
+  answered an empty page. The reader treats an empty page as "escalate", so a navigation the guard
+  refused (the 302 to a non-allowlisted host) could open a NoVNC window instead of answering
+  `400 unsafe_uri`. A crawl that handles no request now raises `ExtractionFailedError`
+  (`502 extraction_failed`) on both the read and the read-with-links path, and the tier always
+  takes the browser path, where the navigation guard is installed, never the unguarded static
+  sub-crawler.
+
+## [0.0.14] - <release date>
+
+### Added
+- `POST /api/v2/web/session/import` stores a captured Playwright storage state for the URL's
+  registrable domain under `session:{domain}:{profile}` with provenance value `import`, dropping
+  cookies of other domains and purging the domain read cache on every instance, so the next read
+  uses the new session. Refusals are problem bodies with codes `invalid_profile` and
+  `no_cookies_for_domain`. The e2e harness `seed_authenticated_session.py` now seeds over HTTP
+  through this endpoint and no longer imports service code (design D5).
+
+## [0.0.13] - <release date>
 
 ### Removed
 - The `3-flaresolverr` tier, its strategy, its `FLARESOLVERR_URL` and `FLARESOLVERR_ENABLED`
@@ -46,6 +67,82 @@ purposes.
   expected upstream `extraction_failed`.
 - Cross-container read-cache purge: clearing a session publishes the domain on the `read_cache_purge`
   Redis channel and every container's subscriber drops that domain's cached reads.
+
+## [0.0.11] - <release date>
+
+### Added
+- Two automated browser tiers in the ladder, both free and self-hosted: `4a-patchright` drives a
+  patched Chromium through the Patchright drop-in for the Playwright API, and `4b-camoufox` drives a
+  hardened Firefox, tried when `4a-patchright` is detected or fails and only while `CAMOUFOX_ENABLED`
+  is true (default `true`). The ladder is `1-beautifulsoup`, `2-trafilatura`, `3-flaresolverr` (only
+  while enabled), `4-playwright_stealth`, `4a-patchright`, `4b-camoufox`, `5-crawlee_adaptive` and
+  `6-novnc`, and both new values are accepted by the REST `tier` field and the MCP `web_read` `tier`
+  argument.
+- Per-domain tier memory: the tier that last succeeded for a registrable domain is kept in Redis and
+  the next read starts there, decaying back to the start of the ladder after `TIER_MEMORY_TTL_SECONDS`
+  (default `86400`). A caller-selected `tier` always wins over the memory.
+- The guarded route handler every browser tier installs: each page load, redirect hop and subresource
+  request is checked against the shared URI guard before the browser connects, and a request that
+  fails is blocked (ADR-015, with a dated amendment to ADR-011 listing the two new public values).
+
+### Changed
+- FlareSolverr stays for one release behind `FLARESOLVERR_ENABLED` (default `false`). While it is off
+  the `3-flaresolverr` tier is skipped by the ladder, a caller that names it gets `409`
+  `tier_disabled`, readiness does not probe it, and a session it produced earlier is replayed by the
+  browser tiers.
+- The two waits `playwright_strategy.py` held as code are settings now, `NETWORKIDLE_POLL_MS`
+  (default `1000`) and `SCROLL_PAUSE_MS` (default `200`), read by every browser tier.
+- Image size grew from 5.6 GB to 10.4 GB with the two patched browser tiers, measured on
+  linux/amd64 on 2026-11-02 by building the commit before this change and the current tree.
+
+## [0.0.10] - <release date>
+
+### Added
+- One scored challenge verdict in place of four booleans: `ChallengeDetector.assess(status_code,
+  headers, html)` returns a `ChallengeVerdict` carrying the score, every signal that fired with its
+  weight, the vendor the signals point at when they point at one, and the intervention type, while
+  `is_blocked`, `has_real_content` and `is_content_accepted` keep their names as thin readers of it.
+- Wall detection that does not depend on language. The evidence is what a wall cannot translate: a
+  definitive vendor response header, vendor script, cookie and header signatures, the HTTP status,
+  the shape of the page, and the ratio of extracted words to bytes, links and article structure. A
+  page is a wall at `CHALLENGE_SCORE_THRESHOLD` (default `100`) or on a definitive signal, which
+  carries twice the threshold so no guard can cancel it, and a page carrying
+  `CHALLENGE_RICH_CONTENT_WORDS` of extracted article text is pulled back below the threshold unless
+  a definitive signal says otherwise.
+- `challenge_dictionary.json` as the one maintained catalogue file, holding each vendor marker and
+  each phrase translation with the source it was taken from, so a marker with no source or a
+  translation with no provenance fails a test. Phrases are normalised before matching and stay a
+  supplement only, sixteen canonical phrases over thirty BCP 47 languages.
+- A counter per signal and per verdict, a histogram of scores, and one log line per verdict at or
+  above half the threshold carrying the score, the signals, the vendor, the tier and the URL. The
+  exception carries the verdict, so the line a tier writes when it escalates says why (ADR-014, with
+  a dated amendment to ADR-001).
+
+## [0.0.9] - <release date>
+
+### Added
+- Concurrent NoVNC intervention windows. Each flow owns its own Chromium process, browser context,
+  page and monitor task, nothing is shared except the X display and the Redis the session store lives
+  in, and every launch uses `--remote-debugging-port=0` with `--remote-debugging-address=127.0.0.1`,
+  so the operating system assigns a free port and two launches never contend for one.
+- `NOVNC_MAX_CONCURRENT_FLOWS` (default `4`) replaces the global single-flow lock. Each window sits at
+  its own deterministic cascade position on the shared display, a second request for a site and
+  profile that already has a live window joins that window and receives the same `vnc_url` and flow
+  identifier, and a flow's lease runs from its own start for `NOVNC_TIMEOUT_SECONDS` plus
+  `NOVNC_FLOW_LEASE_GRACE_SECONDS` (default `30.0`), with a sweep every
+  `NOVNC_FLOW_SWEEP_INTERVAL_SECONDS` (default `30.0`) that cancels a dead flow and takes its window
+  off the display.
+- `GET /api/v2/session/interventions` on REST and `session_interventions` on MCP list the live flows
+  of every container with their windows and remaining lease. The 428 answer gains `flow_id`, `joined`
+  and `window` (slot index and pixel rectangle), and the 409 answer gains `active_flows`,
+  `max_concurrent_flows` and a `flows` array, with `holder_url` and `holder_profile` now describing
+  the oldest live flow (ADR-013, with a dated amendment to ADR-003).
+
+### Changed
+- A 409 is answered only when the cap is reached. A flow that raises, times out, is cancelled or loses
+  its browser closes its own browser, frees its own slot and records its own outcome without touching
+  a sibling, shutdown cancels every live monitor and waits bounded for each to close, and setting
+  `NOVNC_MAX_CONCURRENT_FLOWS` to `1` restores one window at a time without a code change.
 
 ## [0.0.8] - <release date>
 

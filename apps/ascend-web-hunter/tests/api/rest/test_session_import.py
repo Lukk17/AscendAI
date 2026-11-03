@@ -6,6 +6,7 @@ import pytest
 from httpx import AsyncClient
 
 from src.reader.cloudflare.cookie_manager import PRODUCED_BY_IMPORT, PRODUCED_BY_LOGIN_SEED
+from src.session.session_manager import SessionManager
 
 _URL = "https://www.example.net/page"
 _STORAGE = {
@@ -59,9 +60,7 @@ def _payload(**overrides: Any) -> dict[str, Any]:
     return base
 
 
-def _assert_problem(
-    body: dict[str, Any], code: str, instance: str = "/api/v2/web/session/import"
-) -> None:
+def _assert_problem(body: dict[str, Any], code: str, instance: str = "/api/v2/web/session/import") -> None:
     assert body["code"] == code
     assert body["type"] == f"https://ascend.ai/errors/{code.replace('_', '-')}"
     assert body["status"] == 400
@@ -386,3 +385,54 @@ async def test_imported_record_replays_like_login_seed() -> None:
     assert PRODUCED_BY_IMPORT == "import"
     assert import_keys == seed_keys
     assert import_keys
+
+
+@pytest.mark.asyncio
+async def test_import_success_publishes_domain_purge_once(client: AsyncClient) -> None:
+    # when
+    with (
+        patch(
+            "src.api.rest.rest_endpoints.cookie_manager.save_storage_state",
+            new=AsyncMock(),
+        ),
+        patch(
+            "src.api.rest.rest_endpoints.web_reader.clear_cache_for_domain",
+            return_value=1,
+        ) as mock_clear,
+        patch(
+            "src.api.rest.rest_endpoints.publish_purge",
+            new=AsyncMock(return_value=True),
+        ) as mock_publish,
+    ):
+        resp = await client.post("/api/v2/web/session/import", json=_payload())
+
+    # then
+    assert resp.status_code == 200
+    mock_clear.assert_called_once_with("example.net")
+    mock_publish.assert_awaited_once_with("example.net")
+
+
+@pytest.mark.asyncio
+async def test_session_clear_still_publishes_domain_purge_once(client: AsyncClient) -> None:
+    # when
+    with (
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
+        patch.object(SessionManager, "clear", new=AsyncMock(return_value=True)),
+        patch(
+            "src.api.rest.rest_endpoints.web_reader.clear_cache_for_domain",
+            return_value=2,
+        ) as mock_clear,
+        patch(
+            "src.api.rest.rest_endpoints.publish_purge",
+            new=AsyncMock(return_value=True),
+        ) as mock_publish,
+    ):
+        resp = await client.post(
+            "/api/v2/web/session/clear",
+            json={"url": "https://www.example.net/page"},
+        )
+
+    # then
+    assert resp.status_code == 200
+    mock_clear.assert_called_once_with("example.net")
+    mock_publish.assert_awaited_once_with("example.net")

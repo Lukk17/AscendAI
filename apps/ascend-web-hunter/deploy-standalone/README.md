@@ -153,7 +153,7 @@ Three secrets live in `.env` and nothing else should, plus one optional connecti
 | CHALLENGE_WEIGHT_THIN_TEXT | No | Weight of the thin_text signal. Code default `20` applies when unset. |
 | CHALLENGE_WEIGHT_FEW_LINKS | No | Weight of the few_links signal. Code default `20` applies when unset. |
 | CHALLENGE_WEIGHT_NO_ARTICLE | No | Weight of the no_article signal. Code default `20` applies when unset. |
-| CHALLENGE_WEIGHT_RICH_CONTENT | No | Weight of the rich_content guard signal. Code default `-60` applies when unset. |
+| CHALLENGE_WEIGHT_RICH_CONTENT | No | Weight of the rich_content guard signal. Code default `-70` applies when unset. |
 | CHALLENGE_WEIGHT_MANY_LINKS | No | Weight of the many_links guard signal. Code default `-20` applies when unset. |
 | CHALLENGE_WEIGHT_PHRASE_TITLE | No | Weight of the phrase_title signal. Code default `60` applies when unset. |
 | CHALLENGE_WEIGHT_PHRASE_BODY | No | Weight of the phrase_body signal. Code default `30` applies when unset. |

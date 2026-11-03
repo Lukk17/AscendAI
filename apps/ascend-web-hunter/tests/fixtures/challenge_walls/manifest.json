@@ -657,7 +657,7 @@
   },
   {
     "path": "synthetic-ddosguard.html",
-    "vendor": "ddos-guard",
+    "vendor": "ddos_guard",
     "language": "en",
     "kind": "wall",
     "status": 200,
@@ -981,5 +981,116 @@
       "signals_must_not_fire": []
     },
     "notes": "Raw script-only application shell."
+  },
+  {
+    "path": "blog-recaptcha-comment-form.html",
+    "vendor": "recaptcha",
+    "language": "en",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8"
+    },
+    "cookie_names": {},
+    "source_url": "https://www.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/",
+    "captured_on": "2026-11-02",
+    "captured_with": "curl_cffi 0.15.0 impersonate=chrome",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": "recaptcha",
+      "signals_must_fire": [
+        "vendor_script",
+        "rich_content"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Real article hosting a reCAPTCHA comment form; rich_content and many_links hold it below the threshold."
+  },
+  {
+    "path": "mtcaptcha-demo-rendered.html",
+    "vendor": "mtcaptcha",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://service.mtcaptcha.com/mtcv1/demo/",
+    "captured_on": "2026-11-03",
+    "captured_with": "playwright chromium, domcontentloaded plus 8 s",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "login",
+      "vendor": "mtcaptcha",
+      "signals_must_fire": [
+        "vendor_script",
+        "captcha_input",
+        "captcha_element"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "MTCaptcha demo studio after rendering: a live login card (email, password, captcha widget), thin text, scores well above the threshold. Doubles as the login page with a captcha."
+  },
+  {
+    "path": "arkose-iframe.html",
+    "vendor": "arkose",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {
+      "content-type": "text/html",
+      "server": "cloudfront"
+    },
+    "cookie_names": {},
+    "source_url": "https://iframe.arkoselabs.com/",
+    "captured_on": "2026-11-03",
+    "captured_with": "curl_cffi 0.15.0 impersonate=chrome",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "arkose",
+      "signals_must_fire": [
+        "vendor_script"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Arkose enforcement iframe landing page (cloudfront): vendor script loads the challenge, thin text, no article."
+  },
+  {
+    "path": "synthetic-friendly-captcha.html",
+    "vendor": "friendly_captcha",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {},
+    "cookie_names": [],
+    "source_url": "",
+    "captured_on": "2026-11-03",
+    "captured_with": "synthetic",
+    "synthetic": true,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "friendly_captcha",
+      "signals_must_fire": [
+        "vendor_script",
+        "captcha_input",
+        "captcha_element",
+        "phrase_body"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Built from the SDK markers in challenge_dictionary.json alone; no public Friendly Captcha page scored as a wall (best 80 of 100 on app.friendlycaptcha.eu)."
   }
 ]

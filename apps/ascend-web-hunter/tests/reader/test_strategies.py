@@ -2,6 +2,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from crawlee.statistics import FinalStatistics
 from playwright.async_api import Error as PlaywrightError
 
 from src.api.exceptions import ChallengeDetectedException
@@ -10,6 +11,7 @@ from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
 from src.reader.strategies.trafilatura_strategy import TrafilaturaStrategy
+from tests.reader.crawlee_test_support import final_statistics
 
 SAMPLE_HTML = "<html><body><p>Text</p><script>bad</script></body></html>"
 
@@ -777,7 +779,7 @@ async def test_crawlee_strategy_extract_returns_trafilatura_result() -> None:
         ),
     ):
         mock_crawler = MagicMock()
-        mock_crawler.run = AsyncMock()
+        mock_crawler.run = AsyncMock(return_value=final_statistics(1))
         mock_crawler.router.default_handler = lambda f: f
         mock_crawler.pre_navigation_hook = lambda f: f
         mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
@@ -794,9 +796,10 @@ async def test_crawlee_strategy_raises_challenge_on_login_wall() -> None:
     # given
     html = "<html><head><title>Sign In</title></head><body><p>" + "word " * 12 + "</p></body></html>"
 
-    async def fake_run(urls: list[str]) -> None:
+    async def fake_run(urls: list[str]) -> FinalStatistics:
         assert captured["default"] is not None
         await captured["default"](fake_context)
+        return final_statistics(1)
 
     captured: dict[str, Any] = {}
     fake_context = MagicMock()
@@ -823,9 +826,10 @@ async def test_crawlee_strategy_raises_challenge_on_waf_block() -> None:
     # given
     html = "<html><body><div id='cf-challenge-running'></div></body></html>"
 
-    async def fake_run(urls: list[str]) -> None:
+    async def fake_run(urls: list[str]) -> FinalStatistics:
         assert captured["default"] is not None
         await captured["default"](fake_context)
+        return final_statistics(1)
 
     captured: dict[str, Any] = {}
     fake_context = MagicMock()
@@ -966,7 +970,7 @@ async def test_crawlee_decorated_handlers_executed() -> Any:
 
     with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
         mock_crawler = MagicMock()
-        mock_crawler.run = AsyncMock()
+        mock_crawler.run = AsyncMock(return_value=final_statistics(1))
         mock_crawler.router.default_handler = capture_default
         mock_crawler.pre_navigation_hook = capture_pre_nav
         mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
@@ -1007,7 +1011,7 @@ async def test_crawlee_extract_empty_when_trafilatura_none() -> None:
         ),
     ):
         mock_crawler = MagicMock()
-        mock_crawler.run = AsyncMock()
+        mock_crawler.run = AsyncMock(return_value=final_statistics(1))
         mock_crawler.router.default_handler = lambda f: f
         mock_crawler.pre_navigation_hook = lambda f: f
         mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler

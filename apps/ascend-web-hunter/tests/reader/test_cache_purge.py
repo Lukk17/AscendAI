@@ -51,6 +51,7 @@ class _FakeRedis:
         self.fail_publish = fail_publish
         self.fail_subscribe = False
         self.fail_unsubscribe = False
+        self.fail_close = False
         self.explode_listen = False
 
     async def publish(self, channel: str, message: str) -> int:
@@ -63,6 +64,34 @@ class _FakeRedis:
 
     def pubsub(self) -> _FakePubSub:
         return _FakePubSub(self)
+
+
+class _ClosingFakePubSub(_FakePubSub):
+    def __init__(self, owner: "_FakeRedis") -> None:
+        super().__init__(owner)
+        self.closed = False
+
+    async def aclose(self) -> None:
+        if self.owner.fail_close:
+            raise ConnectionError("close blew up")
+        self.closed = True
+
+
+class _ClosingFakeRedis(_FakeRedis):
+    def pubsub(self) -> _ClosingFakePubSub:
+        return _ClosingFakePubSub(self)
+
+
+class _PubsubRaisesRedis(_FakeRedis):
+    def __init__(self, stop: asyncio.Event) -> None:
+        super().__init__(stop)
+        self.pubsub_calls = 0
+
+    def pubsub(self) -> _FakePubSub:
+        self.pubsub_calls += 1
+        if self.pubsub_calls == 1:
+            raise ConnectionError("pubsub blew up")
+        return super().pubsub()
 
 
 @pytest.fixture
@@ -342,3 +371,100 @@ async def test_stop_during_listen_breaks_out(stop: asyncio.Event) -> None:
 
     # then
     assert reader._memory_cache == {}
+
+
+@pytest.mark.asyncio
+async def test_subscribe_failure_closes_pubsub(stop: asyncio.Event, caplog: pytest.LogCaptureFixture) -> None:
+    # given
+    fake = _ClosingFakeRedis(stop)
+    fake.fail_subscribe = True
+    reader = _seeded_reader({})
+
+    # when
+    with (
+        patch("src.reader.cache_purge.settings.READ_CACHE_PURGE_RECONNECT_SECONDS", 0.01),
+        caplog.at_level("WARNING"),
+    ):
+        task = asyncio.create_task(run_subscriber(reader, lambda: fake, stop))
+        for _ in range(200):
+            if len(fake.subscribers) >= 2:
+                break
+            await asyncio.sleep(0.01)
+        stop.set()
+        await task
+
+    # then
+    closing = [s for s in fake.subscribers if isinstance(s, _ClosingFakePubSub)]
+    assert len(closing) >= 2
+    assert all(s.closed for s in closing)
+    assert any("subscribe failed" in record.message for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_reconnect_closes_previous_pubsub(stop: asyncio.Event) -> None:
+    # given
+    fake = _ClosingFakeRedis(stop)
+    fake.explode_listen = True
+    reader = _seeded_reader({_domain_key("example.com", "a"): "stale"})
+
+    # when
+    with patch("src.reader.cache_purge.settings.READ_CACHE_PURGE_RECONNECT_SECONDS", 0.01):
+        task = asyncio.create_task(run_subscriber(reader, lambda: fake, stop))
+        for _ in range(200):
+            if len(fake.subscribers) >= 2:
+                break
+            await asyncio.sleep(0.01)
+        stop.set()
+        await task
+
+    # then
+    closing = [s for s in fake.subscribers if isinstance(s, _ClosingFakePubSub)]
+    assert len(closing) >= 2
+    assert all(s.closed for s in closing)
+    assert reader._memory_cache == {}
+
+
+@pytest.mark.asyncio
+async def test_close_failure_warns_and_continues(
+    stop: asyncio.Event, caplog: pytest.LogCaptureFixture
+) -> None:
+    # given
+    fake = _ClosingFakeRedis(stop)
+    fake.fail_close = True
+    reader = _seeded_reader({})
+
+    # when
+    with (
+        patch("src.reader.cache_purge.settings.READ_CACHE_PURGE_RECONNECT_SECONDS", 0.01),
+        caplog.at_level("WARNING"),
+    ):
+        task = asyncio.create_task(run_subscriber(reader, lambda: fake, stop))
+        await asyncio.sleep(0.1)
+        stop.set()
+        await task
+
+    # then
+    assert any("close failed" in record.message for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_pubsub_creation_failure_retries_without_close(
+    stop: asyncio.Event, caplog: pytest.LogCaptureFixture
+) -> None:
+    # given
+    fake = _PubsubRaisesRedis(stop)
+    reader = _seeded_reader({_domain_key("example.com", "a"): "kept"})
+
+    # when
+    with (
+        patch("src.reader.cache_purge.settings.READ_CACHE_PURGE_RECONNECT_SECONDS", 0.01),
+        caplog.at_level("WARNING"),
+    ):
+        task = asyncio.create_task(run_subscriber(reader, lambda: fake, stop))
+        await asyncio.sleep(0.1)
+        stop.set()
+        await task
+
+    # then
+    assert fake.pubsub_calls >= 2
+    assert any("subscribe failed" in record.message for record in caplog.records)

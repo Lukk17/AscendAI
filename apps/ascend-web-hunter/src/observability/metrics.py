@@ -2,11 +2,12 @@ from prometheus_client import Counter, Gauge, Histogram
 
 from src.config.config import settings
 
-# outcome label values: "success" | "timeout" | "http_error" | "transport_error"
-SEARCH_RESULTS_TOTAL = Counter(
-    "ascendwebhunter_search_results_total",
-    "Number of search results returned per SearXNG call",
-    ["outcome"],
+# outcome label value "ok", observed once per completed search
+SEARCH_RESULTS_RETURNED = Histogram(
+    "search_results_returned",
+    "Number of search results returned per search",
+    ["engine", "outcome"],
+    buckets=(1, 2, 3, 5, 10, 20, 50),
 )
 
 STRATEGY_ATTEMPTS_TOTAL = Counter(

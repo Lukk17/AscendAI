@@ -9,7 +9,7 @@ Copy this file to `../runs/<UTC-timestamp>_4-mcp-tools-list-tasks.md` before sta
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 
 ### Reset state
 

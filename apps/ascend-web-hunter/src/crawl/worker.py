@@ -17,6 +17,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import cast
 from urllib.parse import urlparse
 
 import redis.asyncio as redis
@@ -180,6 +181,10 @@ class Worker:
             if len(answer) > 1:
                 await self._frontier.remove_runnable_member(member)
             return False
+        if status == "budget":
+            if len(answer) > 1 and answer[1] == "succeeded":
+                await self._finalize(tenant_id, job_id, member)
+            return False
         if status != "claimed":
             return False
         await self._process_claim(tenant_id, job_id, member, record, domain, answer[1], int(answer[2]))
@@ -229,8 +234,16 @@ class Worker:
                     logger.warning("crawl: page processing of %s failed: %s", url, exc)
                     outcome, page_line, links, skipped = "failed", "", [], 0
         await self._finish(
-            tenant_id, job_id, member, record, domain, entry,
-            outcome=outcome, page_line=page_line, links=links, skipped=skipped,
+            tenant_id,
+            job_id,
+            member,
+            record,
+            domain,
+            entry,
+            outcome=outcome,
+            page_line=page_line,
+            links=links,
+            skipped=skipped,
         )
 
     async def _is_disallowed(self, record: JobRecord, url: str) -> bool:
@@ -337,7 +350,7 @@ class Worker:
             probe = await self._probe(url, etag=etag, last_modified=last_modified)
             fresh_etag, fresh_last_modified = probe.etag, probe.last_modified
             if probe.status == 304:
-                copied = await self._copy_forward(tenant_id, scope, url, prior, prior_key, new_key)
+                copied = await self._copy_forward(tenant_id, scope, url, prior, prior_key, new_key, None, 0)
                 if copied is not None:
                     return copied
                 copyable = False
@@ -346,7 +359,9 @@ class Worker:
             return "failed", "", [], skipped
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
         if copyable and prior is not None and prior.get("hash") == digest and prior_key is not None:
-            copied = await self._copy_forward(tenant_id, scope, url, prior, prior_key, new_key)
+            copied = await self._copy_forward(
+                tenant_id, scope, url, prior, prior_key, new_key, links, skipped
+            )
             if copied is not None:
                 return copied
             copyable = False
@@ -354,7 +369,7 @@ class Worker:
         if fresh_etag is None and fresh_last_modified is None:
             fresh_etag, fresh_last_modified = await fetcher.head_validators(url)
         await self._write_recrawl(
-            tenant_id, scope, url, digest, fresh_etag, fresh_last_modified, new_key
+            tenant_id, scope, url, digest, fresh_etag, fresh_last_modified, new_key, links
         )
         line = json.dumps(
             {
@@ -376,7 +391,11 @@ class Worker:
         prior: dict[str, object],
         prior_key: str,
         new_key: str,
+        fresh_links: list[dict[str, object]] | None,
+        fresh_skipped: int,
     ) -> tuple[str, str, list[dict[str, object]], int] | None:
+        if fresh_links is None and not isinstance(prior.get("links"), list):
+            return None
         try:
             await self._results.copy_page_forward(prior_key, new_key)
         except Exception as exc:
@@ -387,6 +406,12 @@ class Worker:
         digest = prior.get("hash")
         raw_etag = prior.get("etag")
         raw_modified = prior.get("last_modified")
+        if fresh_links is not None:
+            links_out = fresh_links
+            skipped_out = fresh_skipped
+        else:
+            links_out = cast("list[dict[str, object]]", prior.get("links"))
+            skipped_out = 0
         await self._write_recrawl(
             tenant_id,
             scope,
@@ -395,6 +420,7 @@ class Worker:
             raw_etag if isinstance(raw_etag, str) else None,
             raw_modified if isinstance(raw_modified, str) else None,
             new_key,
+            links_out,
         )
         line = json.dumps(
             {
@@ -406,7 +432,7 @@ class Worker:
             },
             sort_keys=True,
         )
-        return "unchanged", line, [], 0
+        return "unchanged", line, links_out, skipped_out
 
     async def _extract(
         self, record: JobRecord, url: str, depth: int
@@ -445,8 +471,11 @@ class Worker:
             return None
         if result.get("status") != "success":
             return None
-        if "content" in result and isinstance(result["content"], str):
-            return result["content"]
+        if "content" in result:
+            shaped = result["content"]
+            if isinstance(shaped, str):
+                return shaped
+            return json.dumps(shaped, sort_keys=True, default=str)
         return json.dumps(result, sort_keys=True, default=str)
 
     async def _links_for(
@@ -467,9 +496,7 @@ class Worker:
             item = self._filter_link(record, url, depth + 1)
             if item is None:
                 continue
-            kept.append(
-                {"u": item, "d": depth + 1, "domain": cookie_manager.registrable_domain(item)}
-            )
+            kept.append({"u": item, "d": depth + 1, "domain": cookie_manager.registrable_domain(item)})
         return content, kept, skipped
 
     async def _write_recrawl(
@@ -481,13 +508,20 @@ class Worker:
         etag: str | None,
         last_modified: str | None,
         page_key: str,
+        links: list[dict[str, object]],
     ) -> None:
         try:
             await self._recrawl.write(
                 tenant_id,
                 scope,
                 url,
-                {"hash": digest, "etag": etag, "last_modified": last_modified, "page_key": page_key},
+                {
+                    "hash": digest,
+                    "etag": etag,
+                    "last_modified": last_modified,
+                    "page_key": page_key,
+                    "links": links,
+                },
             )
         except Exception as exc:
             logger.warning("crawl: recrawl write failed for %s: %s", url, exc)

@@ -132,9 +132,7 @@ def test_request_rejects_page_budget_outside_bounds(budget: int) -> None:
         ("CRAWL_MAX_PAGES", {"page_budget": 11}),
     ],
 )
-def test_changed_setting_changes_bound(
-    monkeypatch: Any, setting: str, kwargs: dict[str, Any]
-) -> None:
+def test_changed_setting_changes_bound(monkeypatch: Any, setting: str, kwargs: dict[str, Any]) -> None:
     # given a tightened setting below the import-time Field bound
     tightened = {"CRAWL_MAX_SEEDS": 2, "CRAWL_MAX_PATTERNS": 1, "CRAWL_MAX_DEPTH": 1, "CRAWL_MAX_PAGES": 10}
     base: dict[str, Any] = {"seeds": ["https://example.com/"]}

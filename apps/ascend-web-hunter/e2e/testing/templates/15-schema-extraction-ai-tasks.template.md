@@ -9,7 +9,7 @@ Copy this file to `../runs/<UTC-timestamp>_15-schema-extraction-ai-tasks.md` bef
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 - [ ] Fake site reachable: `curl -fsS http://127.0.0.1:7031/__requests` returns a request list
 - [ ] `EXTRACTION_LLM_BASE_URL`, `EXTRACTION_LLM_MODEL` and `EXTRACTION_LLM_API_KEY` name the hosted
       provider and model from the scenario preconditions (provider `minimax`, model `MiniMax-M2.7`)
@@ -35,7 +35,7 @@ Copy this file to `../runs/<UTC-timestamp>_15-schema-extraction-ai-tasks.md` bef
 - [ ] Call 1 body: `content.name` is the canary name, `content.price` is the canary price
 - [ ] Recipe key exists with TTL between `1` and `604800`
 - [ ] Call 2 body: same canary name and price
-- [ ] Call 3 body: same canary name and price; recipe selectors differ from the recorded ones
+- [ ] Call 3 body: same canary name and price with `recipe` `model` (model rebuilt on drift, no stale replay; stored selectors not compared, the model emits identical selectors for both layouts)
 - [ ] Call 4 body: `content` holds `sku` and no `name`
 - [ ] Call 5 body validates and does not hold `"MOTH-SECRET-99"`
 - [ ] Call 6 body: problem body with `code` `extraction_failed`

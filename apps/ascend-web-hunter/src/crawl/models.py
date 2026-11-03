@@ -23,20 +23,14 @@ class JobNotFoundError(Exception):
 class InvalidTenantError(ValueError):
     def __init__(self, tenant: str):
         self.tenant = tenant
-        self.message = (
-            f"Tenant {tenant!r} is not a value of [a-z0-9-] with 1 to 64 characters."
-        )
+        self.message = f"Tenant {tenant!r} is not a value of [a-z0-9-] with 1 to 64 characters."
         super().__init__(self.message)
 
 
 class CrawlRequest(BaseModel):
     seeds: list[AnyUrl] = Field(min_length=1, max_length=settings.CRAWL_MAX_SEEDS)
-    include_patterns: list[str] = Field(
-        default_factory=list, max_length=settings.CRAWL_MAX_PATTERNS
-    )
-    exclude_patterns: list[str] = Field(
-        default_factory=list, max_length=settings.CRAWL_MAX_PATTERNS
-    )
+    include_patterns: list[str] = Field(default_factory=list, max_length=settings.CRAWL_MAX_PATTERNS)
+    exclude_patterns: list[str] = Field(default_factory=list, max_length=settings.CRAWL_MAX_PATTERNS)
     max_depth: int = Field(
         default=settings.CRAWL_DEFAULT_DEPTH,
         ge=0,
@@ -85,6 +79,7 @@ class JobCounts(BaseModel):
     unchanged: int = Field(default=0, ge=0)
     failed: int = Field(default=0, ge=0)
     skipped_unsafe: int = Field(default=0, ge=0)
+
 
 class JobRecord(BaseModel):
     job_id: str = Field(min_length=1)

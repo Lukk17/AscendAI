@@ -8,7 +8,7 @@ ascend-web-hunter is an MCP server and REST API for web search and content extra
 
 - **Language**: Python 3.12
 - **Framework**: FastAPI + Uvicorn, FastMCP
-- **Version**: 0.0.13
+- **Version**: 0.0.15
 - **Docker Base**: `mcr.microsoft.com/playwright/python:v1.60.0-noble`
 
 ## Build & Run Commands
@@ -196,7 +196,7 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 - `CHALLENGE_WEIGHT_THIN_TEXT` - Weight of the thin_text signal (default: `20`)
 - `CHALLENGE_WEIGHT_FEW_LINKS` - Weight of the few_links signal (default: `20`)
 - `CHALLENGE_WEIGHT_NO_ARTICLE` - Weight of the no_article signal (default: `20`)
-- `CHALLENGE_WEIGHT_RICH_CONTENT` - Weight of the rich_content guard signal (default: `-60`)
+- `CHALLENGE_WEIGHT_RICH_CONTENT` - Weight of the rich_content guard signal (default: `-70`)
 - `CHALLENGE_WEIGHT_MANY_LINKS` - Weight of the many_links guard signal (default: `-20`)
 - `CHALLENGE_WEIGHT_PHRASE_TITLE` - Weight of the phrase_title signal (default: `60`)
 - `CHALLENGE_WEIGHT_PHRASE_BODY` - Weight of the phrase_body signal (default: `30`)

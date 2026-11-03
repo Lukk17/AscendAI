@@ -53,8 +53,10 @@ async def test_rest_schema_without_endpoint_is_400(client: AsyncClient) -> None:
     # when
     with (
         patch(_GUARD, return_value=True),
-        patch("src.api.rest.rest_endpoints.web_reader._select_strategies",
-              new=AsyncMock(return_value={"1-beautifulsoup": _StubStrategy()})),
+        patch(
+            "src.api.rest.rest_endpoints.web_reader._select_strategies",
+            new=AsyncMock(return_value={"1-beautifulsoup": _StubStrategy()}),
+        ),
         patch("src.reader.web_reader.recipe_lookup", new=AsyncMock(return_value=None)),
         patch("src.reader.web_reader.settings.EXTRACTION_LLM_BASE_URL", ""),
     ):
@@ -76,8 +78,10 @@ async def test_rest_schema_model_failure_is_502(client: AsyncClient) -> None:
     # when
     with (
         patch(_GUARD, return_value=True),
-        patch("src.api.rest.rest_endpoints.web_reader._select_strategies",
-              new=AsyncMock(return_value={"1-beautifulsoup": _StubStrategy()})),
+        patch(
+            "src.api.rest.rest_endpoints.web_reader._select_strategies",
+            new=AsyncMock(return_value={"1-beautifulsoup": _StubStrategy()}),
+        ),
         patch("src.reader.web_reader.recipe_lookup", new=AsyncMock(return_value=None)),
         patch(
             "src.reader.web_reader.run_schema_model",
@@ -147,9 +151,7 @@ async def test_rest_screenshot_with_links_is_400_bad_request(client: AsyncClient
 async def test_rest_schema_without_schema_is_400_validation(client: AsyncClient) -> None:
     # when
     with patch(_GUARD, return_value=True):
-        resp = await client.post(
-            "/api/v2/web/read", json={"url": _URL, "output_format": "schema"}
-        )
+        resp = await client.post("/api/v2/web/read", json={"url": _URL, "output_format": "schema"})
 
     # then
     assert resp.status_code == 400
@@ -164,8 +166,10 @@ async def test_mcp_schema_without_endpoint_is_tool_error() -> None:
     # when
     with (
         patch(_MCP_GUARD, return_value=True),
-        patch("src.api.mcp.mcp_server.web_reader._select_strategies",
-              new=AsyncMock(return_value={"1-beautifulsoup": _StubStrategy()})),
+        patch(
+            "src.api.mcp.mcp_server.web_reader._select_strategies",
+            new=AsyncMock(return_value={"1-beautifulsoup": _StubStrategy()}),
+        ),
         patch("src.reader.web_reader.recipe_lookup", new=AsyncMock(return_value=None)),
         patch("src.reader.web_reader.settings.EXTRACTION_LLM_BASE_URL", ""),
         pytest.raises(Exception, match=r"^extraction_not_configured: ") as exc_info,
@@ -181,8 +185,10 @@ async def test_mcp_schema_model_failure_is_tool_error() -> None:
     # when
     with (
         patch(_MCP_GUARD, return_value=True),
-        patch("src.api.mcp.mcp_server.web_reader._select_strategies",
-              new=AsyncMock(return_value={"1-beautifulsoup": _StubStrategy()})),
+        patch(
+            "src.api.mcp.mcp_server.web_reader._select_strategies",
+            new=AsyncMock(return_value={"1-beautifulsoup": _StubStrategy()}),
+        ),
         patch("src.reader.web_reader.recipe_lookup", new=AsyncMock(return_value=None)),
         patch(
             "src.reader.web_reader.run_schema_model",

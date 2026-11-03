@@ -218,9 +218,7 @@ async def test_image_route_uses_poll_hint_and_timeout(tmp_path: Path) -> None:
     # given
     async def handle(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
-            return httpx.Response(
-                202, json={"job_id": "job1", "poll_after_seconds": 5, "state": "waiting"}
-            )
+            return httpx.Response(202, json={"job_id": "job1", "poll_after_seconds": 5, "state": "waiting"})
         return httpx.Response(200, json={"state": "running", "poll_after_seconds": 5})
 
     # when
@@ -385,9 +383,7 @@ async def test_audio_transcribed(tmp_path: Path) -> None:
         return httpx.Response(200, text="# invented canary transcript")
 
     # when
-    with patch(
-        "src.reader.document_router._download", return_value=_write(tmp_path, b"ID3fakeaudio")
-    ):
+    with patch("src.reader.document_router._download", return_value=_write(tmp_path, b"ID3fakeaudio")):
         result = await route_document("https://cdn.example.com/a.mp3", client=_stub_client(handle))
 
     # then
