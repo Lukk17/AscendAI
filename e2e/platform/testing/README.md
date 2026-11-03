@@ -8,7 +8,7 @@ Every spec file is the immutable spec for one test and uses the same fixed templ
 
 1. What this verifies. Bullet list of behaviours.
 2. Prerequisites. Concrete check commands the runner executes before starting. Each command is its own code block. The prose around it states what success looks like.
-3. Reset state. One command per code block, executed in order, to wipe state so the test is reproducible. The metrics and targets spec writes nothing, so it needs no post-run cleanup. The AI traffic spec removes the chat history rows, Redis keys, and memory points of its own test user.
+3. Reset state. One command per code block, executed in order, to wipe state so the test is reproducible. The metrics and targets spec wipes the memories of its own canary user after the run. The AI traffic spec removes the chat history rows, Redis keys, and memory points of its own test user.
 4. Run. Numbered steps. Each step is a single Bruno CLI invocation from the platform collection, a curl check, or a docker compose exec query against Loki or Tempo. Steps wait for HTTP 200 before continuing unless the spec expects another status.
 5. Expected. Observable-behaviour assertions verified after each step: HTTP status codes, response body shape, Prometheus target health and series, Loki entry counts per service, Tempo traces and span names. Not log substrings.
 6. Fixtures. Paths to local files the test reads, or None. Platform specs use none today, see the fixtures guide.

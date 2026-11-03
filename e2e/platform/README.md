@@ -30,14 +30,15 @@ apps/ascend-ocr/e2e/
 
 ## Spec classes
 
-Each spec takes the next free number of this suite when it is written, never a number fixed in tasks.md. Task 17.4 moved to add-ascend-python-common and upgrade-spring-boot-4, so it leaves no spec here.
+Each spec takes the next free number of this suite when it is written, never a number fixed in tasks.md. Task 17.4 split into add-ascend-python-common and upgrade-spring-boot-4: the Python half is the error-to-trace spec below, and the agent half joins that same spec later.
 
 | Task | Spec | What it proves |
 | :--- | :--- | :--- |
-| 17.3 | metrics and targets | Every scrape job of infra/observability/prometheus/prometheus.yaml reports up in Prometheus, without writing any state |
+| 17.3 | metrics and targets | Every scrape job of infra/observability/prometheus/prometheus.yaml reports up in Prometheus, and one memory insert leaves a `memory_operations_total` insert series behind, wiped again after the run |
 | 17.5 | logs reach Loki | One refused request per running service shows up as entries in Loki, counted per service, never matched by text |
 | 17.6 | actuator exposure | The agent serves metrics only on the internal management port and the weather service only on its application port, and the closed actuator endpoints answer 404 |
 | 17.7 | AI traffic observability | One model call per provider leaves token series, cache series, a Tempo trace with a chat span and a tool span, and non-empty dashboard queries |
+| 17.4 | error to trace | A refused request to AscendMemory answers a 404 problem body whose `traceId` names a trace Tempo holds with an `ascend-memory` span, and no model is called |
 
 Tasks 17.8 and 17.9 own the rows of this table and the list of what is not tested end to end. See [testing/README.md](testing/README.md) for the spec format and [docs/E2E_RUN_SCENARIOS.md](../../docs/E2E_RUN_SCENARIOS.md) for the run scenarios.
 
@@ -53,7 +54,7 @@ so it stays a portable API client artifact next to the other collections. Each s
 
 Pass criteria are observable behaviour only: HTTP status, response bodies, Prometheus targets and series, the number of Loki entries, and the traces Tempo holds. Never the text of a log line.
 
-Every spec but the one of task 17.7 is deterministic: no AI model is called, and every Bruno request asserts its result in its own tests script.
+Every spec but the ones of tasks 17.3 and 17.7 leaves the AI providers alone: it calls no model, and every Bruno request asserts its result in its own tests script. The metrics and targets spec sends one memory insert that embeds through the hosted `openai` provider, so it needs `OPENAI_API_KEY` on the memory service and wipes the memory points of its own test user after the run. The AI traffic spec of task 17.7 sends prompts to the hosted providers.
 
 Specs and tasks templates are immutable between runs. The runner copies the template into [testing/runs/](testing/runs/) under a sweep timestamp and fills in that copy only. Run records are gitignored by default.
 
