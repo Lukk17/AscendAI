@@ -1,0 +1,35 @@
+info:
+  name: import-status-active
+  type: http
+  seq: 41
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/status"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://www.example.net/",
+        "profile": "e2e-import"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("imported session reads back as active", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("active");
+            expect(b.profile).to.equal("e2e-import");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

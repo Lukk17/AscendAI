@@ -6,6 +6,10 @@ variables:
     value: http
   - name: mcp_session_id
     value: ""
+  - name: fake_site_allowed_url
+    value: e2e-fake-site
+  - name: fake_site_blocked_url
+    value: e2e-fake-site-blocked
   - name: ocrFixtures
     value: ../../../../apps/ascend-ocr/e2e/fixtures
   - name: ascendAgentFixtures

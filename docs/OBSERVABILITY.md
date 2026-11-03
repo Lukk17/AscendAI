@@ -84,6 +84,27 @@ To view traces in Grafana: Explore → Tempo → search by `service.name=ascend-
 
 ---
 
+## From an error to its trace
+
+Every Python service error is an RFC 7807 problem body carrying a `traceId`, the 32 lower case hex W3C trace id of
+the request that failed. When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, the collector ships that same trace to Tempo, so
+one error answer is enough to pull up the whole request in Grafana. See [Traces](#traces) for the export path and
+[How to Reach Grafana](#how-to-reach-grafana) for the datasources.
+
+1. Copy the `traceId` out of the problem body, for example the field a `GET /does-not-exist` 404 returns.
+2. Open Grafana at http://localhost:7078 and go to Explore, the compass icon.
+3. Pick the Tempo datasource.
+4. Paste the id into the Trace ID field. Tempo accepts it with or without the hyphens.
+5. Run the query.
+
+The trace that comes back holds the request's spans, each with `service.name` set to the failing service, for example
+`ascend-memory`, so the span that wrote the error is the one whose attributes match the problem body. The same id also
+works against Tempo's HTTP API from inside the compose network:
+
+```bash
+docker compose exec grafana wget -qO- http://tempo:3200/api/traces/<traceId>
+```
+
 ## Metrics Inventory
 
 Every custom metric emitted by the application services. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters. The L3 cache hit rate divides cache-read tokens by the input series of `gen_ai_client_token_usage_total`, not by a dedicated total counter.

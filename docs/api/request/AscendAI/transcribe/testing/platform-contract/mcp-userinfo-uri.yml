@@ -1,0 +1,54 @@
+info:
+  name: mcp-userinfo-uri
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7017/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 14,
+        "method": "tools/call",
+        "params": {
+          "name": "transcribe_openai",
+          "arguments": {
+            "audio_uri": "https://user:secret@files.example/a.mp3",
+            "model": "whisper-1"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("a URI with user info is refused with validation and no secret", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(envelope.result.isError).to.equal(true);
+            const textEntry = envelope.result.content.find(function (entry) { return entry.type === "text"; });
+            expect(textEntry.text.indexOf("validation: ")).to.equal(0);
+            expect(JSON.stringify(envelope)).to.not.include("secret");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

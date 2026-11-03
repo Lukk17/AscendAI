@@ -1,0 +1,38 @@
+info:
+  name: tier-memory-first
+  type: http
+  seq: 56
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # JavaScript-only page, no tier: warms tier_memory with a browser tier.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/js-only",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("js-only page served by a browser tier with its canary", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("success");
+            expect(b.content).to.include("NIGHT-HERON");
+            expect(["4-playwright_stealth", "4a-patchright", "4b-camoufox", "5-crawlee_adaptive"]).to.include(b.mode);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

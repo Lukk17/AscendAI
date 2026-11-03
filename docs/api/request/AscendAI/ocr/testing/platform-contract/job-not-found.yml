@@ -1,0 +1,35 @@
+info:
+  name: job-not-found
+  type: http
+  seq: 14
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/v1/ocr/jobs/AAAAAAAAAAAAAAAAAAAAAA"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 404", function () {
+            expect(res.getStatus()).to.equal(404);
+        });
+        test("code is JOB_NOT_FOUND", function () {
+            expect(res.getBody().code).to.equal("JOB_NOT_FOUND");
+        });
+        test("type is the job-not-found URI", function () {
+            expect(res.getBody().type).to.equal("https://ascend.ai/errors/job-not-found");
+        });
+        test("instance is the request path", function () {
+            expect(res.getBody().instance).to.equal("/v1/ocr/jobs/AAAAAAAAAAAAAAAAAAAAAA");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

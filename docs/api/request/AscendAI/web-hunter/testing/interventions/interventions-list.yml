@@ -1,0 +1,29 @@
+info:
+  name: interventions-list
+  type: http
+  seq: 60
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/session/interventions"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("listing carries the flow envelope", function () {
+            const b = res.getBody();
+            expect(b.active_flows).to.be.a("number");
+            expect(b.max_concurrent_flows).to.equal(5);
+            expect(b.flows).to.be.an("array");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,44 @@
+info:
+  name: unknown-path
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/does-not-exist"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 404", function () {
+            expect(res.getStatus()).to.equal(404);
+        });
+        test("Content-Type is application/problem+json", function () {
+            expect(res.getHeader("content-type")).to.include("application/problem+json");
+        });
+        test("code is not_found", function () {
+            expect(res.getBody().code).to.equal("not_found");
+        });
+        test("type is the not-found URI", function () {
+            expect(res.getBody().type).to.equal("https://ascend.ai/errors/not-found");
+        });
+        test("title is Not Found", function () {
+            expect(res.getBody().title).to.equal("Not Found");
+        });
+        test("instance is the request path", function () {
+            expect(res.getBody().instance).to.equal("/does-not-exist");
+        });
+        test("traceId is 32 lower case hex characters", function () {
+            expect(res.getBody().traceId).to.match(/^[0-9a-f]{32}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

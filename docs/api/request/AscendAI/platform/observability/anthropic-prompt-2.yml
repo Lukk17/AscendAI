@@ -1,7 +1,7 @@
 info:
   name: anthropic-prompt-2
   type: http
-  seq: 8
+  seq: 9
 
 http:
   method: POST

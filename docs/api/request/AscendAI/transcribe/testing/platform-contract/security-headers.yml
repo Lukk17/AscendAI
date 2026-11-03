@@ -1,0 +1,41 @@
+info:
+  name: security-headers
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7017/health"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("x-content-type-options is nosniff", function () {
+            expect(res.getHeader("x-content-type-options")).to.equal("nosniff");
+        });
+        test("x-frame-options is DENY", function () {
+            expect(res.getHeader("x-frame-options")).to.equal("DENY");
+        });
+        test("referrer-policy is present", function () {
+            expect(res.getHeader("referrer-policy")).to.equal("strict-origin-when-cross-origin");
+        });
+        test("permissions-policy is present", function () {
+            expect(res.getHeader("permissions-policy")).to.equal("camera=(), microphone=(), geolocation=()");
+        });
+        test("content-security-policy is present", function () {
+            expect(res.getHeader("content-security-policy")).to.equal("default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+        });
+        test("strict-transport-security carries a max-age", function () {
+            expect(res.getHeader("strict-transport-security")).to.match(/^max-age=\d+; includeSubDomains; preload$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

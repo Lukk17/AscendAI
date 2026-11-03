@@ -26,10 +26,10 @@ runtime:
         test("status is success", function () {
             expect(res.getBody().status).to.equal("success");
         });
-        test("content contains canary 'books to scrape'", function () {
+        test("content contains canary 'in stock'", function () {
             const b = res.getBody();
             const c = (b.content || b.text || b.markdown || "").toLowerCase();
-            expect(c).to.include("books to scrape");
+            expect(c).to.include("in stock");
         });
 
 settings:

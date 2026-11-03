@@ -1,0 +1,39 @@
+info:
+  name: realworld-ah-hcaptcha-widget
+  type: http
+  seq: 34
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://www.hcaptcha.com/",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("status is success", function () {
+            expect(res.getBody().status).to.equal("success");
+        });
+        test("content contains canary 'real-time bot detection'", function () {
+            const b = res.getBody();
+            const c = (b.content || b.text || b.markdown || "").toLowerCase();
+            expect(c).to.include("real-time bot detection");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

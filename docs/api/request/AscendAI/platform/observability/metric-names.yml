@@ -1,7 +1,7 @@
 info:
   name: metric-names
   type: http
-  seq: 2
+  seq: 3
 
 http:
   method: GET
@@ -26,6 +26,9 @@ runtime:
         });
         test("Python client metrics are served without any model call", function () {
             expect(res.getBody().data).to.include("python_info");
+        });
+        test("Memory operation metrics are served by the memory service", function () {
+            expect(res.getBody().data).to.include("memory_operations_total");
         });
 
 settings:

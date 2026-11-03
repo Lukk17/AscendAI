@@ -1,0 +1,65 @@
+info:
+  name: initialize-2025-06-18
+  type: http
+  seq: 101
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7017/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 101,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "bruno-platform-contract",
+            "version": "0.1.0"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("no mcp-session-id response header in stateless mode", function () {
+            expect(res.getHeader("mcp-session-id")).to.equal(undefined);
+        });
+        test("protocolVersion echoes 2025-06-18", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(envelope.result.protocolVersion).to.equal("2025-06-18");
+        });
+        test("serverInfo.name is ascend-audio-scribe", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(envelope.result.serverInfo.name).to.equal("ascend-audio-scribe");
+        });
+        test("serverInfo.version is a non-empty string", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(envelope.result.serverInfo.version).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

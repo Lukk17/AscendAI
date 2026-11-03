@@ -1,0 +1,41 @@
+info:
+  name: intervention-window-6th-busy
+  type: http
+  seq: 62
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Sixth profile while five windows are open: the cap answers 409.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/turnstile-wall",
+        "include_links": false,
+        "heavy_mode": false,
+        "profile": "e2e-w6"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 409", function () {
+            expect(res.getStatus()).to.equal(409);
+        });
+        test("busy window names the five held flows", function () {
+            const b = res.getBody();
+            expect(b.code).to.equal("novnc_busy");
+            expect(b.active_flows).to.equal(5);
+            expect(b.max_concurrent_flows).to.equal(5);
+            expect(b.flows).to.be.an("array").with.lengthOf(5);
+            expect(b.holder_url).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

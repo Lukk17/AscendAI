@@ -1,0 +1,50 @@
+info:
+  name: import-mixed
+  type: http
+  seq: 40
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/session/import"
+  body:
+    type: json
+    # Same body as apps/ascend-web-hunter/e2e/fixtures/session-import-mixed.json:
+    # two example.net cookies with canary values and one example.org cookie.
+    data: |-
+      {
+        "url": "https://www.example.net/",
+        "profile": "e2e-import",
+        "user_agent": "e2e-session-import-test/1.0",
+        "storage_state": {
+          "cookies": [
+            {"domain": ".example.net", "expires": -1, "httpOnly": false, "name": "e2e-canary-auth-1", "path": "/", "sameSite": "Lax", "secure": true, "value": "CANARY-ALPHA-7741"},
+            {"domain": ".example.net", "expires": -1, "httpOnly": false, "name": "e2e-canary-auth-2", "path": "/", "sameSite": "Lax", "secure": true, "value": "CANARY-BETA-8823"},
+            {"domain": ".example.org", "expires": -1, "httpOnly": false, "name": "e2e-canary-foreign", "path": "/", "sameSite": "Lax", "secure": true, "value": "CANARY-FOREIGN-1199"}
+          ],
+          "origins": []
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("import keeps only the domain cookies with the expected split", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("imported");
+            expect(b.domain).to.equal("example.net");
+            expect(b.profile).to.equal("e2e-import");
+            expect(b.auth_cookies).to.equal(2);
+            expect(b.waf_cookies).to.equal(0);
+            expect(b.dropped_cookies).to.equal(1);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

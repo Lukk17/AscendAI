@@ -1,0 +1,45 @@
+info:
+  name: tools-list-after-oversize
+  type: http
+  seq: 110
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7017/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 110,
+        "method": "tools/list"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("lists the tool names of the pin test", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            const names = envelope.result.tools.map(function (tool) { return tool.name; });
+            ["transcribe_local", "transcribe_openai", "transcribe_hf", "transcribe_audacity", "health"].forEach(function (toolName) {
+                expect(names).to.include(toolName);
+            });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

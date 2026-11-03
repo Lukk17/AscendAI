@@ -27,18 +27,25 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("Status code is 422", function () {
-            expect(res.getStatus()).to.equal(422);
+        test("A submission with no file is rejected with the validation code", function () {
+            expect(res.getStatus()).to.equal(400);
         });
-        test("Content-Type starts with application/json", function () {
-            expect(res.getHeader("content-type")).to.match(/^application\/json/);
+        test("Content-Type is application/problem+json", function () {
+            expect(res.getHeader("content-type")).to.include("application/problem+json");
         });
-        test("detail is a non-empty array naming the missing file field", function () {
+        test("The body is the problem body with the validation code", function () {
             const body = res.getBody();
-            expect(body.detail).to.be.an("array").that.is.not.empty;
-            const fileError = body.detail.find(function (d) { return Array.isArray(d.loc) && d.loc.includes("file"); });
-            expect(fileError).to.be.ok;
-            expect(fileError.type).to.include("missing");
+            expect(body.code).to.equal("validation");
+            expect(body.detail).to.be.a("string").and.not.empty;
+        });
+        test("The errors array names the missing file field", function () {
+            const body = res.getBody();
+            expect(body.errors).to.be.an("array").that.is.not.empty;
+            const fields = body.errors.map(function (entry) { return entry.field; });
+            expect(fields).to.include("file");
+            body.errors.forEach(function (entry) {
+                expect(entry.message).to.be.a("string").and.not.empty;
+            });
         });
 
 settings:

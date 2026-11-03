@@ -23,7 +23,7 @@ http:
         "params": {
           "name": "ocr_submit",
           "arguments": {
-            "file_uri": "http://host.docker.internal:9070/e2e-fixtures/argent-saga-chronicles-page1.png",
+            "file_uri": "http://e2e-s3-9070:9070/e2e-fixtures/argent-saga-chronicles-page1.png",
             "lang": "en"
           }
         }

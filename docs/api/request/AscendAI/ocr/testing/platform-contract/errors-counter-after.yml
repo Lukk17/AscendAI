@@ -1,0 +1,42 @@
+info:
+  name: errors-counter-after
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/metrics"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        function findCounter(text, want) {
+            var result = 0;
+            String(text).split("\n").forEach(function (line) {
+                if (line.indexOf("ascend_service_errors_total{") !== 0) { return; }
+                var m = line.match(/^ascend_service_errors_total\{([^}]*)\}\s+([0-9.eE+\-]+)/);
+                if (!m) { return; }
+                var labels = m[1];
+                var ok = Object.keys(want).every(function (k) {
+                    return labels.indexOf(k + '="' + want[k] + '"') !== -1;
+                });
+                if (ok) { result = parseFloat(m[2]); }
+            });
+            return result;
+        }
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("the not_found rest unmatched counter grew by exactly one", function () {
+            var before = bru.getVar("pcNotFoundBefore");
+            var after = findCounter(res.getBody(), {code: "not_found", surface: "rest", operation: "unmatched"});
+            expect(after).to.equal(before + 1);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

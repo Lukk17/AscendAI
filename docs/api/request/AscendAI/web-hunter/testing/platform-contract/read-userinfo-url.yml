@@ -1,0 +1,41 @@
+info:
+  name: read-userinfo-url
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+          "url": "https://user:secret@example.com/",
+          "include_links": false,
+          "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 400", function () {
+            expect(res.getStatus()).to.equal(400);
+        });
+        test("code is unsafe_uri", function () {
+            expect(res.getBody().code).to.equal("unsafe_uri");
+        });
+        test("no header or body text holds the user info secret", function () {
+            var seen = JSON.stringify(res.getBody());
+            if (typeof res.getHeaders === "function") {
+                seen += JSON.stringify(res.getHeaders());
+            }
+            expect(seen).to.not.include("secret");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

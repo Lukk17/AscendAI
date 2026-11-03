@@ -1,0 +1,47 @@
+info:
+  name: validation-error
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7020/api/v1/memory/insert"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 400", function () {
+            expect(res.getStatus()).to.equal(400);
+        });
+        test("code is validation", function () {
+            expect(res.getBody().code).to.equal("validation");
+        });
+        test("errors is a non-empty array with field and message and no location prefix", function () {
+            var errors = res.getBody().errors;
+            expect(errors).to.be.an("array").that.is.not.empty;
+            errors.forEach(function (entry) {
+                expect(entry.field).to.be.a("string").and.not.empty;
+                expect(entry.message).to.be.a("string").and.not.empty;
+                expect(entry).to.not.have.property("loc");
+            });
+            expect(JSON.stringify(errors)).to.not.include('"loc"');
+        });
+        test("errors are sorted by field", function () {
+            var fields = res.getBody().errors.map(function (entry) { return entry.field; });
+            expect(fields).to.deep.equal(fields.slice().sort());
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

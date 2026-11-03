@@ -253,7 +253,7 @@ docker compose up -d --build
 - **Java modules** (ascend-ai-agent, ascend-weather-mcp): Java 21, Spring Boot 3.5.14, Gradle, Spring AI 1.1.5.
 - **Python modules** (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
 - **Python virtual environments**: every Python module has its own `.venv/` at the module root. Run every `pip`, `pytest`, `uvicorn`, `ruff`, and `mypy` invocation through that module's own `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Linux/macOS) - never the system Python. A bare `pip` or `pytest` resolves to whatever Python is first on `PATH`, which does not have the module's dependencies installed and fails with import errors instead of running the intended command. Each module's own `AGENTS.md` gives the exact commands.
-- **Python shared library install order**: every Python service pins `ascend-python-common==0.1.0` and the name is on no package index, so install the library from its folder before the service itself, otherwise pip asks the index and fails. From the repository root, PowerShell:
+- **Python shared library install order**: every Python service pins `ascend-python-common==2.0.0` and the name is on no package index, so install the library from its folder before the service itself, otherwise pip asks the index and fails. From the repository root, PowerShell:
 
 ```powershell
 apps/ascend-memory/.venv/Scripts/python.exe -m pip install -e libs/ascend-python-common
