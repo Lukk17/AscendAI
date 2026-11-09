@@ -1,7 +1,9 @@
 name: ascend-ai
 
 include:
-  - compose.ascend-web-hunter.yaml
+  - path:
+      - compose.ascend-web-hunter.yaml
+      - compose.ascend-web-hunter.platform.yaml
 
 services:
 
@@ -84,13 +86,13 @@ services:
       # container by its host-published address, with presigned URLs signed against the
       # address a caller on the host can fetch. Its own bucket, never the agent's
       # knowledge-base, whose contents the agent's manual ingestion indexes as sources.
-      - OCR_RESULT_S3_ENDPOINT=http://host.docker.internal:9070
-      - OCR_RESULT_S3_PUBLIC_ENDPOINT=http://localhost:9070
+      - OCR_RESULT_S3_ENDPOINT=${OBJECT_STORE_S3_ENDPOINT:-http://host.docker.internal:9070}
+      - OCR_RESULT_S3_PUBLIC_ENDPOINT=${OBJECT_STORE_S3_PUBLIC_ENDPOINT:-http://localhost:9070}
       - OCR_RESULT_S3_BUCKET=ocr-results
       - OCR_RESULT_S3_ACCESS_KEY=${OCR_RESULT_S3_ACCESS_KEY:-admin}
       - OCR_RESULT_S3_SECRET_KEY=${OCR_RESULT_S3_SECRET_KEY:-password}
       # SSRF guard: the host-published object store (Floci) is reached via
-      # the host-bound localhost address (host.docker.internal:9070) per ADR-001.
+      # the host-bound localhost address (host.docker.internal) per ADR-001.
       - ALLOWED_PRIVATE_HOSTS=host.docker.internal,localhost,127.0.0.1
       # file:// is disabled by default; mount a writable dir and set
       # MCP_FILE_URI_ROOT to the in-container path to enable.
@@ -98,7 +100,6 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
       - REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0}
       - OTEL_SERVICE_NAME=ascend-ocr
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.3.1
     networks:
       default:
         aliases:
@@ -157,6 +158,8 @@ services:
       # per-provider compaction-model map stays yaml-only (Spring Boot env-var
       # binding for nested Map<String,String> is awkward).
       - APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED=${APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED:-true}
+      - OBJECT_STORE_S3_ENDPOINT=${OBJECT_STORE_S3_ENDPOINT:-http://host.docker.internal:9070}
+      - OBJECT_STORE_S3_PUBLIC_ENDPOINT=${OBJECT_STORE_S3_PUBLIC_ENDPOINT:-http://localhost:9070}
       - MANAGEMENT_OTLP_TRACING_ENDPOINT=${MANAGEMENT_OTLP_TRACING_ENDPOINT:-http://otel-collector:4318/v1/traces}
       - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:-1.0}
       - OTEL_SERVICE_NAME=ascend-agent
@@ -224,7 +227,6 @@ services:
       - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-false}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
       - OTEL_SERVICE_NAME=ascend-memory
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.1.4
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -305,7 +307,7 @@ services:
       - HF_TOKEN=${HF_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       # SSRF guard: the host-published object store (Floci) is reached via
-      # the host-bound localhost address (host.docker.internal:9070); allow
+      # the host-bound localhost address (host.docker.internal); allow
       # the loopback aliases.
       - ALLOWED_PRIVATE_HOSTS=host.docker.internal,localhost,127.0.0.1
       # Enables file:// URIs jailed to /audio.
@@ -326,7 +328,6 @@ services:
       - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-false}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
       - OTEL_SERVICE_NAME=ascend-audio-scribe
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.9.4
     volumes:
       - "${HF_CACHE_ROOT:-hf-cache}:/hf-cache"
       - "${ASCEND_AUDIO_SCRIBE_MEDIA_ROOT:-ascend-audio-scribe-media}:/audio"

@@ -18,6 +18,10 @@ workflow does not read; if the two ever disagree, this file wins for release pur
 - The MCP server reports the service name and version in `initialize`.
 - The `/mcp` endpoint accepts only allowed `Host` headers (`ascend-ocr,localhost,127.0.0.1`)
   and no `Origin` header; a refused `Host` answers 421, a refused `Origin` answers 403.
+- Every exported span, the worker processes' spans included, carries the installed package version as
+  `service.version`. `compose.yaml` no longer sets `OTEL_RESOURCE_ATTRIBUTES` by hand, so the two cannot drift.
+- `compose.yaml` sets `OCR_RESULT_S3_ENDPOINT` from `OBJECT_STORE_S3_ENDPOINT` and `OCR_RESULT_S3_PUBLIC_ENDPOINT` from
+  `OBJECT_STORE_S3_PUBLIC_ENDPOINT` in the root `.env`, defaults `http://host.docker.internal:9070` and `http://localhost:9070`.
 
 ## [0.3.1] - <release date>
 

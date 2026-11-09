@@ -244,7 +244,7 @@ The jobs are independent and run in parallel. Each job installs the Bruno CLI wi
 |---|---|---|---|---|
 | `ascend-weather-mcp` | `ascend-weather-mcp` | polls `/actuator/health` on port 9998, because the service has no compose healthcheck | 7 of 7 | nothing. The container is restarted before spec 7, which needs a cold geocoding cache |
 | `ascend-ocr` | `ascend-ocr` (`--wait`) | polls `/ready` on port 7022 until the default engine is warm | 12 of 16 | the other 4 specs |
-| `ascend-web-hunter` | `searxng`, `flaresolverr`, `ascend-web-hunter` (`--wait`) | the compose healthchecks | 11 of 12 | spec 11, which needs a human to solve a CAPTCHA through NoVNC |
+| `ascend-web-hunter` | `searxng`, `ascend-web-hunter` (`--wait`) | the compose healthchecks | 11 of 12 | spec 11, which needs a human to solve a CAPTCHA through NoVNC |
 | `ascend-memory` | `ascend-memory` (`--wait`) | the compose healthcheck | 2 of 6 (specs 1 and 4) | specs 2, 3, 5 and 6, which make paid OpenAI embedding calls |
 
 The external prerequisites are job-level service containers, not compose services: `redis:7-alpine` on port 6379 for `ascend-web-hunter` and `qdrant/qdrant:v1.13.0` on port 6333 for `ascend-memory`. The `ascend-web-hunter` job writes a random `SEARXNG_SECRET` (`openssl rand -hex 32`) to the job environment before compose starts, because compose refuses to start SearXNG without one.

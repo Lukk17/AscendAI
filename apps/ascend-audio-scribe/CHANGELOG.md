@@ -17,6 +17,8 @@ workflow does not read; if the two ever disagree, this file wins for release pur
 - The MCP server reports the service name and version in `initialize`.
 - The `/mcp` endpoint accepts only allowed `Host` headers (`ascend-audio-scribe,localhost,127.0.0.1`)
   and no `Origin` header; a refused `Host` answers 421, a refused `Origin` answers 403.
+- Every exported span carries the installed package version as `service.version`, read by the shared
+  library. `compose.yaml` no longer sets `OTEL_RESOURCE_ATTRIBUTES` by hand, so the two cannot drift.
 
 ## [0.9.4] - <release date>
 

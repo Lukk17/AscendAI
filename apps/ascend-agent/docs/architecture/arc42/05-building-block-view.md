@@ -20,7 +20,6 @@ graph TB
         Qdrant["Qdrant"]
         S3["S3-compatible storage"]
         SearXNG["SearXNG"]
-        FlareSolverr["FlareSolverr"]
     end
 
     AscendAiAgent --> AudioScribe
@@ -32,7 +31,6 @@ graph TB
     AscendAiAgent --> Qdrant
     AscendAiAgent --> S3
     WebHunter --> SearXNG
-    WebHunter --> FlareSolverr
 ```
 
 ---

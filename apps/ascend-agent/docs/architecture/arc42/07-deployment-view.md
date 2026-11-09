@@ -24,7 +24,6 @@ graph TB
 
         subgraph "Support Services"
             SearXNG["SearXNG<br/>:9020"]
-            FlareSolverr["FlareSolverr<br/>:8191"]
         end
     end
 
@@ -41,7 +40,6 @@ graph TB
     AscendAiAgent --> Qdrant
     AscendAiAgent --> S3
     WebHunter --> SearXNG
-    WebHunter --> FlareSolverr
     Memory --> Qdrant
     AscendAiAgent -->|"OpenAI API"| LMStudio
 ```
@@ -63,7 +61,6 @@ graph TB
 | Qdrant            | 6333 (HTTP), 6334 (gRPC)      | HTTP / gRPC   | Vector database (external prerequisite).                |
 | S3-compatible storage | 9070 (API), 9071 (UI)      | HTTP          | Object storage (external prerequisite), provided locally by a self-hosted emulator and by Amazon S3 in production. |
 | SearXNG           | 9020                          | HTTP          | Meta search engine.                                     |
-| FlareSolverr      | 8191                          | HTTP          | Cloudflare bypass proxy.                                |
 
 ---
 

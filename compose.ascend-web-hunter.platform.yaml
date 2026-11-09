@@ -1,0 +1,4 @@
+services:
+  ascend-web-hunter:
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}

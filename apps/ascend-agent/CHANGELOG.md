@@ -10,6 +10,11 @@ workflow does not read; if the two ever disagree, this file wins for release pur
 
 ## [0.1.3] - <commit date>
 
+### Changed
+- The object store address is configurable. `app.s3.endpoint` reads `OBJECT_STORE_S3_PUBLIC_ENDPOINT` on a host run, and under the
+  `docker` profile `app.s3.endpoint` reads `OBJECT_STORE_S3_ENDPOINT` and `app.s3.public-endpoint` reads
+  `OBJECT_STORE_S3_PUBLIC_ENDPOINT`, which `compose.yaml` passes from the root `.env`. Both keep the `9070` defaults.
+
 ### Documentation
 - The configuration reference names `SPRING_PROFILES_ACTIVE`, `APP_MEMORY_CHATHISTORY_REDIS_ENABLED`, `APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED`, `APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, `MODEL_PROVIDER`, `SECURITY_ENABLED`, `SECURITY_USERNAME`, `SECURITY_PASSWORD`, `OPENAI_EXTRACTION_MODEL`, `GEMINI_EXTRACTION_MODEL`, `ANTHROPIC_EXTRACTION_MODEL` and `MINIMAX_EXTRACTION_MODEL`. `fix-linux-docker-host-access`.
 

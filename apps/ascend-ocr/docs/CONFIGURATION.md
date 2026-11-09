@@ -92,8 +92,8 @@ ascend-ai-agent already uses for the same store.
 
 | Variable                          | Default                                       | Purpose                                                                                  |
 | :-------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------- |
-| OCR_RESULT_S3_ENDPOINT            | `http://localhost:9070`                       | The address this service writes to. Must be an absolute `http` or `https` URL. The docker-compose service sets `http://host.docker.internal:9070`, which is the address its SSRF allowlist already names. |
-| OCR_RESULT_S3_PUBLIC_ENDPOINT     | the endpoint above                            | The address baked into a presigned URL, which is not always the one this service reaches. The docker-compose service sets `http://localhost:9070`. |
+| OCR_RESULT_S3_ENDPOINT            | `http://localhost:9070`                       | The address this service writes to. Must be an absolute `http` or `https` URL. The docker-compose service reads it from `OBJECT_STORE_S3_ENDPOINT` in the root `.env`, default `http://host.docker.internal:9070`, whose host its SSRF allowlist already names. |
+| OCR_RESULT_S3_PUBLIC_ENDPOINT     | the endpoint above                            | The address baked into a presigned URL, which is not always the one this service reaches. The docker-compose service reads it from `OBJECT_STORE_S3_PUBLIC_ENDPOINT` in the root `.env`, default `http://localhost:9070`. |
 | OCR_RESULT_S3_BUCKET              | `ocr-results`                                 | Its own bucket, never the agent's `knowledge-base`, whose contents the agent's manual ingestion lists and indexes as source documents. Headed at startup and created when missing. Must allow neither anonymous listing nor anonymous reads, because the job identifier is the only credential. |
 | OCR_RESULT_S3_ACCESS_KEY          | empty                                         | Static credentials, the way the agent supplies them. Empty by default so a deployment that has not configured a result store finds out at startup, in the banner, rather than silently writing nowhere. |
 | OCR_RESULT_S3_SECRET_KEY          | empty                                         | As above. Never printed in the startup banner or in any log line.                        |
@@ -142,7 +142,7 @@ ascend-ai-agent already uses for the same store.
 | OTEL_EXPORTER_OTLP_ENDPOINT       | unset                                         | gRPC OTLP collector address. Trace export happens whenever it is set.                    |
 | OTEL_SDK_DISABLED                 | `false`                                       | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
 | OTEL_SERVICE_NAME                 | `ascend-ocr`                                  | Service name carried on every exported span. Fixed in `compose.yaml`.                    |
-| OTEL_RESOURCE_ATTRIBUTES          | `service.version=0.3.1`                       | Resource attributes carried on every exported span. Fixed in `compose.yaml`.             |
+| OTEL_RESOURCE_ATTRIBUTES          | unset                                         | Not set in compose. The library puts the installed package version on every exported span as `service.version`, and a `service.version` given here is ignored. The worker processes do the same. |
 
 ---
 

@@ -238,8 +238,8 @@ jobs:
       - name: Generate ephemeral SEARXNG_SECRET
         run: echo "SEARXNG_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
-      - name: Build and start searxng, flaresolverr, ascend-web-hunter
-        run: docker compose up -d --build --wait searxng flaresolverr ascend-web-hunter
+      - name: Build and start searxng, ascend-web-hunter
+        run: docker compose up -d --build --wait searxng ascend-web-hunter
 
       - name: Install Bruno CLI
         run: npm install -g @usebruno/cli
@@ -308,8 +308,9 @@ jobs:
           # Spec 12: clearance-reuse. Same Cloudflare-protected site as spec 6,
           # so it runs after it. The spec's own Reset state drops the stored
           # session and the reader's in-process read cache for the domain, so
-          # Call 1 goes through FlareSolverr and stores a fresh clearance
-          # instead of being answered from the cache spec 6 just filled. Redis
+          # Call 1 escalates past the blocked curl tiers to a browser tier,
+          # which solves the challenge and stores a fresh clearance, instead
+          # of being answered from the cache spec 6 just filled. Redis
           # is a job service here with no fixed container name, so the session
           # clear endpoint, which drops both, stands in for the spec's
           # docker exec delete. Call 2 reads the same page under a different

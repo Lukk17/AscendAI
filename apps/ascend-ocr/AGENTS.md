@@ -354,8 +354,8 @@ logs a `WARNING`, never a refusal, when that service peak meets or exceeds it. S
 - `OCR_JOB_MAX_RETAINED` - finished records retained before the oldest is evicted. A backstop against a defect rather than an eviction policy a caller meets (default `1000`).
 - `OCR_JOB_QUEUE_MAX_PAGES` - total pages that may be waiting, which is what turns the wait into a number: each page ahead multiplied by its own engine's allowance. Cannot be below `OCR_JOB_MAX_PAGES` (default `200`).
 - `OCR_JOB_QUEUE_MAX_DOCUMENTS` - documents that may be waiting, which bounds the disk their bytes hold and the length of the list operation (default `8`).
-- `OCR_RESULT_S3_ENDPOINT` - the S3-compatible address results are written to; must be an absolute http or https URL (default `http://localhost:9070`, the same Floci instance the agent uses).
-- `OCR_RESULT_S3_PUBLIC_ENDPOINT` - the address baked into a presigned URL, which is not always the one this service reaches (defaults to the endpoint above).
+- `OCR_RESULT_S3_ENDPOINT` - the S3-compatible address results are written to; must be an absolute http or https URL (default `http://localhost:9070`, the same Floci instance the agent uses). Compose reads it as `OBJECT_STORE_S3_ENDPOINT` (default `http://host.docker.internal:9070`).
+- `OCR_RESULT_S3_PUBLIC_ENDPOINT` - the address baked into a presigned URL, which is not always the one this service reaches (defaults to the endpoint above). Compose reads it as `OBJECT_STORE_S3_PUBLIC_ENDPOINT` (default `http://localhost:9070`).
 - `OCR_RESULT_S3_BUCKET` - its own bucket, never the agent's `knowledge-base` (default `ocr-results`).
 - `OCR_RESULT_S3_ACCESS_KEY` / `OCR_RESULT_S3_SECRET_KEY` - static credentials, the way the agent supplies them (default empty, so an unconfigured store is visible in the startup banner).
 

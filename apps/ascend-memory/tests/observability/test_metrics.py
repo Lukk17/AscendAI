@@ -31,7 +31,7 @@ def test_search_histogram_registered_with_embedding_provider_label() -> None:
     assert 'memory_search_duration_seconds_bucket{embedding_provider="openai"' in payload
 
 
-def test_other_histograms_registered_with_provider_label() -> None:    # given
+def test_other_histograms_registered_with_provider_label() -> None:  # given
     for histogram in (
         metrics.MEMORY_INSERT_DURATION_SECONDS,
         metrics.MEMORY_DELETE_DURATION_SECONDS,

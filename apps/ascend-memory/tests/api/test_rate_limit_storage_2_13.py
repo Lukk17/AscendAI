@@ -8,6 +8,7 @@ from limits.storage import RedisStorage
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from src import main as main_module
 from src.config.config import Settings
 from src.config.config import settings as service_settings
 from src.main import create_app
@@ -41,6 +42,7 @@ def test_limiter_storage_uri_equals_redis_url_with_service_prefix(
         return real_build_limiter(default_limit, storage_uri, key_prefix, key_func)
 
     monkeypatch.setattr(app_module, "build_limiter", spy_limiter)
+    monkeypatch.setattr(main_module, "definition", main_module._service_definition())
     # when
     wired_app: FastAPI = create_app()
     # then

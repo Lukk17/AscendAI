@@ -27,6 +27,7 @@ def test_limiter_storage_uri_equals_redis_url_with_service_prefix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # given
+    import_time_redis_url = service_settings.REDIS_URL
     monkeypatch.setattr(service_settings, "REDIS_URL", "redis://127.0.0.1:6379/0")
     built: list[Limiter] = []
     real_build_limiter = build_limiter
@@ -52,6 +53,6 @@ def test_limiter_storage_uri_equals_redis_url_with_service_prefix(
     assert isinstance(built[0]._storage, RedisStorage)
     # then - the service definition hands the factory that storage URI
     assert _service_definition().rate_limit_storage_uri == service_settings.REDIS_URL
-    # then - the limiter the REST decorators use carries the same prefix
+    # then - the limiter the REST decorators use, built at import, carries the same prefix and the import-time URL
     assert rest_endpoints.limiter._key_prefix == "ascend-ocr"
-    assert rest_endpoints.limiter._storage_uri == service_settings.REDIS_URL
+    assert rest_endpoints.limiter._storage_uri == import_time_redis_url

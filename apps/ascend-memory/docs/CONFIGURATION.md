@@ -16,7 +16,7 @@ invoked, so a single deployment can serve `provider=lmstudio`, `provider=openai`
 | `LOG_LEVEL`              | `INFO`                                                             | Log level.                                                               |
 | `LOG_FORMAT`             | `json`                                                             | `json` for log sinks, `color` for local terminal output.                 |
 | `OTEL_SERVICE_NAME`      | `ascend-memory`                                                    | Service name carried on every exported span. Fixed in `compose.yaml`.    |
-| `OTEL_RESOURCE_ATTRIBUTES` | `service.version=0.1.4`                                          | Resource attributes carried on every exported span. Fixed in `compose.yaml`. |
+| `OTEL_RESOURCE_ATTRIBUTES` | unset                                                            | Not set in compose. The library puts the installed package version on every exported span as `service.version`, and a `service.version` given here is ignored. |
 | `RATE_LIMIT_DEFAULT`     | `6000/minute`                                                      | Flood-protection rate limit for REST routes and MCP tools. Compose reads it as `MEMORY_RATE_LIMIT_DEFAULT`. Added by `add-ascend-python-common`. |
 | `REDIS_URL`              | `redis://127.0.0.1:6379/0`                                         | Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-memory`. Added by `add-ascend-python-common`. |
 | `READINESS_PROBE_TIMEOUT_SECONDS` | `3`                                                     | Budget of each readiness probe. Added by `add-ascend-python-common`.     |

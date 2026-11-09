@@ -227,7 +227,7 @@ specs need:
 Every entry names a specific container (`postgres`, `redis`, `ascend-agent`, `ascend-audio-scribe`, `ascend-ocr`,
 `ascend-web-hunter`) or a specific localhost port (`:6333` Qdrant, `:9070` object store, `:9917` ascend-agent, `:9998`
 ascend-weather-mcp, `:7020` AscendMemory). No blanket `docker exec *`, `docker cp *` or `curl *`, and no entry for a container
-no spec touches: `searxng`, `flaresolverr`, `ngrok-ascend-web-hunter`, `ascend-weather-mcp`, `ascend-memory`, `docling-serve`,
+no spec touches: `searxng`, `ngrok-ascend-web-hunter`, `ascend-weather-mcp`, `ascend-memory`, `docling-serve`,
 `unstructured-api` and the observability containers get nothing. Because the container name is pinned as the first
 token after `docker exec`, no entry can be used to smuggle in a different container or a flag such as `-u 0`. The
 object store needs no `docker exec` entry at all: it is published on the host by a compose project this repository

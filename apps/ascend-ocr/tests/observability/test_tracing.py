@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from importlib.metadata import version as package_version
 from unittest.mock import patch
 
 import pytest
@@ -36,7 +37,11 @@ class TestConfigureWorkerTracing:
             with patch("src.observability.tracing.trace.set_tracer_provider") as mock_set:
                 configure_worker_tracing()
         # then
-        mock_build.assert_called_once_with("ascend-ocr", otel_endpoint="http://probe-collector:4317")
+        mock_build.assert_called_once_with(
+            "ascend-ocr",
+            otel_endpoint="http://probe-collector:4317",
+            service_version=package_version("ascend-ocr"),
+        )
         mock_set.assert_called_once_with(mock_build.return_value)
 
     @pytest.mark.usefixtures("_isolated_global_provider")
@@ -51,6 +56,7 @@ class TestConfigureWorkerTracing:
         # then
         assert isinstance(provider, TracerProvider)
         assert provider.resource.attributes["service.name"] == "ascend-ocr"
+        assert provider.resource.attributes["service.version"] == package_version("ascend-ocr")
 
     @pytest.mark.usefixtures("_isolated_global_provider")
     def test_endpoint_unset_installs_an_unsampled_provider(self, monkeypatch: pytest.MonkeyPatch) -> None:

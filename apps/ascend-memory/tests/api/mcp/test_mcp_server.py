@@ -241,7 +241,9 @@ def test_memory_insert_unknown_provider_records_unknown_label() -> None:
         memory_insert(user_id="u1", text="hello", provider="not-real")
 
     # then
-    assert MEMORY_OPERATIONS_TOTAL.labels(operation="insert", outcome="error")._value.get() == before_counter + 1
+    assert (
+        MEMORY_OPERATIONS_TOTAL.labels(operation="insert", outcome="error")._value.get() == before_counter + 1
+    )
     assert MEMORY_INSERT_DURATION_SECONDS.labels(provider="unknown")._sum.get() > before_duration
 
 
@@ -392,5 +394,7 @@ def test_memory_wipe_unknown_provider_records_unknown_label() -> None:
         memory_wipe(user_id="u1", provider="not-real")
 
     # then
-    assert MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome="error")._value.get() == before_counter + 1
+    assert (
+        MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome="error")._value.get() == before_counter + 1
+    )
     assert MEMORY_WIPE_DURATION_SECONDS.labels(provider="unknown")._sum.get() > before_duration

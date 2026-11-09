@@ -76,6 +76,8 @@ time via the `model` form field; these are the shipped defaults.
 | `APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED` | No | Async summarisation of older chat turns (default `true`).                                    |
 | `OTEL_SERVICE_NAME`          | No                 | Service name carried on every exported span. Fixed in `compose.yaml` as `ascend-agent`.      |
 | `OTEL_RESOURCE_ATTRIBUTES`   | No                 | Resource attributes carried on every exported span. Fixed in `compose.yaml` as `service.version=0.1.3`. |
+| `OBJECT_STORE_S3_ENDPOINT`   | No                 | Object-store address the container reaches, bound to `app.s3.endpoint` by the `docker` profile (default `http://host.docker.internal:9070`). Shared with ascend-ocr and ascend-web-hunter in `compose.yaml`. |
+| `OBJECT_STORE_S3_PUBLIC_ENDPOINT` | No            | Object-store address a caller on the host reaches, bound to `app.s3.public-endpoint` by the `docker` profile and to `app.s3.endpoint` on a host run (default `http://localhost:9070`). Shared with ascend-ocr in `compose.yaml`. |
 
 ---
 
@@ -182,9 +184,10 @@ Boot env-var binding (uppercase, dots and dashes to underscores).
 
 - **`server.port`** (`9917`). Public REST port.
 - **`app.embedding.default-provider`**. Active embedding backend (mirrors `EMBEDDING_PROVIDER`).
-- **`app.s3.endpoint`** (`http://localhost:9070`). Object-store endpoint for ingestion.
+- **`app.s3.endpoint`** (`http://localhost:9070`). Object-store endpoint for ingestion. Read from `OBJECT_STORE_S3_PUBLIC_ENDPOINT` on a host
+  run and from `OBJECT_STORE_S3_ENDPOINT` under the `docker` profile.
 - **`app.s3.public-endpoint`**. Host-reachable object-store URL used in presigned `sources[].downloadUrl` payloads. In
-  Docker, override to `http://host.docker.internal:9070`.
+  Docker it is read from `OBJECT_STORE_S3_PUBLIC_ENDPOINT` (default `http://localhost:9070`).
 - **`app.s3.bucket`** (`knowledge-base`). Ingestion bucket. Auto-created at startup if missing.
 - **`spring.datasource.url`**. Postgres connection for the metadata store.
 - **`app.rag.enabled`**. Toggle the retrieval-gated soft-RAG path.

@@ -1,3 +1,5 @@
+from importlib.metadata import version as package_version
+
 from ascend_python_common.tracing import build_tracer_provider
 from ascend_python_common.tracing import get_tracer as _library_get_tracer
 from opentelemetry import propagate, trace
@@ -6,6 +8,7 @@ from opentelemetry.context import Context
 from src.config.config import settings
 
 _SERVICE_NAME: str = "ascend-ocr"
+_DISTRIBUTION_NAME: str = "ascend-ocr"
 
 
 def configure_worker_tracing() -> None:
@@ -21,6 +24,7 @@ def configure_worker_tracing() -> None:
     provider = build_tracer_provider(
         _SERVICE_NAME,
         otel_endpoint=settings.OTEL_EXPORTER_OTLP_ENDPOINT,
+        service_version=package_version(_DISTRIBUTION_NAME),
     )
     trace.set_tracer_provider(provider)
 
