@@ -13,7 +13,7 @@ FAILED: Final[str] = "FAILED"
 CONFIGURED: Final[str] = "Configured"
 NOT_CONFIGURED: Final[str] = "Not configured"
 
-_USER_INFO_RE: Final[re.Pattern[str]] = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)[^/\s@]+@")
+_USER_INFO_RE: Final[re.Pattern[str]] = re.compile(r"([A-Za-z][A-Za-z0-9+.-]{0,31}://)[^/?#\s]*@")
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +45,7 @@ def strip_user_info(value: str) -> str:
 
 
 def format_check(target: str, status: str) -> str:
-    return f"{strip_user_info(target)} [{status}]"
+    return f"{strip_user_info(target)} [{strip_user_info(status)}]"
 
 
 def render_value(value: str, *, secret: bool) -> str:

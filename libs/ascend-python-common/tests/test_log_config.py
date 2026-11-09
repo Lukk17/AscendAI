@@ -10,11 +10,13 @@ from opentelemetry.sdk.trace import TracerProvider
 from pydantic import Field
 
 from ascend_python_common.log_config import (
+    CLIENT_REQUEST_LOGGER_NAMES,
     COLOR_FORMAT_DEFAULTS,
     DATE_FORMAT,
     LOG_COLORS,
     LOGGERS_ROUTED_THROUGH_ROOT,
     MCP_TRANSPORT_LOGGER_NAMES,
+    TOOL_ARGUMENT_LOGGER_NAMES,
     UVICORN_LOGGER_NAMES,
     CenteredLevelFormatter,
     configure_logging,
@@ -55,7 +57,10 @@ def _clean_log_env(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def restored_logging() -> Iterator[None]:
     root = logging.getLogger()
-    routed = [logging.getLogger(name) for name in LOGGERS_ROUTED_THROUGH_ROOT]
+    routed = [
+        logging.getLogger(name)
+        for name in (*LOGGERS_ROUTED_THROUGH_ROOT, *CLIENT_REQUEST_LOGGER_NAMES, *TOOL_ARGUMENT_LOGGER_NAMES)
+    ]
     saved_root = (list(root.handlers), root.level)
     saved_routed = [(list(each.handlers), each.level, each.propagate) for each in routed]
     try:
@@ -69,6 +74,27 @@ def restored_logging() -> Iterator[None]:
             routed_logger.propagate = propagate
 
 
+def test_tool_arguments_never_reach_the_log_at_debug(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    restored_logging: None,
+) -> None:
+    # given
+    monkeypatch.setattr(settings, "LOG_LEVEL", "DEBUG")
+    monkeypatch.setattr(settings, "LOG_FORMAT", "json")
+    configure_logging(SERVICE_NAME, settings)
+
+    # when
+    logging.getLogger("fastmcp.server.mixins.mcp_operations").debug(
+        "Handler called: call_tool session_status with {'url': 'https://user:topsecret@example.com/'}"
+    )
+    captured = capsys.readouterr()
+
+    # then
+    assert "topsecret" not in captured.err + captured.out
+    assert logging.getLogger("fastmcp.server.mixins.mcp_operations").getEffectiveLevel() == logging.WARNING
+
+
 def _last_json_line(capsys: pytest.CaptureFixture[str]) -> dict[str, object]:
     # given
     captured = capsys.readouterr()
@@ -77,6 +103,22 @@ def _last_json_line(capsys: pytest.CaptureFixture[str]) -> dict[str, object]:
     # then
     assert isinstance(parsed, dict)
     return parsed
+
+
+@pytest.mark.parametrize("log_level", ["DEBUG", "INFO", "ERROR"])
+@pytest.mark.parametrize("logger_name", ["httpx", "httpx2", "httpcore", "httpcore.http11"])
+def test_http_client_request_loggers_stay_at_warning_whatever_the_log_level(
+    monkeypatch: pytest.MonkeyPatch,
+    restored_logging: None,
+    log_level: str,
+    logger_name: str,
+) -> None:
+    # given
+    monkeypatch.setattr(settings, "LOG_LEVEL", log_level)
+    # when
+    configure_logging(SERVICE_NAME, settings)
+    # then
+    assert logging.getLogger(logger_name).getEffectiveLevel() == logging.WARNING
 
 
 def test_json_line_carries_every_required_field(

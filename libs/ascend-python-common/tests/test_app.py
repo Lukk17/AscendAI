@@ -22,6 +22,7 @@ from ascend_python_common.app import (
     MCP_PATH,
     McpPathRoute,
     ServiceDefinition,
+    _CorrelatedFastAPI,
     create_service_app,
 )
 from ascend_python_common.errors import ErrorRegistry
@@ -539,3 +540,16 @@ def test_app_carries_service_name_and_distribution_version() -> None:
     # then
     assert app.title == "probe-service"
     assert app.version == package_version("ascend-python-common")
+
+
+def test_tracer_resource_carries_the_distribution_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "service.version=0.0.7")
+    definition = _definition(name="probe-service")
+    # when
+    app = create_service_app(definition)
+    # then
+    assert isinstance(app, _CorrelatedFastAPI)
+    assert app._tracer_provider.resource.attributes["service.version"] == package_version(
+        "ascend-python-common"
+    )

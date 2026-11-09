@@ -12,6 +12,7 @@ from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased
 from starlette.types import ASGIApp
 
 SERVICE_NAME_RESOURCE_KEY: Final[str] = "service.name"
+SERVICE_VERSION_RESOURCE_KEY: Final[str] = "service.version"
 MCP_SESSION_ID_SPAN_ATTRIBUTE: Final[str] = "mcp.session.id"
 
 
@@ -30,11 +31,15 @@ def build_tracer_provider(
     service_name: str,
     *,
     otel_endpoint: str | None,
+    service_version: str | None = None,
     exporter: SpanExporter | None = None,
 ) -> TracerProvider:
     endpoint = otel_endpoint or None
+    resource_attributes = {SERVICE_NAME_RESOURCE_KEY: service_name}
+    if service_version is not None:
+        resource_attributes[SERVICE_VERSION_RESOURCE_KEY] = service_version
     provider = TracerProvider(
-        resource=Resource.create({SERVICE_NAME_RESOURCE_KEY: service_name}),
+        resource=Resource.create(resource_attributes),
         sampler=ParentBased(ALWAYS_ON) if endpoint is not None else ParentBased(ALWAYS_OFF),
     )
     provider.add_span_processor(DropMcpSessionIdSpanProcessor())
@@ -91,9 +96,15 @@ def configure_tracing(
     service_name: str,
     *,
     otel_endpoint: str | None,
+    service_version: str | None = None,
     exporter: SpanExporter | None = None,
 ) -> TracerProvider:
-    provider = build_tracer_provider(service_name, otel_endpoint=otel_endpoint, exporter=exporter)
+    provider = build_tracer_provider(
+        service_name,
+        otel_endpoint=otel_endpoint,
+        service_version=service_version,
+        exporter=exporter,
+    )
     trace.set_tracer_provider(provider)
 
     return provider

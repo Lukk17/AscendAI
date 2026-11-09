@@ -74,6 +74,9 @@ MCP_TRANSPORT_LOGGER_NAMES: tuple[str, ...] = (
     "mcp.server.streamable_http_manager",
     "mcp.server.streamable_http",
 )
+CLIENT_REQUEST_LOGGER_NAMES: tuple[str, ...] = ("httpx", "httpx2", "httpcore")
+TOOL_ARGUMENT_LOGGER_NAMES: tuple[str, ...] = ("fastmcp.server.mixins.mcp_operations",)
+LOGGERS_KEPT_AT_WARNING: tuple[str, ...] = (*CLIENT_REQUEST_LOGGER_NAMES, *TOOL_ARGUMENT_LOGGER_NAMES)
 
 DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
@@ -130,6 +133,11 @@ def _redact_at_the_mcp_transport_loggers() -> None:
         logging.getLogger(logger_name).addFilter(_MCP_TRANSPORT_REDACTION_FILTER)
 
 
+def _keep_sensitive_loggers_at_warning() -> None:
+    for logger_name in LOGGERS_KEPT_AT_WARNING:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+
 def configure_logging(service_name: str, settings: ServiceSettings) -> None:
     handler = (
         _build_json_handler(service_name)
@@ -145,6 +153,7 @@ def configure_logging(service_name: str, settings: ServiceSettings) -> None:
     for logger_name in LOGGERS_ROUTED_THROUGH_ROOT:
         _route_through_root(logger_name)
     _redact_at_the_mcp_transport_loggers()
+    _keep_sensitive_loggers_at_warning()
 
 
 def get_logger(name: str) -> logging.Logger:

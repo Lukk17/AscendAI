@@ -308,6 +308,54 @@ def test_sdk_disabled_hands_out_noop_tracers(
     assert trace_id is None
 
 
+def test_service_version_is_carried_on_the_resource(
+    shutdown_providers: list[TracerProvider],
+) -> None:
+    # given
+    service_version = "1.2.3"
+    # when
+    provider = build_tracer_provider(SERVICE_NAME, otel_endpoint=None, service_version=service_version)
+    shutdown_providers.append(provider)
+    # then
+    assert provider.resource.attributes["service.version"] == service_version
+
+
+def test_service_version_wins_over_the_resource_attributes_variable(
+    shutdown_providers: list[TracerProvider], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "service.version=0.0.7")
+    # when
+    provider = build_tracer_provider(SERVICE_NAME, otel_endpoint=None, service_version="1.2.3")
+    shutdown_providers.append(provider)
+    # then
+    assert provider.resource.attributes["service.version"] == "1.2.3"
+
+
+def test_no_service_version_adds_no_version_attribute(
+    shutdown_providers: list[TracerProvider], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    monkeypatch.delenv("OTEL_RESOURCE_ATTRIBUTES", raising=False)
+    # when
+    provider = build_tracer_provider(SERVICE_NAME, otel_endpoint=None)
+    shutdown_providers.append(provider)
+    # then
+    assert "service.version" not in provider.resource.attributes
+
+
+def test_configure_tracing_carries_the_service_version(
+    shutdown_providers: list[TracerProvider],
+) -> None:
+    # given
+    service_version = "4.5.6"
+    # when
+    provider = configure_tracing(SERVICE_NAME, otel_endpoint=None, service_version=service_version)
+    shutdown_providers.append(provider)
+    # then
+    assert provider.resource.attributes["service.version"] == service_version
+
+
 def test_configure_tracing_sets_the_global_provider(
     shutdown_providers: list[TracerProvider],
 ) -> None:

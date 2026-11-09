@@ -158,6 +158,17 @@ async def test_host_that_does_not_resolve_is_refused(monkeypatch: pytest.MonkeyP
     assert seen == [("missing.invalid", 80)]
 
 
+@pytest.mark.parametrize("host", [f"{'a' * 70}.example", "a" * 70, "name.example.."])
+async def test_host_the_name_codec_refuses_is_an_unsafe_uri(host: str) -> None:
+    # given
+    policy = FetchPolicy()
+    # when
+    with pytest.raises(UnsafeUriError) as excinfo:
+        await check_fetch_uri(f"http://{host}/", policy)
+    # then
+    assert isinstance(excinfo.value.__cause__, UnicodeError)
+
+
 async def test_lookup_with_no_address_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     # given
     seen: list[tuple[str, int]] = []
@@ -195,6 +206,15 @@ async def test_lookup_answer_that_is_not_an_ip_is_refused(
         "255.255.255.255",
         "::1",
         "fe80::1",
+        "100.64.0.1",
+        "100.100.100.200",
+        "100.127.255.254",
+        "64:ff9b::a9fe:a9fe",
+        "64:ff9b::808:808",
+        "::ffff:100.100.100.200",
+        "::ffff:127.0.0.1",
+        "::ffff:224.0.0.1",
+        "fec0::1",
     ],
 )
 async def test_non_public_address_is_refused(ip: str, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -322,6 +342,54 @@ async def test_private_ip_literal_is_refused(monkeypatch: pytest.MonkeyPatch) ->
         await check_fetch_uri("http://10.0.0.5/secret", FetchPolicy())
     # then
     assert "10.0.0.5" not in str(excinfo.value)
+    assert seen == []
+
+
+@pytest.mark.parametrize(
+    "literal",
+    [
+        "100.100.100.200",
+        "[64:ff9b::a9fe:a9fe]",
+        "[::ffff:100.100.100.200]",
+        "[::ffff:127.0.0.1]",
+        "[fec0::1]",
+    ],
+)
+async def test_non_public_ip_literal_is_refused(literal: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
+    seen: list[tuple[str, int]] = []
+    await _fake_dns(monkeypatch, AssertionError("must not resolve"), seen)
+    # when
+    with pytest.raises(UnsafeUriError, match="non-public"):
+        await check_fetch_uri(f"http://{literal}/", FetchPolicy())
+    # then
+    assert seen == []
+
+
+async def test_ipv4_mapped_public_address_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
+    mapped = f"::ffff:{PUBLIC_V4}"
+    await _fake_dns(monkeypatch, [mapped], [])
+    # when
+    target = await check_fetch_uri("https://example.com/", FetchPolicy())
+    # then
+    assert target.addresses == (mapped,)
+
+
+@pytest.mark.parametrize("host", ["shared.example", "100.100.100.200"])
+async def test_allowed_host_on_the_shared_range_passes_without_lookup(
+    host: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    seen: list[tuple[str, int]] = []
+    await _fake_dns(monkeypatch, ["100.100.100.200"], seen)
+    policy = FetchPolicy(allowed_hosts=(host,))
+    # when
+    target = await check_fetch_uri(f"http://{host}/x", policy)
+    # then
+    assert target.host == host
+    assert target.addresses == ()
     assert seen == []
 
 
@@ -668,6 +736,19 @@ async def test_redirect_hop_to_allowed_host_passes(
         "https://public.example/a.mp3",
         "http://internal.example/b.mp3",
     ]
+
+
+@pytest.mark.parametrize("location", ["http://[", "//[", "https://[::1"])
+async def test_loop_refuses_a_location_that_does_not_parse(
+    location: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    first = await _public_target(monkeypatch, "https://public.example/a")
+    send = _HopRoutes({"https://public.example/a": (302, location, "")})
+    # when / then
+    with pytest.raises(UnsafeUriError, match="does not parse"):
+        await follow_guarded_redirects(first, FetchPolicy(), send)
+    assert send.calls == ["https://public.example/a"]
 
 
 async def test_loop_hands_back_the_last_3xx_after_max_hops(

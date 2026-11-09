@@ -163,7 +163,7 @@ Path of one refused request. `GET /does-not-exist` matches no route, so the rout
 | [src/ascend_python_common/settings.py](src/ascend_python_common/settings.py) | `ServiceSettings`, `McpFetchSettings`, `CsvTuple`, upper-casing `LogLevel` |
 | [src/ascend_python_common/log_config.py](src/ascend_python_common/log_config.py) | `configure_logging`, JSON or color format, `trace_id` and `span_id` fields, MCP session token masking |
 | [src/ascend_python_common/request_context.py](src/ascend_python_common/request_context.py) | Request id and MCP session digest as pure ASGI middleware plus the FastMCP log context middleware |
-| [src/ascend_python_common/tracing.py](src/ascend_python_common/tracing.py) | Tracer provider with the OTLP exporter only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, span processor dropping `mcp.session.id` at span start plus an exporter scrubbing it on the way out, `current_trace_id` |
+| [src/ascend_python_common/tracing.py](src/ascend_python_common/tracing.py) | Tracer provider carrying `service.name` and, when given, `service.version` (the app wiring passes the service's installed package version), with the OTLP exporter only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, span processor dropping `mcp.session.id` at span start plus an exporter scrubbing it on the way out, `current_trace_id` |
 | [src/ascend_python_common/errors/codes.py](src/ascend_python_common/errors/codes.py) | `ProblemCode` and the platform codes |
 | [src/ascend_python_common/errors/problem.py](src/ascend_python_common/errors/problem.py) | The one problem body builder |
 | [src/ascend_python_common/errors/registry.py](src/ascend_python_common/errors/registry.py) | `ErrorRegistry`, exception type to code and detail |

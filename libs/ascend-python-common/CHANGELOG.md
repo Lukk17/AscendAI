@@ -39,8 +39,29 @@ All notable changes to this project are documented in this file. The format foll
   (`_SessionIdScrubbingExporter`), because FastMCP 4.1.1 re-adds the attribute
   after span start. The start-time processor is unchanged, no new processor
   and no condition was added (D5, owner decision 93).
+- `build_tracer_provider` and `configure_tracing` take an optional `service_version`, put on the
+  resource as `service.version`, where it wins over `OTEL_RESOURCE_ATTRIBUTES`. `create_service_app`
+  passes the version of the service distribution read from `importlib.metadata`, the same value
+  `/health` answers, so no compose file writes the version by hand. Existing callers keep working.
 - No warning was silenced and no `noqa`, `type: ignore` or `pragma: no cover`
   was added.
+
+### Fixed
+- `strip_user_info` runs in linear time. The scheme part is limited to 32 characters, so a long run of letters no longer
+  costs quadratic time.
+- `format_check` removes user info from the status as well as from the target.
+- `configure_logging` keeps the `fastmcp.server.mixins.mcp_operations` logger at WARNING whatever `LOG_LEVEL` is, so
+  tool arguments never reach the log, even at DEBUG.
+- `strip_user_info` now removes everything up to the last `@` before the
+  first `/`, `?` or `#`. A password that holds an `@` is no longer partly
+  printed, and an `@` in the query or fragment of an address with no path is
+  no longer taken for user info.
+- `configure_logging` keeps the `httpx`, `httpx2` and `httpcore` loggers at WARNING whatever `LOG_LEVEL` is, so a
+  request address with a password or a signature never reaches the log.
+- The URI guard refuses every address that is not globally routable, including the shared range 100.64.0.0/10 and the
+  old IPv6 site-local range fec0::/10, also in IPv4-mapped form. A host name the name codec cannot encode, such as one
+  with a 70 character label, is an `UnsafeUriError` and no longer a raw `UnicodeError`.
+- A redirect `Location` that does not parse, such as `http://[`, is an `UnsafeUriError` and no longer a raw `ValueError`.
 
 ## [1.0.0] - <release date>
 

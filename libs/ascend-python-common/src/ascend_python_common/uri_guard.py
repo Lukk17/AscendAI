@@ -58,6 +58,8 @@ def _is_blocked(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
         or address.is_multicast
         or address.is_reserved
         or address.is_unspecified
+        or not address.is_global
+        or (isinstance(address, ipaddress.IPv6Address) and address.is_site_local)
     )
 
 
@@ -69,7 +71,7 @@ def _is_allowed(host: str, allowed: tuple[str, ...]) -> bool:
 async def _lookup(host: str, port: int) -> list[AddrInfo]:
     try:
         return await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
-    except socket.gaierror as exc:
+    except (socket.gaierror, UnicodeError) as exc:
         raise UnsafeUriError("host does not resolve") from exc
 
 
@@ -163,7 +165,11 @@ async def follow_guarded_redirects(
     hops = 0
     while answer.status in _REDIRECT_STATUSES and hops < policy.max_redirect_hops and answer.location:
         hop_policy = policy if policy.file_root is None else replace(policy, file_root=None)
-        current = await check_fetch_uri(urljoin(current.url, answer.location), hop_policy)
+        try:
+            next_url = urljoin(current.url, answer.location)
+        except ValueError as exc:
+            raise UnsafeUriError("redirect location does not parse") from exc
+        current = await check_fetch_uri(next_url, hop_policy)
         answer = await send_hop(current)
         hops += 1
     return answer

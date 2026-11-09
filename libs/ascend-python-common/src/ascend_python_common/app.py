@@ -109,9 +109,11 @@ class _CorrelatedFastAPI(FastAPI):
 
 def create_service_app(definition: ServiceDefinition) -> FastAPI:
     configure_logging(definition.name, definition.settings)
+    version = package_version(definition.distribution)
     provider = configure_tracing(
         definition.name,
         otel_endpoint=definition.settings.OTEL_EXPORTER_OTLP_ENDPOINT,
+        service_version=version,
     )
     server = definition.mcp
     limiter = build_limiter(
@@ -147,7 +149,6 @@ def create_service_app(definition: ServiceDefinition) -> FastAPI:
                 logger.info("%s", "\n".join(definition.startup_banner()))
             yield
 
-    version = package_version(definition.distribution)
     app = _CorrelatedFastAPI(
         title=definition.name,
         version=version,

@@ -1,5 +1,6 @@
 import logging
 import socket
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -23,6 +24,7 @@ from ascend_python_common.startup_banner import (
     format_check,
     render_section,
     render_value,
+    strip_user_info,
     warning,
 )
 
@@ -80,11 +82,11 @@ def test_check_target_prints_failed_status() -> None:
 
 def test_check_target_prints_warning_with_reason() -> None:
     # given
-    target = "http://flaresolverr:8191/"
+    target = "http://example-dependency:8080/"
     # when
     line = format_check(target, warning("status=503"))
     # then
-    assert line == "http://flaresolverr:8191/ [Warning (status=503)]"
+    assert line == "http://example-dependency:8080/ [Warning (status=503)]"
 
 
 def test_section_with_different_label_lengths_aligns_values_in_one_column() -> None:
@@ -124,6 +126,69 @@ def test_uri_value_with_user_info_prints_without_it() -> None:
     # then
     assert rendered == "http://db-host:5432/app"
     assert "s3cret" not in rendered
+
+
+def test_user_info_with_an_at_sign_in_the_password_is_stripped_up_to_the_last_one() -> None:
+    assert strip_user_info("http://u:p@ss@h/x") == "http://h/x"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("http://h/x?to=a@b", "http://h/x?to=a@b"),
+        ("http://h/x#a@b", "http://h/x#a@b"),
+        ("http://h?to=a@b", "http://h?to=a@b"),
+        ("redis://:p@ss@redis:6379/0 and http://u:pw@h/y", "redis://redis:6379/0 and http://h/y"),
+    ],
+)
+def test_an_at_sign_after_the_authority_is_kept(value: str, expected: str) -> None:
+    assert strip_user_info(value) == expected
+
+
+_ONE_MEGABYTE = 1_000_000
+
+_SCAN_BUDGET_SECONDS = 1.0
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://h/" + "a" * _ONE_MEGABYTE,
+        "http://" + "a" * _ONE_MEGABYTE,
+        "a" * _ONE_MEGABYTE,
+        "a://" * (_ONE_MEGABYTE // 4),
+    ],
+    ids=["path", "authority-without-at-sign", "letters", "repeated-schemes"],
+)
+def test_strip_user_info_reads_a_long_value_in_one_pass(value: str) -> None:
+    # given
+    started = time.perf_counter()
+
+    # when
+    stripped = strip_user_info(value)
+
+    # then
+    assert time.perf_counter() - started < _SCAN_BUDGET_SECONDS
+    assert stripped == value
+
+
+def test_user_info_after_a_longest_scheme_is_stripped() -> None:
+    # given
+    scheme = "a" * 32
+
+    # when
+    stripped = strip_user_info(f"{scheme}://user:pw@host/x")
+
+    # then
+    assert stripped == f"{scheme}://host/x"
+
+
+def test_format_check_strips_user_info_from_the_status() -> None:
+    # when
+    rendered = format_check("redis://host/0", "Warning (cannot reach redis://user:pw@host/0)")
+
+    # then
+    assert rendered == "redis://host/0 [Warning (cannot reach redis://host/0)]"
 
 
 def test_empty_section_renders_title_only() -> None:
