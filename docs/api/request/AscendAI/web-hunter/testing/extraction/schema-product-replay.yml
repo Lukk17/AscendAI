@@ -1,0 +1,49 @@
+info:
+  name: schema-product-replay
+  type: http
+  seq: 35
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Same schema as schema-product.yml under a new query string, so the read
+    # misses the read cache and replays the recipe Call 1 stored, no model call.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/product?v=2",
+        "include_links": false,
+        "heavy_mode": false,
+        "output_format": "schema",
+        "extraction_schema": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "price": {"type": "number"}
+          },
+          "required": ["name", "price"]
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("replayed recipe answers the canary values without the model", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("success");
+            expect(b.recipe).to.equal("replay");
+            expect(b.content.name).to.equal("Brassbound Meridian Astrolabe");
+            expect(b.content.price).to.equal(847.25);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

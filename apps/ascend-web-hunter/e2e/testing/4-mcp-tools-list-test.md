@@ -29,7 +29,7 @@ Expect a version string.
 Check the ascend-web-hunter server is reachable.
 
 ```bash
-curl -fsS http://localhost:7021/health
+curl -fsS http://127.0.0.1:7021/health
 ```
 
 Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
@@ -52,13 +52,13 @@ cd docs/api/request/AscendAI
 **PowerShell:**
 
 ```powershell
-curl.exe -fsS -i -X POST http://localhost:7021/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
+curl.exe -fsS -i -X POST http://127.0.0.1:7021/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 **Unix:**
 
 ```bash
-curl -fsS -i -X POST http://localhost:7021/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
+curl -fsS -i -X POST http://127.0.0.1:7021/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"e2e","version":"0.1.0"}}}'
 ```
 
 No `Mcp-Session-Id` is emitted (the service is stateless), so any dummy value is used as the `mcp_session_id`
@@ -84,9 +84,18 @@ Step 2 returns HTTP 200. The JSON-RPC response body matches:
 - Some entry has `name` equal to `"web_read"`. Call that entry `T_read`.
   - `T_read.inputSchema.properties.url` exists.
   - `T_read.inputSchema.required` is an array containing `"url"`.
-  - `T_read.inputSchema.properties` also advertises at least one of `include_links`, `link_filter`,
-    `heavy_mode`.
+  - `T_read.inputSchema.properties.include_links` exists.
+  - `T_read.inputSchema.properties.link_filter` exists.
+  - `T_read.inputSchema.properties.heavy_mode` exists.
 
 ## Fixtures
 
 None.
+
+## Concurrency
+
+`tools/list` is a stateless read of the MCP server's tool registry. It writes no Redis key, reaches no upstream
+service, and counts against no rate limit window, because the library limits only `tools/call`. Safe beside every
+other spec.
+
+- Serial: false

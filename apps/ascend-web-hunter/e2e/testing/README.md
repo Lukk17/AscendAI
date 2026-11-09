@@ -62,19 +62,19 @@ be run on its own.
 6. [6-tiered-scraping-test.md](6-tiered-scraping-test.md). Per-tier regression sweep (`curl_cffi` static,
    browser-tier Cloudflare, Playwright JS-rendered) against real sites.
 7. [7-authenticated-realworld-scraping-test.md](7-authenticated-realworld-scraping-test.md). Real-world URL matrix
-   plus automated saucedemo login-reuse. Two parts, both automated, no human step. Runs after test 6 because its
-   reset flushes every `session:*` key.
+   plus automated saucedemo login-reuse. Two parts, both automated, no human step. Runs after test 6 because both
+   read `wikipedia.org` and `toscrape.com`.
 8. [8-session-clear-test.md](8-session-clear-test.md). `POST /api/v2/web/session/clear` against a seeded and an
    unseeded session. Redis-only, no egress - cheapest test in the suite alongside 1 and 4. Do not run in parallel
    with test 10.
 9. [9-session-status-test.md](9-session-status-test.md). `POST /api/v2/web/session/status` across its `none`,
    `expired`, and `active` states. Redis-only, no egress - same cost tier as 1, 4, and 8.
 10. [10-session-establish-test.md](10-session-establish-test.md). `POST /api/v2/web/session/establish` - asserts
-    the immediate response, plus a live-verified finding: the background monitor's "cleared" check accepts any
-    unchallenged page, so it captures a session within seconds even though nobody solved a challenge. Launches a
-    real headful Playwright browser that can be held by a background monitor for up to 10 minutes. Highest per-run
-    resource cost in this module's suite; do not run in parallel with test 8 or with itself; see the spec's own
-    cost note.
+    the immediate response, that no session is saved for a page that never showed a login, that
+    `DELETE /api/v2/session/interventions/{flow_id}` closes the window and `last_window` then reads `cancelled`,
+    and that a second window on an imported `example.net` login ends on its own with `already_authenticated`.
+    Launches two real headful Patchright browsers. Do not run in parallel with tests 7, 8 or 17, or with itself.
+    See the spec's own cost note.
 11. [11-captcha-solve-and-capture-test.md](11-captcha-solve-and-capture-test.md). Human-solved hCaptcha on the
     democaptcha demo form, proven by the `hmt_id` cookie a human's checkbox click sets and captured under
     `session:democaptcha.com:default`. Asserts the capture only, since the form renders its widget on every load and
@@ -85,7 +85,7 @@ be run on its own.
 12. [12-clearance-reuse-test.md](12-clearance-reuse-test.md). Stored Cloudflare clearance reused on a second read
     of the same site, fully automated: a cold read of `scrapingcourse.com` stores `cf_clearance`, and a read of the
     same page under a different address must answer HTTP 200 with `status="success"` faster than the cold read,
-    never a 428. A 428 is a FAIL and register defect A61 until its fix lands. Runs after test 6, which reads the
+    never a 428. A 428 is a FAIL and register defect F54 until its fix lands. Runs after test 6, which reads the
     same site, and not alongside tests 6, 7, 8 or 10.
 13. [13-structured-extraction-test.md](13-structured-extraction-test.md). Deterministic formats on the shared
     fake site: structured JSON-LD metadata, tables cell for cell, and screenshot twice on the pinned
@@ -99,15 +99,18 @@ be run on its own.
     hosted model (provider `minimax`, model `MiniMax-M2.7`, never LM Studio): validated answer, recipe
     stored with TTL, replay without the model, drift rebuild, second schema separation, prompt-injection
     resistance, unsatisfiable schema refusal. Writes only `recipe:e2e-fake-site:*`, safe beside every
-    spec. Token use goes into the run record and the spec's `docs/E2E_COST.md` row.
+    spec. The runner records token use in its run file, and the person or main session running the sweep copies it into the spec's row in `docs/E2E_COST.md`.
 16. [16-crawl-jobs-test.md](16-crawl-jobs-test.md). Crawl jobs on the fake site crawl tree: submission
-    and polling, result index under the tenant prefix with depth, pattern and robots bounds, unsafe
+    and polling, result index under the tenant prefix with depth, pattern and robots bounds, a default
+    crawl reading a page robots.txt forbids, unsafe
     links counted, unchanged pages copied forward on recrawl, tenant isolation across two tenants, and
     cancel while running. Mutates only the two tenants' crawl data and the fake site request log.
 17. [17-session-import-test.md](17-session-import-test.md). `POST /api/v2/web/session/import` stores an
     out-of-band Playwright `storage_state` for `https://www.example.net/` under profile `e2e-import` (keeps the
     domain's two canary cookies, drops the foreign cookie), reads back `active` via `session/status` and clears
-    via `session/clear`. Redis-only, no egress. Runs after test 8 and before test 10.
+    via `session/clear`. A localStorage-only state is accepted, and a state with neither site cookies nor site
+    localStorage is refused with `no_cookies_for_domain`. Redis-only, no egress. Runs after test 8 and before
+    test 10.
 18. [18-tier-ladder-and-guard-test.md](18-tier-ladder-and-guard-test.md). Tier ladder guard and tier
     memory on the shared fake site: blocked-name reads refused with `unsafe_uri` on every read tier
     before any fetch, redirect, subresource and script navigation toward the blocked name contained,
@@ -123,14 +126,20 @@ be run on its own.
     shared fake site's thin turnstile wall page, fully automated, no human: reads under profiles `e2e-w1` to
     `e2e-w4` answer HTTP 428 with four distinct `flow_id` values and four distinct `window.slot` values, the REST
     listing and the MCP `session_interventions` tool report the same four flows, a fifth read under `e2e-w5`
-    answers HTTP 428 with a fifth flow and slot, a sixth read under `e2e-w6` answers HTTP 409 with `holder_url`,
-    a rejoin under `e2e-w2` answers HTTP 428 `joined`, and lease expiry drains
-    every flow back to `active_flows` 0 with no session key left behind. Fills every window slot, so it runs alone
-    after spec 10, beside no spec that can answer a 428.
+    answers HTTP 409 `novnc_busy` with a `Retry-After` header and `holder_url` because all four windows are open,
+    a rejoin under `e2e-w2` answers HTTP 428 `joined`, `DELETE /api/v2/session/interventions/{flow_id}` and the
+    MCP `session_cancel_intervention` tool each free one slot, a second close of the same flow answers
+    `flow_not_found`, and the cleanup closes the last flows, leaving `active_flows` 0 with no session key left
+    behind. Fills every window slot, so it runs alone after spec 10, beside no spec that can answer a 428.
 21. [21-platform-contract-test.md](21-platform-contract-test.md). The shared platform contract: health, readiness,
     the problem bodies, the errors counter, security headers, the MCP `initialize` plus refusal, and the REST
     `unsafe_uri` refusals. Reads and refusals only, no `session:*` key, safe beside every spec.
-    Twenty one specs in all, twenty of them automated (spec 11 needs a human).
+22. [22-human-login-reuse-test.md](22-human-login-reuse-test.md). Human login with save and reuse on LinkedIn:
+    a human logs in to their own account in the window the establish call opens, the window ends `resolved`, the
+    saved record holds `li_at` by name, the feed reads logged in before and after a restart of the
+    ascend-web-hunter container, and a second login window ends `already_authenticated`. Main session only,
+    runs alone, on a human's go.
+    Twenty two specs in all, twenty of them automated (specs 11 and 22 need a human).
 
 ## Cross-cutting conventions
 

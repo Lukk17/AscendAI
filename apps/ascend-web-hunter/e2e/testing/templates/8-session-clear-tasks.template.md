@@ -2,7 +2,7 @@
 
 Spec: [../8-session-clear-test.md](../8-session-clear-test.md)
 
-Copy this file to `../runs/<UTC-timestamp>_8-session-clear-tasks.md` before starting a run. Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
+Copy this file to `../runs/<UTC-timestamp>_8-session-clear-tasks.md` before starting a run. For a repeated run of the same spec in the same sweep, which shares the sweep's timestamp, add `-rerun<N>` before `.md` (`-rerun2` for the second run, `-rerun3` for the third). Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
 
 ## Tasks
 
@@ -14,11 +14,12 @@ Copy this file to `../runs/<UTC-timestamp>_8-session-clear-tasks.md` before star
 
 ### Reset state
 
-- [ ] `session:example.net:default` and `session:example.com:default` both return `0` from `EXISTS` (deleted
-      `example.net`'s leftover key first if a prior run did not clean up)
-- [ ] Primed the no-op path: `POST /api/v2/web/session/clear` for `https://example.com/` returned HTTP 200 with
-      `existed=false` (empties the in-process read cache spec 3 fills, which the Redis deletes cannot reach)
-- [ ] Copied `fixtures/session-clear-seed.json` into the `redis` container
+- [ ] Recorded the `redis-cli --scan --pattern "session:*"` key list as the baseline (pasted under Additional tasks I did)
+- [ ] `session:example.net:default` and `session:example.edu:default` both return `0` from `EXISTS` (deleted both
+      with one `DEL` first if a prior run did not clean up)
+- [ ] Primed the no-op path: `POST /api/v2/web/session/clear` for `https://example.edu/` returned HTTP 200 with
+      `existed=false` (empties the in-process read cache for the domain, which the Redis deletes cannot reach)
+- [ ] Copied `fixtures/session-clear-seed.json` into the `redis` container from the repository root
 - [ ] Seeded `session:example.net:default` via `redis-cli -x SETEX ... < /tmp/session-clear-seed.json`, got `OK`
 - [ ] Confirmed `session:example.net:default` now returns `1` from `EXISTS`
 - [ ] Removed the copied seed file: `docker exec redis sh -c "rm /tmp/session-clear-seed.json"` left nothing behind
@@ -26,6 +27,7 @@ Copy this file to `../runs/<UTC-timestamp>_8-session-clear-tasks.md` before star
 
 ### Run
 
+- [ ] Moved into `docs/api/request/AscendAI` from the repository root
 - [ ] Sent `session-clear-existing.yml` via `bru run` and got HTTP 200
 - [ ] Sent `session-clear-idempotent.yml` via `bru run` and got HTTP 200
 
@@ -33,10 +35,14 @@ Copy this file to `../runs/<UTC-timestamp>_8-session-clear-tasks.md` before star
 
 - [ ] Call 1 body: `status="cleared"`, `url="https://example.net/"`, `existed=true`
 - [ ] `session:example.net:default` returns `0` from `EXISTS` after call 1
-- [ ] Call 2 body: `status="cleared"`, `url="https://example.com/"`, `existed=false`, `cleared_cache_entries=0`
-- [ ] `session:example.com:default` returns `0` from `EXISTS` after call 2
-- [ ] `redis-cli --scan --pattern "session:*"` after the run matches the pre-test key list exactly (no leftover
+- [ ] Call 2 body: `status="cleared"`, `url="https://example.edu/"`, `existed=false`, `cleared_cache_entries=0`
+- [ ] `session:example.edu:default` returns `0` from `EXISTS` after call 2
+- [ ] `redis-cli --scan --pattern "session:*"` after the run matches the baseline recorded in Reset state exactly (no leftover
       `example.net` key, no other domain's key touched)
+
+### Post-run cleanup
+
+- [ ] `DEL "session:example.net:default" "session:example.edu:default"` run once (`0` on a passing run)
 
 ### Verdict
 

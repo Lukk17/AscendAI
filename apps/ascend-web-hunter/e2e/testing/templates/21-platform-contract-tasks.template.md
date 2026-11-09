@@ -2,7 +2,7 @@
 
 Spec: [../21-platform-contract-test.md](../21-platform-contract-test.md)
 
-Copy this file to `../runs/<UTC-timestamp>_21-platform-contract-tasks.md` before starting a run. Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
+Copy this file to `../runs/<UTC-timestamp>_21-platform-contract-tasks.md` before starting a run. For a repeated run of the same spec in the same sweep, which shares the sweep's timestamp, add `-rerun<N>` before `.md` (`-rerun2` for the second run, `-rerun3` for the third). Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
 
 ## Tasks
 
@@ -22,7 +22,7 @@ Copy this file to `../runs/<UTC-timestamp>_21-platform-contract-tasks.md` before
 ### Expected
 
 - [ ] `health.yml`: HTTP 200, `status` `ok`, `service` `ascend-web-hunter`, non-empty `version`
-- [ ] `ready.yml`: HTTP 200, `status` `ready`, same `service` and `version`, every `checks` entry `ok` or `skipped`
+- [ ] `ready.yml`: HTTP 200, `status` `ready`, same `service`, `version` equal to the one `health.yml` stored, every `checks` entry `ok` or `skipped`
 - [ ] `unknown-path.yml`: HTTP 404 problem body, `code` `not_found`, `type` `https://ascend.ai/errors/not-found`, `title` `Not Found`, `instance` `/does-not-exist`, `traceId` 32 lower case hex
 - [ ] `errors-counter-after.yml`: the `not_found` `rest` `unmatched` counter grew by exactly one
 - [ ] `delete-health.yml`: HTTP 405 problem body, `code` `method_not_allowed`, an `Allow` header
@@ -34,7 +34,6 @@ Copy this file to `../runs/<UTC-timestamp>_21-platform-contract-tasks.md` before
 - [ ] `mcp-refusal.yml`: error text starts with `unsafe_uri: ` (metadata address)
 - [ ] `read-metadata-address.yml`: HTTP 400, `code` `unsafe_uri`
 - [ ] `read-userinfo-url.yml`: HTTP 400, `code` `unsafe_uri`, no header or body text holds `secret`
-- [ ] `read-blocked-name.yml`: a read of `fake_site_blocked_url`, HTTP 400 with the full problem body of design D23 (`Content-Type` `application/problem+json`, `code` `unsafe_uri`, `type` `https://ascend.ai/errors/unsafe-uri`, `status` 400, an `instance`, a 32 hex `traceId`)
 - [ ] `initialize-2025-06-18.yml`: HTTP 200, no `mcp-session-id`, `protocolVersion` `2025-06-18`, `serverInfo.name` `ascend-web-hunter`, non-empty `serverInfo.version`
 - [ ] `initialize-2025-11-25.yml`: HTTP 200, no `mcp-session-id`, `protocolVersion` `2025-11-25`, `serverInfo.name` `ascend-web-hunter`, non-empty `serverInfo.version`
 - [ ] `initialized-notification.yml`: HTTP 200 or 202
@@ -44,7 +43,8 @@ Copy this file to `../runs/<UTC-timestamp>_21-platform-contract-tasks.md` before
 - [ ] `health-foreign-host.yml`: `GET /health` with a foreign `Host`, HTTP 200
 - [ ] `origin-refused.yml`: 4xx and no `mcp-session-id`
 - [ ] `oversized-body.yml`: HTTP 413 and no `mcp-session-id`
-- [ ] `tools-list-after-oversize.yml`: HTTP 200, lists the ten web-hunter tools
+- [ ] `tools-list-after-oversize.yml`: HTTP 200, exactly 11 tools, the eleven `src/api/mcp/mcp_server.py` registers (`session_cancel_intervention` among them)
+- [ ] `read-blocked-name.yml`: a read of `fake_site_blocked_url`, HTTP 400 with the full problem body of design D23 (`Content-Type` `application/problem+json`, `code` `unsafe_uri`, `type` `https://ascend.ai/errors/unsafe-uri`, `status` 400, an `instance`, a 32 hex `traceId`)
 
 ### Post-run cleanup
 

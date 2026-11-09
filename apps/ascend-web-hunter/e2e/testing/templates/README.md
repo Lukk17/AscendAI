@@ -16,6 +16,7 @@ and `{capability}` name.
    checkbox, a Result summary block (Input tokens, Output tokens, Start (UTC), End (UTC), Duration), and an
    "Additional tasks I did" section.
 3. To run a test, copy the matching template into `../runs/` with a UTC-timestamp prefix
-   (`<UTC-timestamp>_<N>-<capability>-tasks.md`), then tick boxes and fill results in that copy - never here.
+   (`<UTC-timestamp>_<N>-<capability>-tasks.md`), then tick boxes and fill results in that copy - never here. A
+   repeated run of the same spec in the same sweep adds `-rerun<N>` before `.md` (`-rerun2` for the second run).
 
 See [../runs/README.md](../runs/README.md) for the full runner contract.

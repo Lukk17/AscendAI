@@ -17,7 +17,9 @@ string arguments only - no file uploads.
 - `session-import-mixed.json` - the full `POST /api/v2/web/session/import` request body used by test 17
   ([../testing/17-session-import-test.md](../testing/17-session-import-test.md)): a Playwright `storage_state`
   with two `example.net` cookies carrying canary values and one `example.org` cookie, so the import keeps two,
-  drops one, and stores provenance `import`.
+  drops one, and stores provenance `import`. Bruno does not read this file: the request file
+  `docs/api/request/AscendAI/web-hunter/testing/session-import/import-mixed.yml` carries the same body inline, so
+  change both together.
 
 Reserved for future tests that might need canary content, e.g. a small static HTML page hosted under
 `fixtures/static/` for an extraction-tier regression test against a known body.
@@ -58,9 +60,17 @@ canary.mp3`. The declared word is Kaksma: ascend-audio-scribe
 "KAKSMA", verified twice on 2026-10-19.
 
 Canary pages (all `text/html; charset=utf-8` unless noted): `/` index,
-`/article` (QUARRY-THRUSH survey, 47 nesting pairs), `/product` (visible
-Brassbound Meridian Astrolabe, 847.25 USD plus JSON-LD, layout 2 via `/__state`
-with changed selectors and its own visible price),
+`/article` (QUARRY-THRUSH survey, 47 nesting pairs), `/product` (layout 1, the
+default: the name Brassbound Meridian Astrolabe alone in `h1.product-name`, the
+price 847.25 alone in `span.price` with `USD` in its own `span.currency`, plus
+JSON-LD and a description sentence that names the product, so one CSS selector per
+field replays each value and spec 15 can store and replay a recipe. Layout 2 via
+`/__state` changes the markup: the name in an `h2`, the price inside the sentence
+`Priced at 847.25 USD.` of `p.stock-price`, so layout 1's selectors match nothing
+and no selector can replay the price. Both layouts carry the SKU canary
+`MRD-4471-QUILL`, in `span.sku` on layout 1 and in `p.stock-sku` on layout 2, a
+value no cached answer of another schema holds, so spec 15's `sku` read proves it
+read the live page),
 `/product-broken` (malformed JSON-LD), `/tables` (SKU-1147/2203/3318),
 `/js-only` (NIGHT-HERON ledger, 11 lanterns, script-injected only),
 `/captcha-wall` (Mirell field-notes blog of 190+ extracted words with a
@@ -71,8 +81,10 @@ spec expectation),
 `/redirect-1` to `/redirect-2` to `/article` (302 chain),
 `/redirect-blocked` (302 to the blocked name), `/private-image` (img from the
 blocked name), `/script-nav` (script sets `window.location` to the blocked
-name), `/crawl/` sitemap tree down to `/crawl/a/b/c` plus `/crawl/outside` and
-`/crawl/blocked-link`, `/crawl/disallowed` (see `/robots.txt`), `/wall-ko`
+name), `/crawl/` link tree down to `/crawl/a/b/c` plus `/crawl/outside` and
+`/crawl/blocked-link`, `/crawl/disallowed` (see `/robots.txt`),
+`/crawl/a-sitemap-only` (no page links to it, only `/sitemap.xml` lists it, canary
+`The KESTREL-BUOY register lists 19 marker buoys moored off the Mirell south point.`), `/wall-ko`
 (Korean captcha: captcha image, `captcha_answer` text input, the Korean phrase
 `로봇이 아님을 확인하십시오. 계속하려면 상자를 선택하십시오.`, no vendor marker),
 `/wall-tr` (Turkish login: the sentence `Giriş yapmak için kutuyu işaretleyin.`
@@ -92,8 +104,11 @@ archive nav, keeps `سجل مسح QUARRY-THRUSH 47 زوجا معششا.`),
 `/prose-captcha` (QUARRY-THRUSH canary plus `The essay uses the word captcha
 only as prose.`), `/rich-403` (403, members article of ten paragraphs with a
 22-link archive nav, keeps `Long rich member article text.`),
-`/robots.txt` (`text/plain`, disallows `/crawl/disallowed`), `/sitemap.xml`
-(`application/xml`), `/oversized-declared` (large body with `Content-Length`),
+`/robots.txt` (`text/plain`, disallows `/crawl/disallowed`, names the sitemap by its full
+address built from the request's `Host`, so `http://e2e-fake-site:7031/sitemap.xml` inside the
+network), `/sitemap.xml` (`application/xml`, lists `/crawl/`, `/crawl/a`, `/crawl/outside` and
+`/crawl/a-sitemap-only` by their full addresses, never a page deeper than depth 1 by links, because
+a sitemap address enters the crawl at depth 1), `/oversized-declared` (large body with `Content-Length`),
 `/oversized-undeclared` (chunked, no `Content-Length`), `/slow` (streams one
 chunk per second, no `Content-Length`), `/pdf-link-blocked` (its own canary
 sentence plus a `.pdf` link to `http://e2e-fake-site-blocked:7031/files/canary.pdf`).

@@ -24,7 +24,7 @@ Expect a version string. If the command is not found, install it with `npm insta
 Check the ascend-web-hunter server is reachable.
 
 ```bash
-curl -fsS http://localhost:7021/health
+curl -fsS http://127.0.0.1:7021/health
 ```
 
 Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
@@ -71,3 +71,12 @@ PASS.
 ## Fixtures
 
 None.
+
+## Concurrency
+
+Writes no `session:*`, tier-memory, crawl or recipe key and never reaches SearXNG. Each of its three calls counts
+against the caller's rate limit window of `/api/v1/web/search`, the window spec 2
+([2-search-happy-path-test.md](2-search-happy-path-test.md)) deletes in its reset. Neither spec asserts on the count,
+so the two still run side by side. Safe beside every other spec.
+
+- Serial: false

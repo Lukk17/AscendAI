@@ -28,12 +28,14 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("lists the tool names of the pin test", function () {
+        test("lists exactly the eleven tools the service registers", function () {
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
             const names = envelope.result.tools.map(function (tool) { return tool.name; });
-            ["web_search", "web_read", "session_establish", "session_interventions", "session_status", "session_clear", "crawl_submit", "crawl_job_status", "crawl_list_jobs", "crawl_cancel_job"].forEach(function (toolName) {
+            const expected = ["web_search", "web_read", "session_establish", "session_interventions", "session_cancel_intervention", "session_status", "session_clear", "crawl_submit", "crawl_job_status", "crawl_list_jobs", "crawl_cancel_job"];
+            expect(names).to.have.lengthOf(expected.length);
+            expected.forEach(function (toolName) {
                 expect(names).to.include(toolName);
             });
         });

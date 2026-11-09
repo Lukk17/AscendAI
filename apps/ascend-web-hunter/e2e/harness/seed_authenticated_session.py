@@ -19,7 +19,7 @@ from typing import Any
 
 import httpx
 
-WEB_HUNTER_BASE_URL = os.environ.get("WEB_HUNTER_BASE_URL", "http://localhost:7021")
+WEB_HUNTER_BASE_URL = os.environ.get("WEB_HUNTER_BASE_URL", "http://127.0.0.1:7021")
 
 
 @dataclass(frozen=True)

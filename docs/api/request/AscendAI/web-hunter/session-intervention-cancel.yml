@@ -1,0 +1,35 @@
+info:
+  name: session-intervention-cancel
+  type: http
+  seq: 10
+
+http:
+  method: DELETE
+  # 0123456789ab is shaped like a flow_id but no window carries it, so a clean
+  # environment documents the baseline "unknown flow" answer. To close a real
+  # window, take its flow_id from interventions-list or a 428 answer: the call
+  # then answers 204 with no body and frees the slot.
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/session/interventions/0123456789ab"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 404", function () {
+            expect(res.getStatus()).to.equal(404);
+        });
+        test("problem body names the unknown flow", function () {
+            expect(res.getHeader("content-type")).to.contain("application/problem+json");
+            const b = res.getBody();
+            expect(b.code).to.equal("flow_not_found");
+            expect(b.status).to.equal(404);
+            expect(b.detail).to.equal("No open intervention window has flow_id 0123456789ab.");
+            expect(b.instance).to.equal("/api/v2/session/interventions/0123456789ab");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

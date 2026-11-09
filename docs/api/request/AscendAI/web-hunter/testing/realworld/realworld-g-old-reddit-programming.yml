@@ -36,6 +36,15 @@ runtime:
                 expect(b.vnc_url).to.be.a("string").and.not.empty;
             }
         });
+        test("a success must be the subreddit, never the old Reddit account wall", function () {
+            if (res.getStatus() !== 200) {
+                return;
+            }
+            const b = res.getBody() || {};
+            const content = (b.content || b.text || b.markdown || "").toLowerCase();
+
+            expect(content, "account wall reported as a successful scrape").to.not.include("accounts are required to access old reddit");
+        });
 
 settings:
   encodeUrl: true

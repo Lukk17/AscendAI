@@ -18,7 +18,8 @@ http:
         "seeds": ["http://e2e-fake-site:7031/crawl/"],
         "include_patterns": ["/crawl/[ab]*"],
         "max_depth": 2,
-        "page_budget": 5
+        "page_budget": 5,
+        "respect_robots": true
       }
   auth: inherit
 

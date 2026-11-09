@@ -19,10 +19,13 @@ default.
 2026-05-30T01-15-00_1-invalid-input-tasks.md
 2026-05-30T01-15-00_2-search-happy-path-tasks.md
 2026-05-30T01-15-00_3-read-example-com-tasks.md
+2026-05-30T01-15-00_3-read-example-com-tasks-rerun2.md
 ```
 
 Use ISO-8601 UTC with colons replaced by hyphens so the filename is filesystem-safe across Windows / macOS / Linux.
-Group all tests from one sweep under the same timestamp; one timestamp = one full e2e sweep.
+Group all tests from one sweep under the same timestamp; one timestamp = one full e2e sweep. A repeated run of the
+same spec in the same sweep shares that timestamp, so it adds `-rerun<N>` before `.md`: `-rerun2` for the second
+run, `-rerun3` for the third.
 
 ## Runner steps
 

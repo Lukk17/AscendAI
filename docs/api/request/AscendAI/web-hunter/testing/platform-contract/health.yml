@@ -23,6 +23,7 @@ runtime:
         });
         test("version is a non-empty string", function () {
             expect(res.getBody().version).to.be.a("string").and.not.empty;
+            bru.setVar("pcHealthVersion", res.getBody().version);
         });
 
 settings:

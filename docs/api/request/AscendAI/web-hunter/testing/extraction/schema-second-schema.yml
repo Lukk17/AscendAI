@@ -37,6 +37,9 @@ runtime:
             expect(b.content.sku).to.be.a("string");
             expect(b.content).to.not.have.property("name");
         });
+        test("sku carries the canary only the live product page holds", function () {
+            expect(res.getBody().content.sku).to.include("MRD-4471-QUILL");
+        });
 
 settings:
   encodeUrl: true

@@ -19,10 +19,6 @@ not steps of this spec: the unit tests of tasks 2.1, 5.1 and 3.1 prove them (own
 2026-10-08). The three steps kept run the formats on pages fetched by the real tiers of the image,
 with a real browser for the screenshot.
 
-## Concurrency
-
-Reads only, opens no NoVNC flow, safe beside every spec.
-
 ## Prerequisites
 
 Check Bruno CLI is installed.
@@ -36,7 +32,7 @@ Expect a version string.
 Check the ascend-web-hunter server is reachable.
 
 ```bash
-curl -fsS http://localhost:7021/health
+curl -fsS http://127.0.0.1:7021/health
 ```
 
 Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
@@ -93,7 +89,7 @@ bru run "web-hunter/testing/extraction/screenshot.yml" --env ascend-local
 
 ## Expected
 
-- **Step 1:** HTTP 200. Body `content` holds the product sentence, `metadata["json-ld"][0].name`
+- **Step 1:** HTTP 200. Body `content` holds the product name, `metadata["json-ld"][0].name`
   equals `"Brassbound Meridian Astrolabe"` and `metadata["json-ld"][0].offers.price` equals `847.25`.
 - **Step 2:** HTTP 200. Body `tables` equals, cell for cell,
   `[[["SKU-1147","Cinder Sparrow feeder","23.50"],["SKU-2203","Lumen Badger hutch","89.99"],["SKU-3318","Helix Finch perch","12.75"]]]`.
@@ -113,3 +109,15 @@ Every assertion above is an HTTP status, a response body or the fake site reques
 
 None. The fake site pages `/product`, `/tables` and `/article` carry the canaries (product name and
 price, table rows, article survey).
+
+## Concurrency
+
+Opens no NoVNC flow. Steps 1 and 2 name no tier and send `heavy_mode` false, so each of them that the read cache
+does not answer writes `tier_memory:e2e-fake-site` with a TTL of `TIER_MEMORY_TTL_SECONDS`. Step 3 names a tier and
+writes nothing. Its reset empties the fake site request log and restores the product page to layout 1, and its
+Expected counts the `/article` requests in that log, so not beside 14, 15, 16 or 18, which empty the same log, and
+not beside 15, which switches the product page to layout 2. Not beside 18, which asserts on that key, or 19, whose
+reads a remembered tier would start partway up the ladder. Its Expected does not depend on the key, and the specs
+that do (14, 18 and 19) delete it in their own reset, so this spec leaves it.
+
+- Serial: false

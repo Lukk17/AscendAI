@@ -10,7 +10,7 @@ http:
     type: json
     data: |-
       {
-        "url": "https://www.indeed.com/jobs?q=AI&l=usa&radius=25&fromage=7&from=searchOnDesktopSerp&start=20&pp=gQAeAAABnF_iawAAAAACVo1v-QA6AQEBCD6A99N9SysLaVNWOP602J2TfGu4WMTYl2QVe1DlKNumaEW23YqEO6pnPpwcCdrqVNqmBRvXggAA",
+        "url": "https://www.indeed.com/jobs?q=AI&l=usa&radius=25&fromage=7&from=searchOnDesktopSerp",
         "include_links": false,
         "heavy_mode": false
       }
@@ -35,6 +35,28 @@ runtime:
                 expect(b.code).to.equal("human_intervention_required");
                 expect(b.vnc_url).to.be.a("string").and.not.empty;
             }
+        });
+        test("a success must be the job list, never a sign-in prompt or a block page", function () {
+            if (res.getStatus() !== 200) {
+                return;
+            }
+            const b = res.getBody() || {};
+            const content = b.content || b.text || b.markdown || "";
+
+            expect(content.length, "a job list is longer than the 315-character sign-in prompt").to.be.at.least(1000);
+
+            const blockMarkers = [
+                "create an account or sign in",
+                "Continue with Apple",
+                "Security Check",
+                "Just a moment...",
+                "Checking if the site connection is secure",
+                "Additional Verification Required",
+                "Ray ID"
+            ];
+            blockMarkers.forEach(function (marker) {
+                expect(content, "sign-in or block-page marker reported as a successful scrape: " + marker).to.not.include(marker);
+            });
         });
 
 settings:

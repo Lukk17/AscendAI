@@ -61,7 +61,7 @@ Expect a version string.
 Check the ascend-web-hunter server is reachable.
 
 ```bash
-curl -fsS http://localhost:7021/health
+curl -fsS http://127.0.0.1:7021/health
 ```
 
 Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
@@ -171,7 +171,7 @@ and both slots verbatim in the chat.
    exactly that flow's slot while the `e2e-h1` flow is still open.
 
 ```bash
-curl -fsS http://localhost:7021/api/v2/session/interventions
+curl -fsS http://127.0.0.1:7021/api/v2/session/interventions
 ```
 
 Expect the `flows` array to hold the Call 2 `flow_id` with its slot and no entry with the Call 3 slot.
@@ -195,7 +195,7 @@ Expect `0`.
    longer.
 
 ```bash
-curl -fsS http://localhost:7021/api/v2/session/interventions
+curl -fsS http://127.0.0.1:7021/api/v2/session/interventions
 ```
 
 Expect no entry with the Call 2 `flow_id` and none with the Call 3 `flow_id`.
@@ -259,8 +259,9 @@ None, and no secrets: the captcha is human-solved. The URL is hardcoded in the B
   `session:democaptcha.com:e2e-h1` and `session:democaptcha.com:e2e-h2`, plus up to two NoVNC
   window slots for as long as the human windows are open (`NOVNC_TIMEOUT_SECONDS`, 600 s by default, if nobody
   solves them).
-- Conflicts with: any spec that opens a NoVNC flow (test 7's row u, test 10, spec 20
+- Conflicts with: any spec that opens a NoVNC flow (test 7's 428 rows, test 10, the wall rows of spec 19
+  ([19-challenge-verdicts-test.md](19-challenge-verdicts-test.md)), spec 20
   ([20-concurrent-interventions-test.md](20-concurrent-interventions-test.md)), and any read that escalates to
-  NoVNC), because the service answers `409` `novnc_busy` while every window slot is held, and any test
-  that flushes `session:*` (test 7's reset), which would wipe the capture before the capture check.
+  NoVNC), because the service answers `409` `novnc_busy` while every window slot is held. Test 7's reset deletes
+  only the named keys of its own domains, none of them on `democaptcha.com`, so it does not touch the capture.
 - Serial: true. Runs alone, last in the sweep, and only on a human's go, with the human on the main session.

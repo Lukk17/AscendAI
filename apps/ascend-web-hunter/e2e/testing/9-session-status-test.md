@@ -29,7 +29,7 @@ Expect a version string.
 Check the ascend-web-hunter server is reachable.
 
 ```bash
-curl -fsS http://localhost:7021/health
+curl -fsS http://127.0.0.1:7021/health
 ```
 
 Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
@@ -196,3 +196,13 @@ bru run "web-hunter/testing/session-status-active.yml" --env ascend-local
 `storage_state` record for `example.org` with a `saved_at` timestamp already outside the auth TTL, not a captured
 real login. `status()` only reads `saved_at` and the record's presence; it never inspects the cookies themselves,
 so the fixture's shape only needs to match what `save_storage_state` would have written.
+
+## Concurrency
+
+Mutates only `session:example.org:default`, seeded twice and removed by the test itself. No overlap with the
+`example.net` keys of tests 8, 10 and 17 or any other test's domains. Tests 8
+([8-session-clear-test.md](8-session-clear-test.md)) and 17
+([17-session-import-test.md](17-session-import-test.md)) compare a scan of `session:*` before and after their run,
+and this key would appear in it, so not beside them. Safe to run in parallel with tests 1, 2, 4, 5, 10 and 19.
+
+- Serial: false

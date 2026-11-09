@@ -35,6 +35,7 @@ runtime:
         test("schema answer carries the canary name and price", function () {
             const b = res.getBody();
             expect(b.status).to.equal("success");
+            expect(b.recipe).to.equal("model");
             expect(b.content.name).to.equal("Brassbound Meridian Astrolabe");
             expect(b.content.price).to.equal(847.25);
         });

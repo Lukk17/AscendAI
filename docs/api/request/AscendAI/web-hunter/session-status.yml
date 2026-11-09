@@ -25,12 +25,13 @@ runtime:
         test("Status code is 200", function () {
             expect(res.getStatus()).to.equal(200);
         });
-        test("response contract: url, status, auth_ttl_remaining_seconds, last_validated, profile typed", function () {
+        test("response contract: url, status, auth_ttl_remaining_seconds, last_validated, profile, last_window typed", function () {
             const b = res.getBody();
             expect(b.url).to.equal("https://www.example.com/");
             expect(b.status).to.be.a("string");
             expect(b.auth_ttl_remaining_seconds).to.be.a("number");
             expect(b.profile).to.equal("default");
+            expect(b).to.have.property("last_window");
         });
 
 settings:

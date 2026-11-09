@@ -2,7 +2,7 @@
 
 Spec: [../11-captcha-solve-and-capture-test.md](../11-captcha-solve-and-capture-test.md)
 
-Copy this file to `../runs/<UTC-timestamp>_11-captcha-solve-and-capture-tasks.md` before starting a run. Tick boxes
+Copy this file to `../runs/<UTC-timestamp>_11-captcha-solve-and-capture-tasks.md` before starting a run. For a repeated run of the same spec in the same sweep, which shares the sweep's timestamp, add `-rerun<N>` before `.md` (`-rerun2` for the second run, `-rerun3` for the third). Tick boxes
 as you go. Record how long the human solve took and any 409 retry under Additional tasks I did.
 
 ## Tasks
@@ -10,7 +10,7 @@ as you go. Record how long the human solve took and any 409 retry under Addition
 ### Prerequisites
 
 - [ ] `bru --version` returns a version string.
-- [ ] `curl -fsS http://localhost:7021/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
+- [ ] `curl -fsS http://127.0.0.1:7021/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 - [ ] `docker exec redis redis-cli PING` returns `PONG`.
 
 ### Reset state
@@ -47,7 +47,7 @@ as you go. Record how long the human solve took and any 409 retry under Addition
 - [ ] Part 2 `e2e-h1` solved second: listing holds neither flow; `session:democaptcha.com:e2e-h1` holds `hmt_id`; `e2e-h2` record unchanged.
 - [ ] Cleanup: deleted `session:democaptcha.com:default`, `EXISTS` returns `0`.
 - [ ] Cleanup: deleted `session:democaptcha.com:e2e-h1` and `session:democaptcha.com:e2e-h2`, `EXISTS` returns `0`.
-- [ ] Ran alone: no other spec opened the human window or flushed `session:*` during this run.
+- [ ] Ran alone: no other spec opened the human window or deleted a `session:democaptcha.com:*` key during this run.
 
 ### Verdict
 

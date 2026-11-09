@@ -25,7 +25,7 @@ runtime:
         });
         test("oversized file is refused with a routing error", function () {
             const b = res.getBody();
-            expect(b.routing_error).to.be.a("string");
+            expect(b.routing_error).to.equal("file_too_large");
         });
 
 settings:

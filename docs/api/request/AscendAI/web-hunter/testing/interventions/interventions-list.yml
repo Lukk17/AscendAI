@@ -18,7 +18,7 @@ runtime:
         test("listing carries the flow envelope", function () {
             const b = res.getBody();
             expect(b.active_flows).to.be.a("number");
-            expect(b.max_concurrent_flows).to.equal(5);
+            expect(b.max_concurrent_flows).to.equal(4);
             expect(b.flows).to.be.an("array");
         });
 

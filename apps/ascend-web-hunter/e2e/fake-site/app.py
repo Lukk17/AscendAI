@@ -42,7 +42,11 @@ CANARY_ARTICLE = (
 )
 CANARY_PRODUCT_NAME = "Brassbound Meridian Astrolabe"
 CANARY_PRODUCT_PRICE = 847.25
+CANARY_PRODUCT_SKU = "MRD-4471-QUILL"
 CANARY_JS = "The NIGHT-HERON ledger lists 11 lanterns lit on the first frost."
+CANARY_SITEMAP_ONLY = "The KESTREL-BUOY register lists 19 marker buoys moored off the Mirell south point."
+SITEMAP_ONLY_PATH = "/crawl/a-sitemap-only"
+SITEMAP_PATHS = ["/crawl/", "/crawl/a", "/crawl/outside", SITEMAP_ONLY_PATH]
 CANARY_TABLE_ROWS = [
     ("SKU-1147", "Cinder Sparrow feeder", "23.50"),
     ("SKU-2203", "Lumen Badger hutch", "89.99"),
@@ -76,6 +80,7 @@ def product_body(layout: int) -> str:
             "<main><section><div>"
             f"<h2>{CANARY_PRODUCT_NAME}</h2><p>Only 7 left in the Mirell warehouse.</p>"
             f"<p class='stock-price'>Priced at {CANARY_PRODUCT_PRICE} USD.</p>"
+            f"<p class='stock-sku'>SKU: {CANARY_PRODUCT_SKU}</p>"
             "<p>The instrument tracks meridian transits for survey crews working the Mirell "
             "shoreline. Brass dials hold calibration through cold mornings and damp boat crossings.</p>"
             "<p>The warehouse team checks each mount, hinge and etched ring before packing "
@@ -84,10 +89,12 @@ def product_body(layout: int) -> str:
             "</div></section></main>"
         )
     return (
-        "<article><header><h1>Product</h1></header>"
+        f"<article><header><h1 class='product-name'>{CANARY_PRODUCT_NAME}</h1></header>"
         f'<script type="application/ld+json">{json.dumps(ld)}</script>'
-        f"<p>{CANARY_PRODUCT_NAME} is priced at {CANARY_PRODUCT_PRICE} USD.</p>"
-        "<p>The instrument tracks meridian transits for survey crews working the Mirell "
+        f"<p class='product-price'>Price: <span class='price'>{CANARY_PRODUCT_PRICE}</span> "
+        "<span class='currency'>USD</span></p>"
+        f"<p class='product-sku'>SKU: <span class='sku'>{CANARY_PRODUCT_SKU}</span></p>"
+        f"<p>The {CANARY_PRODUCT_NAME} tracks meridian transits for survey crews working the Mirell "
         "shoreline. Brass dials hold calibration through cold mornings and damp boat crossings.</p>"
         "<p>The warehouse team checks each mount, hinge and etched ring before packing "
         "the crate for delivery.</p></article>"
@@ -202,6 +209,12 @@ def build_pages() -> None:
         "<p>The jetty gate leads to a private boathouse that crawlers must never follow. Staff "
         "ferry survey crates across by hand instead of opening the gate.</p>"
         f"<a href='http://e2e-fake-site-blocked:{PORT}/article'>private</a></article>",
+    )
+    PAGES[SITEMAP_ONLY_PATH] = (
+        "Sitemap only",
+        f"<article><h1>Sitemap only</h1><p>{CANARY_SITEMAP_ONLY}</p>"
+        "<p>No trail sign points to this mooring list. Harbour staff read it from the posted "
+        "chart before they row out to check each chain and lamp.</p></article>",
     )
     PAGES["/wall-ko"] = _page_file("wall-ko.html")
     PAGES["/wall-tr"] = _page_file("wall-tr.html")
@@ -327,19 +340,24 @@ def _finish(request: Request, path: str, resp: Response, body: bytes) -> Respons
     return resp
 
 
+def _site_root(request: Request) -> str:
+    return str(request.base_url).rstrip("/")
+
+
 async def content_handler(request: Request) -> Response:
     path = request.url.path
     if path in gone_pages:
         return _finish(request, path, PlainTextResponse("gone", status_code=404), b"gone")
     if path == "/robots.txt":
-        body = b"User-agent: *\nDisallow: /crawl/disallowed\nSitemap: /sitemap.xml\n"
+        sitemap_line = f"Sitemap: {_site_root(request)}/sitemap.xml\n"
+        body = f"User-agent: *\nDisallow: /crawl/disallowed\n{sitemap_line}".encode()
         return _finish(request, path, PlainTextResponse(body.decode(), media_type="text/plain"), body)
     if path == "/sitemap.xml":
-        urls = "".join(
-            f"<url><loc>{p}</loc></url>"
-            for p in ["/crawl/", "/crawl/a", "/crawl/a/b", "/crawl/a/b/c", "/crawl/outside"]
-        )
-        body = f'<?xml version="1.0"?><urlset>{urls}</urlset>'.encode()
+        urls = "".join(f"<url><loc>{_site_root(request)}{p}</loc></url>" for p in SITEMAP_PATHS)
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>'
+        ).encode()
         return _finish(request, path, Response(body, media_type="application/xml"), body)
     if path == "/oversized-declared":
         body = (CANARY_ARTICLE + "\n").encode() * 32768
