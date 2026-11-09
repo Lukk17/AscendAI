@@ -77,6 +77,8 @@ To filter by level: `{service="ascend-ai-agent"} |= "WARN"`.
 
 The OTel Collector receives OTLP on port 4317 (gRPC) and 4318 (HTTP) from all six application services. It batches and forwards to Tempo.
 
+The collector runs only in the main stack (`compose.yaml`, project `ascend-ai`). ascend-web-hunter gets its collector address there from `compose.ascend-web-hunter.platform.yaml`, which the main file's `include:` merges over `compose.ascend-web-hunter.yaml`. Run alone (project `ascend-scrapper`), the scraping file leaves `OTEL_EXPORTER_OTLP_ENDPOINT` empty, so ascend-web-hunter exports nothing. Setting the variable in `.env` overrides the address in both projects.
+
 - ascend-ai-agent and ascend-weather-mcp: Spring AI 1.1 emits OTel spans for every LLM call, tool call, and embedding call when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (which it is via compose.yaml). No additional code is required.
 - Python services: OTel auto-instrumentation is activated when `OTEL_EXPORTER_OTLP_ENDPOINT` is set and the `opentelemetry-distro` package is installed and activated in `src/main.py`. FastAPI, httpx, and requests are auto-instrumented.
 
@@ -123,6 +125,9 @@ Every custom metric emitted by the application services. Micrometer converts dot
 | ascend-agent | `prompt_cache.tokens.read` | `prompt_cache_tokens_read_total` | counter | `provider` | L3 Cache Hit Rate |
 | ascend-agent | `prompt_cache.tokens.creation` | `prompt_cache_tokens_creation_total` | counter | `provider` (Anthropic only) | L3 Cache Hit Rate |
 | ascend-web-hunter | `strategy_attempts_total` | `strategy_attempts_total` | counter | `strategy`, `outcome`, `domain` | - |
+| ascend-web-hunter | `challenge_verdicts_total` | `challenge_verdicts_total` | counter | `verdict` (`wall`, `content`, `no_content`), `tier` | - |
+| ascend-web-hunter | `challenge_signals_fired_total` | `challenge_signals_fired_total` | counter | `signal`, `vendor` | - |
+| ascend-web-hunter | `challenge_score` | `challenge_score_bucket` | histogram | none | - |
 | ascend-ocr | `ascendocr_jobs_total` | `ascendocr_jobs_total` | counter | `outcome` | - |
 | ascend-ocr | `ascendocr_job_duration_seconds` | `ascendocr_job_duration_seconds` | histogram | none | - |
 | ascend-ocr | `ascendocr_job_queue_wait_seconds` | `ascendocr_job_queue_wait_seconds` | histogram | none | - |
@@ -130,6 +135,8 @@ Every custom metric emitted by the application services. Micrometer converts dot
 | ascend-ocr | `ascendocr_job_queue_pages` | `ascendocr_job_queue_pages` | gauge | none | - |
 
 Allowed values for `outcome` tag: `ok`, `error`, `timeout`, `rate_limited`, `not_found`. Never use free-form strings - see Cardinality Rules below.
+
+`challenge_verdicts_total`, `challenge_signals_fired_total` and `challenge_score` record one verdict per read for each read tier. A NoVNC window (tier `novnc-monitor`) rechecks its page on every poll while it waits for a human, and records only its last check in all three, once per window when the window ends. A window that never checked a page records nothing.
 
 ---
 

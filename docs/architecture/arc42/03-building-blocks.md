@@ -24,7 +24,6 @@ graph TB
 
     subgraph "Support Services"
         SearXNG["SearXNG :9020"]
-        Flare["FlareSolverr :8191"]
         Docling["Docling :5001"]
         Unstructured["Unstructured :9080"]
     end
@@ -41,7 +40,6 @@ graph TB
     Agent --> Docling
     Agent --> Unstructured
     WebHunter --> SearXNG
-    WebHunter --> Flare
     Memory --> Qdrant
 ```
 

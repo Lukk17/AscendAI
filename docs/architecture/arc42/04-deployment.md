@@ -30,7 +30,6 @@ graph TB
     subgraph "Compose project: ascend-scrapper (compose.ascend-web-hunter.yaml)"
         WebHunter["ascend-web-hunter :7021"]
         SearXNG["SearXNG :9020"]
-        Flare["FlareSolverr :8191"]
         Ngrok["ngrok-ascend-web-hunter"]
     end
 
@@ -58,7 +57,6 @@ graph TB
     Agent -.-> Anthropic
     Agent -.-> MiniMax
     WebHunter --> SearXNG
-    WebHunter --> Flare
     Memory --> Qdrant
 ```
 
@@ -78,7 +76,6 @@ graph TB
 | Docling Serve     | 5001            | Document conversion   | Docker                 |
 | Unstructured API  | 9080            | Document parsing      | Docker                 |
 | SearXNG           | 9020            | Meta search           | Docker                 |
-| FlareSolverr      | 8191            | Cloudflare bypass     | Docker                 |
 | PostgreSQL        | 5432            | Database              | External prerequisite  |
 | Redis             | 6379            | Cache                 | External prerequisite  |
 | Qdrant            | 6333 / 6334     | Vector DB             | External prerequisite  |

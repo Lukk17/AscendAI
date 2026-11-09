@@ -111,7 +111,7 @@ conversations actually accumulate knowledge.
   Docling / Unstructured and indexes them automatically.
 - **Hybrid chat history.** Redis for the active context window, PostgreSQL for durable long-term archives and
   analytics.
-- **Privacy-respecting web.** SearXNG meta-search plus FlareSolverr for Cloudflare-protected pages, all self-hosted.
+- **Privacy-respecting web.** SearXNG meta-search plus patched-browser tiers (Patchright, Camoufox) for Cloudflare-protected pages, all self-hosted.
 
 ---
 
@@ -387,7 +387,6 @@ the actual transport ascend-ai-agent uses today. The other surface is available 
 | Service                 | Port    | Default credentials | Role                                                        |
 | :---------------------- | :------ | :------------------ | :---------------------------------------------------------- |
 | **SearXNG**             | `9020` (loopback) | `SEARXNG_SECRET`  | Privacy-respecting meta-search; backend for ascend-web-hunter.|
-| **FlareSolverr**        | `8191` (loopback) | (none)            | Cloudflare bypass proxy used by ascend-web-hunter.            |
 | **ngrok (web-hunter)**  | (none)  | `NGROK_AUTHTOKEN`   | Public tunnel to ascend-web-hunter's NoVNC for remote CAPTCHA intervention. |
 | **Docling Serve**       | `5001`  | (none)              | PDF / DOCX to structured JSON (used by ingestion pipeline). |
 | **Unstructured API**    | `9080`  | (none)              | Generic document parsing fallback for ingestion.            |

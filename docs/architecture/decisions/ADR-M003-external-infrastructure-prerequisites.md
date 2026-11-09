@@ -23,7 +23,7 @@ Move Redis, Qdrant, S3-compatible object storage, and PostgreSQL out of [compose
 
 The [compose.yaml](../../../compose.yaml) now only contains:
 - Application services: AscendMemory, ascend-audio-scribe, ascend-web-hunter, ascend-weather-mcp, ascend-ocr
-- Support services: SearXNG, FlareSolverr, Docling Serve, Unstructured API
+- Support services: SearXNG, Docling Serve, Unstructured API (FlareSolverr was listed here until ascend-web-hunter removed its tier and container, see [ADR-018](../../../apps/ascend-web-hunter/docs/architecture/decisions/ADR-018-flaresolverr-tier-removed.md))
 
 ---
 

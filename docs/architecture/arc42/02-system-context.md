@@ -34,7 +34,6 @@ graph TB
 
     subgraph "Support Services (Docker)"
         SearXNG["SearXNG"]
-        FlareSolverr["FlareSolverr"]
         Docling["Docling Serve"]
         Unstructured["Unstructured API"]
     end
@@ -57,7 +56,6 @@ graph TB
     Agent -.->|"per-request"| Gemini
     Agent -.->|"per-request"| MiniMax
     WebHunter --> SearXNG
-    WebHunter --> FlareSolverr
     Memory --> Qdrant
 ```
 

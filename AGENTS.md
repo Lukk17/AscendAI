@@ -173,7 +173,7 @@ On Docker Engine for Linux each of these services must listen on an address the 
 | PostgreSQL | 5432 | Persistent metadata, chat history, ingestion state |
 | Redis | 6379 | Chat history cache and session persistence |
 | Qdrant | 6333 / 6334 | Vector database for RAG embeddings and semantic memory |
-| Object storage (locally: Floci) | 9070 / 9071 | S3-compatible object storage for RAG document ingestion |
+| Object storage (locally: Floci) | 9070 / 9071 | S3-compatible object storage for RAG document ingestion. A store on another address is set in `.env` with `OBJECT_STORE_S3_ENDPOINT` (as a container reaches it) and `OBJECT_STORE_S3_PUBLIC_ENDPOINT` (as the host reaches it) |
 
 ## Docker Compose Services
 
@@ -183,6 +183,8 @@ Compose is split into two project files. The second is reached only through the 
 
 - **`compose.yaml`** (project `ascend-ai`) - main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
 - **`compose.ascend-web-hunter.yaml`** (project `ascend-scrapper`) - web-scraping stack, pulled in by the main file's `include:`.
+
+The main file's `include:` also merges `compose.ascend-web-hunter.platform.yaml` over the scraping file. It only points `ascend-web-hunter` at the platform's `otel-collector`, so the scraping file alone exports no telemetry, and a value of `OTEL_EXPORTER_OTLP_ENDPOINT` in `.env` wins in both projects.
 
 Both files use the same three fixed container names, `searxng`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`, so only one of the two projects runs at a time: the main stack (project `ascend-ai`, which already includes the scraping file) or the scraping file alone (project `ascend-scrapper`). Switching means `docker compose down` on the project you leave, which removes its containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create its containers with a name conflict. Running the scraping file alone on a host without its own Redis also needs `COMPOSE_PROFILES=redis` and `REDIS_URL=redis://redis:6379/0` in `.env`, which `.env.example` documents as commented-out lines. To leave the main stack and start the scraping stack alone, from the repo root:
 

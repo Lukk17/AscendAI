@@ -33,7 +33,6 @@ graph TB
 
     subgraph "Support (Docker)"
         SX["SearXNG :9020"]
-        FS["FlareSolverr :8191"]
         DL["Docling :5001"]
         UN["Unstructured :9080"]
     end
@@ -57,7 +56,6 @@ graph TB
     Agent --> UN
 
     WebHunter --> SX
-    WebHunter --> FS
     Memory --> QD
 ```
 
@@ -73,4 +71,4 @@ graph TB
 | Memory              | ascend-ai-agent to AscendMemory to Qdrant                               | REST + Qdrant API                   |
 | Chat history        | ascend-ai-agent to Redis (read / write), PostgreSQL (persist)           | TCP                                 |
 | Document ingestion  | S3-compatible storage to ascend-ai-agent to Docling / Unstructured to Qdrant | S3 + REST + Qdrant              |
-| Web search          | ascend-ai-agent to ascend-web-hunter to SearXNG to FlareSolverr           | MCP + HTTP                          |
+| Web search          | ascend-ai-agent to ascend-web-hunter to SearXNG, then the page itself     | MCP + HTTP                          |

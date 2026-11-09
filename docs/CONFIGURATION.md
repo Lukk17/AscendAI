@@ -88,7 +88,7 @@ The settings of `ascend-memory` are listed in its own reference, [apps/ascend-me
 | `ascend-audio-scribe` | `MCP_ALLOWED_HOST_HEADERS` | `ascend-audio-scribe,localhost,127.0.0.1` | Host names the `/mcp` endpoint accepts in the `Host` header (inbound). Compose reads it as `AUDIO_SCRIBE_MCP_ALLOWED_HOST_HEADERS`. `ALLOWED_PRIVATE_HOSTS` above is outbound. | `add-python-runtime-upgrades` |
 | `ascend-audio-scribe` | `MCP_DOWNLOAD_TIMEOUT_SECONDS` | `30.0` | Total wall-clock budget for an MCP HTTP fetch. | `existing` |
 | `ascend-audio-scribe` | `OTEL_SERVICE_NAME` | `ascend-audio-scribe` | Fixed in `compose.yaml`. Service name carried on every exported span. | `existing` |
-| `ascend-audio-scribe` | `OTEL_RESOURCE_ATTRIBUTES` | `service.version=0.9.4` | Fixed in `compose.yaml`. Resource attributes carried on every exported span. | `existing` |
+| `ascend-audio-scribe` | `OTEL_RESOURCE_ATTRIBUTES` | unset | Not set in compose. The library puts the installed package version on every exported span as `service.version`, and a `service.version` given here is ignored. | `existing` |
 | `ascend-audio-scribe` | `API_TIMEOUT_SECONDS` | `120` | Upstream HTTP client timeout. | `existing` |
 | `ascend-audio-scribe` | `SUPPORTED_AUDIO_EXTENSIONS` | `wav, mp3, flac, m4a, mp4, mpeg, mpga, oga, ogg, webm` | Audio file extensions accepted on upload and URI download. | `existing` |
 | `ascend-audio-scribe` | `TEMP_FILE_SUFFIX_DEFAULT` | (empty) | Default temp-file suffix. | `existing` |
