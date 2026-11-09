@@ -116,7 +116,7 @@ sequenceDiagram
     Ngrok-->>S6: {tunnels:[{public_url:"https://abc.ngrok.io"}]}
     S6->>S6: spawn _monitor_for_cookies task (background)
     S6-->>WR: raises HumanInterventionRequiredException(vnc_url)
-    WR-->>Agent: 428 problem body {code:"human_intervention_required", intervention_type:..., vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true"}
+    WR-->>Agent: 428 problem body {code:"human_intervention_required", intervention_type:..., vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true&v=0.0.15"}
 ```
 
 When strategy 1 or 2 return empty string without raising (not a detected block, just no content), the chain

@@ -4,6 +4,42 @@
 
 Accepted, 2026-10-19
 
+## Amendment, 2026-10-20 (remove-flaresolverr-tier)
+
+D2 no longer applies: the FlareSolverr tier, `FLARESOLVERR_ENABLED`,
+`FLARESOLVERR_URL` and the `flaresolverr` container are removed. A
+request that selects `3-flaresolverr` is now refused as a value outside the
+allowed set, not with `tier_disabled`. `tier_disabled` (409) stays for the
+switched-off Camoufox tier. See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
+
+## Amendment, 2026-11-06 (tier memory write rule)
+
+Owner decision: D3's overwrite rule changes. The memory holds the tier that
+last returned accepted content, whichever ladder position it has, so a
+success at a dearer tier replaces a cheaper memory too. Only a read with no
+caller `tier` and with `heavy_mode` off writes it, because the start point of
+any other read was chosen by the caller, not found by the ladder. The
+consequence that a cheaper success overwrites a dearer memory at once still
+holds, as one case of the new rule. The requirement is "Per-domain tier
+memory with decay" in `openspec/specs/web-search-tier-ladder/spec.md`.
+
+## Amendment, 2026-11-07 (security fix 19)
+
+D4 changes on a pass: the handler no longer uses `route.fetch`. It sends the request through the pinned
+curl_cffi fetch to the address the guard checked and hands the answer back with `route.fulfill`. A redirected
+navigation is aborted and its frame navigates to the checked and pinned next hop, so the page shows the final
+address, and a redirected subresource is followed inside the handler. Every page WebSocket is closed, and every
+browser launches with a refusing proxy for the connections routing does not see. The residual DNS rebinding window of D4 is
+closed. The full decision and its measurements are the 2026-11-07 amendment of
+[ADR-012](ADR-012-connect-time-address-pinning.md).
+
+## Amendment, 2026-11-09
+
+The 2026-11-07 fetch is replaced. On a pass the handler continues the request with `route.continue_()`, and the browser
+connects through the pinned tunnel of `src/reader/pinned_tunnel.py`, the only way out it has, so its own TLS reaches the
+site. The human NoVNC window launches Patchright, like the `4a-patchright` tier. The full decision and its measurements
+are the 2026-11-09 amendment of [ADR-012](ADR-012-connect-time-address-pinning.md).
+
 ## Context
 
 The ladder of [ADR-001](ADR-001-multi-tier-extraction-strategy.md) climbs from cheap static tiers to a

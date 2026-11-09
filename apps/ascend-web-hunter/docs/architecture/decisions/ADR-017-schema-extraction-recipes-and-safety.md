@@ -4,6 +4,27 @@
 
 Accepted, 2026-10-19
 
+## Amendment, 2026-11-07 (spec 15 end-to-end run): the model reads markup, and a recipe must replay
+
+The live run of spec 15 stored recipes that could never replay. The model was given the extracted main
+text only, so it could not see the markup and guessed selectors (`h2`, `.price`) that matched nothing on
+the page. Every later read then failed the replay, deleted the recipe and called the model again.
+
+The model is now given the cleaned markup of the page (`clean_markup` in
+`src/reader/schema_extraction.py`): the `<title>` and the body, with `script`, `style`, `noscript`,
+`template`, `svg`, `math`, `iframe`, `object`, `embed`, `canvas`, `link`, `meta` and `base` elements,
+comments and processing instructions removed, every attribute but `id`, `class`, `itemprop`, `name`,
+`role` and `datetime` removed, and whitespace collapsed. It is cut to `EXTRACTION_LLM_MAX_INPUT_CHARS`
+and placed in the same untrusted `<page_text>` block with the same delimiter escaping, so D3 still holds:
+no script, style or event handler attribute is ever sent.
+
+A recipe is stored only when its selectors, replayed on the page they came from with the same coercion a
+later replay uses, give exactly the values the model returned. Otherwise nothing is stored and the read
+still answers the model's values with `recipe` `model`. A page whose values sit inside one sentence, with
+no element holding a field alone, therefore calls the model on every read: no CSS selector can isolate
+such a value, and storing a selector that cannot replay only adds a failed replay and a delete to every
+read. The rest of this record is unchanged.
+
 ## Context
 
 `output_format` `structured` returns the article fields the extractors find, plus the embedded JSON-LD,

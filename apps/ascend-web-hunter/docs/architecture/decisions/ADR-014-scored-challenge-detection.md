@@ -4,6 +4,46 @@
 
 Accepted - 2026-10-19
 
+## Amendment, 2026-11-07 (is_content_accepted removed)
+
+D1 changes on one name: `ChallengeDetector.is_content_accepted` is removed.
+It had no caller left, because the read path (`src/reader/web_reader.py`),
+`src/reader/strategies/browser_read.py` and the NoVNC monitor
+(`src/reader/strategies/novnc_strategy.py`) read the verdict's `accepted`
+field directly. `is_blocked` and `has_real_content` keep their names and
+read the verdict. The rest of this record is unchanged.
+
+## Amendment, 2026-11-07 (login landing rule, block phrase and prefix cuts)
+
+D1 gains one rule outside the score. A read whose final address has a path
+segment from the catalogue's `login_path_segments` while the requested
+address has none, and that carries a second login sign (a query parameter
+from `login_return_parameters` on the final address, or a password input on
+the page), is a login wall in every read tier at any size. The reason is
+measured: an anonymous read of `https://old.reddit.com/r/programming/` is
+redirected to `https://old.reddit.com/login/?reason=lor2&dest=...`, a 200
+page titled "Welcome to Reddit" that scores 60 and that no title or password
+rule caught, so the browser tier returned it as content. The address is the
+evidence the page itself does not carry. The second sign keeps help pages
+such as `/en/login/reset-password` out. The verdict of this rule carries
+`login_landing`, which makes the read ladder go straight to the NoVNC tier,
+or end with `reason` `login_required` when no human may be asked, instead of
+running every anonymous tier into the same login page. The NoVNC monitor
+applies the rule, and its login redirect address check, only until its
+window has seen a login wall.
+
+D2 family E gains the body phrase `generic_blocked_by_network_security`,
+and the prefix that families C and E parse is now taken after emptying
+inline `<style>` bodies and cutting `data:` attribute values to `data:`.
+The corpus fixture filed as a 403 with a large real body was Reddit's
+"You've been blocked by network security" page, whose sentence sits at byte
+189316, behind inline styles and an 87552-byte inline image. It is now the
+wall `reddit-network-block-403.html` (`status_large_body` 20 plus
+`phrase_body` 30 plus three shape signals, 110 in total). D4 keeps its rule that the corpus
+holds a 403 with a large real body: no public article served with 403 was
+found on 2026-11-07, so the e2e fake-site page `rich-403.html` holds that
+guard and the gap is listed in the corpus README.
+
 ## Context
 
 `ChallengeDetector.is_blocked` matched substrings from a hand-typed

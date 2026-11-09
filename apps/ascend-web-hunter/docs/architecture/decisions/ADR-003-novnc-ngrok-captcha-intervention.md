@@ -29,7 +29,7 @@ the resolved VNC URL. It does not return content. The `human_intervention_except
 {
   "status": "human_intervention_required",
   "intervention_type": "captcha|login",
-  "vnc_url": "https://abc123.ngrok.io/vnc.html?autoconnect=true",
+  "vnc_url": "https://abc123.ngrok.io/vnc.html?autoconnect=true&v=0.0.15",
   "message": "Manual Captcha resolution required. Please visit: ..."
 }
 ```

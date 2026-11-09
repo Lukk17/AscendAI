@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted, 2026-10-19. Supersedes ADR-009 (the status-line update on ADR-009 itself is pending an owner
-decision and is not part of this change).
+Accepted, 2026-10-19. Supersedes [ADR-009](ADR-009-recall-pass-for-thin-precision-extractions.md), whose status
+line names this record.
 
 ## Context
 

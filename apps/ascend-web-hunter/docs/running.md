@@ -77,6 +77,30 @@ Run the service (identical in both shells):
 python src/main.py
 ```
 
+Run the unit tests with the 100% branch-coverage gate (identical in both shells, the default run leaves out
+`tests/integration`):
+
+```bash
+python -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
+```
+
+Run the integration tests. They drive the real Playwright, Patchright and Camoufox browsers, and the read cache
+purge tests in `tests/integration/test_cache_purge_redis.py` need the local Redis at `REDIS_URL` (default
+`redis://127.0.0.1:6379`), where they use database 15 only and close every connection they open. They are outside
+the coverage gate, hence `--no-cov`.
+
+Bash:
+
+```bash
+.venv/bin/python -m pytest tests/integration -q --no-cov
+```
+
+PowerShell:
+
+```powershell
+.venv/Scripts/python.exe -m pytest tests/integration -q --no-cov
+```
+
 ---
 
 ### Docker
@@ -151,6 +175,8 @@ the user and re-call `web_read` once they confirm the challenge is solved. On RE
 with a problem body carrying `code: "human_intervention_required"` plus `intervention_type` and `vnc_url`. The cached Redis session will let
 the second call succeed without escalating again.
 
+In the NoVNC window, Ctrl+V (Cmd+V on a Mac) types the text on your own clipboard as key presses into the field that has focus in the remote browser, and a paste on a phone does the same. Polish letters arrive unchanged. A newline in the text is a real Return key, so multi-line text pasted into a one-line field can submit the form, and a tab character is a real Tab key. Only text you choose to paste is sent. A paste above 10000 characters is refused with a message on the NoVNC page and no key is sent, because several windows share one display. A browser tab that was open on the NoVNC page before an update keeps the old script until you reload it. The Clipboard button in the noVNC side panel stays as the fallback if your browser does not pass the shortcut through, and it still uses the clipboard path, where Polish letters can arrive wrong.
+
 When it carries `status: "session_expired"`, the stored login for that domain and profile has lapsed and no tier
 ran. The agent should call `session_establish` for the same url and profile, have the user complete the login,
 then re-call `web_read`.
@@ -165,8 +191,20 @@ one of `1-beautifulsoup`, `2-trafilatura`, `4-playwright_stealth`, `4a-patchrigh
 ### Startup readiness banner
 
 On startup the service logs one multi-line INFO record. It contains an ASCII banner, the bound access URLs,
-parallel 2-second probes for SearXNG / Redis, and the full list of REST and observability
-endpoints. Implementation in [src/config/startup_banner.py](../src/config/startup_banner.py).
+the External services rows, and the full list of REST and observability endpoints. Implementation in
+[src/config/startup_banner.py](../src/config/startup_banner.py).
+
+The External services rows probe SearXNG and Redis, and the `/health` of each document routing target:
+docling-serve (`DOCLING_SERVE_URL`, PDF route), ascend-ocr (`ASCEND_OCR_URL`, image route) and
+ascend-audio-scribe (`AUDIO_SCRIBE_URL`, audio route). Each probe waits at most
+`STARTUP_PROBE_TIMEOUT_SECONDS` (default `2`). A routing target row reads `<url>/health [Connected]` when
+its `/health` answers 2xx, `[Warning (status=<code>)]` on another status, and `[FAILED]` when it cannot be
+reached. An empty URL reads `route off [Not configured]` and is not probed. A row is a warning only and never
+stops the service from starting.
+
+The three routing targets are not `/ready` probes. Each route is optional and answers on its own when its
+target is down or turned off, so a missing target must not make the whole service not ready. Watch these rows
+to see a routing target that is down.
 
 ---
 

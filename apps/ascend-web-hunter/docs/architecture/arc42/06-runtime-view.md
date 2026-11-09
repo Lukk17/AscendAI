@@ -28,7 +28,10 @@ sequenceDiagram
 The blocklist load is a hard failure only in the packaging-defect sense: if the vendored file is missing or fails
 to parse, `blocklist_loader.load_rules()` raises during module import and the process never reaches
 `create_app()`. In normal operation this cannot depend on any external host - the file ships in the image, and
-nothing downloads at startup. There is no `/ready` endpoint separate from `/health`; liveness is the only probe.
+nothing downloads at startup. `/health` is liveness and touches no dependency. `/ready` aggregates the `redis`,
+`searxng` and `searxng_breaker` probes. The startup banner also probes the `/health` of docling-serve, ascend-ocr
+and ascend-audio-scribe, as a warning only. Those three stay out of `/ready`, because each document route is
+optional and must not make the service not ready.
 
 ---
 
@@ -119,7 +122,7 @@ sequenceDiagram
     NoVNC->>NoVNC: spawn _monitor_for_cookies task (background)
     NoVNC-->>WR: raises HumanInterventionRequiredException(vnc_url)
     WR-->>Handler: exception propagates
-    Handler-->>Agent: 428 problem body {code:"human_intervention_required", intervention_type:..., vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true"}
+    Handler-->>Agent: 428 problem body {code:"human_intervention_required", intervention_type:..., vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true&v=0.0.15"}
 ```
 
 ---

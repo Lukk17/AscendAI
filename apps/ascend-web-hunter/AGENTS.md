@@ -69,6 +69,18 @@ Linux/macOS:
 .venv/bin/python -m pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100
 ```
 
+The default run leaves out `tests/integration`. Those tests drive the real Playwright, Patchright and Camoufox browsers, and the read cache purge tests in `tests/integration/test_cache_purge_redis.py` need the local Redis at `REDIS_URL` (default `redis://127.0.0.1:6379`), where they use database 15 only and close every connection they open. They are outside the coverage gate, so run them with `--no-cov`. Windows:
+
+```powershell
+.venv/Scripts/python.exe -m pytest tests/integration -q --no-cov
+```
+
+Linux/macOS:
+
+```bash
+.venv/bin/python -m pytest tests/integration -q --no-cov
+```
+
 Docker, identical on every platform:
 
 ```bash
@@ -87,8 +99,10 @@ docker build -t ascend-web-hunter:latest .
   fetch guard refuses answers `400` with code `unsafe_uri`. The NoVNC answers are problem bodies too: `428`
   with code `human_intervention_required` and extension members `intervention_type` and `vnc_url`, and `409`
   with code `novnc_busy`, extension members `holder_url` and `holder_profile`, and a `Retry-After` header.
-  Unexpected failures answer `500` with code `internal` and a fixed detail. MCP refusals are tool errors whose
-  text starts with `<code>: ` (`validation: `, `unsafe_uri: `, `internal: `). The MCP status objects
+  Closing an intervention window whose `flow_id` is unknown or already finished answers `404` with code
+  `flow_not_found`. Unexpected failures answer `500` with code `internal` and a fixed detail. MCP refusals are
+  tool errors whose text starts with `<code>: ` (`validation: `, `unsafe_uri: `, `flow_not_found: `,
+  `invalid_profile: `, `internal: `). The MCP status objects
   (`human_intervention_required`, `novnc_busy`, `session_expired`) are successful tool results, not errors, and
   keep their `status`-keyed shape.
 - `/health` answers `200 {"status": "ok", "service": "ascend-web-hunter", "version": ...}` without touching a
@@ -113,15 +127,33 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 **Key Features**:
 - SearXNG integration for privacy-respecting meta-search
 - HTTP 428 asks for human intervention (NoVNC), HTTP 429 rate-limits flooded callers
+- Open NoVNC windows are listed by `GET /api/v2/session/interventions` (MCP `session_interventions`) and closed by
+  `DELETE /api/v2/session/interventions/{flow_id}` (answers `204`, MCP `session_cancel_intervention`), which frees
+  the slot at once, saves nothing and ends the flow with the outcome `cancelled`. A window of another container is
+  closed by its owner within one `NOVNC_COOKIE_SYNC_POLL_SECONDS`
+- A saved login counts while it holds a cookie or a localStorage entry the site set on its own origin (analytics
+  and consent keys excluded), and the browser tiers restore both. The session status answer carries `last_window`
+  (`flow_id`, `intervention_type`, `outcome`, `finished_at`, or `null`), how the last window for the site and
+  profile ended
 - Session persistence in Redis
 - Ad/annoyance blocklist filtering
+- Every browser tier request passes the SSRF guard (`src/reader/browser_guard.py`) and the browser then makes its
+  own connection through one local tunnel per process (`src/reader/pinned_tunnel.py`), the only way out a browser
+  has. The tunnel resolves each host once, refuses what the guard refuses, connects only to the checked address and
+  copies bytes, so a rebound name is never connected to and the browser keeps its own TLS. A refused redirect hop of
+  the read's own main frame still ends the read with `unsafe_uri`. Tier code navigates with `guarded_goto`, never a
+  bare `page.goto`. Page WebSockets are closed. See the 2026-11-09 amendment of
+  [ADR-012](docs/architecture/decisions/ADR-012-connect-time-address-pinning.md)
 - Content validation (minimum word count)
 - Polling crawl jobs (`POST /api/v1/crawl/jobs`, status, list, cancel, plus the `crawl_submit`,
   `crawl_job_status`, `crawl_list_jobs` and `crawl_cancel_job` MCP tools) over a shared Redis frontier:
   several instances share one crawl through Lua-claimed URLs with per-domain politeness, results land in
   Floci under `tenant/<tenantId>/`, recrawls copy unchanged pages forward. Every seed, discovered link,
   redirect hop, robots.txt and sitemap fetch passes the same SSRF guard and connect-time pinning as a
-  single read. Honest ceiling: the hundreds-of-thousands-of-pages class per job across several workers.
+  single read. A crawl job ignores the rules and `Crawl-delay` of robots.txt unless the caller sends
+  `respect_robots` true, it uses the sitemaps robots.txt names either way, and the
+  `CRAWL_DEFAULT_DELAY_SECONDS` delay per domain applies either way. Honest ceiling: the
+  hundreds-of-thousands-of-pages class per job across several workers.
   See [ADR-019](docs/architecture/decisions/ADR-019-crawl-jobs.md).
 
 ## Key Dependencies
@@ -134,6 +166,7 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 ## Environment Variables
 
 - `SEARXNG_BASE_URL` - SearXNG endpoint (default: `http://searxng:8080`)
+- `API_HOST` - Bind address, read by supervisord (default: `0.0.0.0`)
 - `API_PORT` - Service port (default: 7021)
 - `WEB_HUNTER_HOST_PORT` - Host port of the service (default: 7021)
 - `LOG_LEVEL` - Logging level (default: `INFO`)
@@ -148,22 +181,29 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 - `ALLOWED_PRIVATE_HOSTS` - Hosts the URI fetch guard may reach even at a private address (default: empty)
 - `MCP_ALLOWED_HOST_HEADERS` - Host names the `/mcp` endpoint accepts in the `Host` header, inbound check on the MCP endpoint only (default: `ascend-web-hunter,localhost,127.0.0.1`). `ALLOWED_PRIVATE_HOSTS` is the outbound direction and one does not replace the other.
 
-`API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the
+`API_HOST`, `API_PORT`, `LOG_LEVEL`, `LOG_FORMAT`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED`, and `RATE_LIMIT_DEFAULT` are defined in the
 `ascend-python-common` `ServiceSettings` base class and subclassed in `src/config/config.py`.
 - `CAMOUFOX_ENABLED` - Route reads through the 4b-camoufox tier (default: `true`)
 - `TIER_MEMORY_TTL_SECONDS` - TTL in seconds for the per-domain tier memory (default: `86400`)
 - `EXTRACTION_SCHEMA_MAX_BYTES` - Maximum size in bytes of the caller-supplied extraction schema (default: `16384`)
 - `EXTRACTION_LLM_BASE_URL` - Base URL of the OpenAI-compatible endpoint schema extraction calls; empty turns the schema format off (default: empty)
 - `EXTRACTION_LLM_MODEL` - Model name sent to the extraction endpoint (default: empty)
-- `EXTRACTION_LLM_API_KEY` - API key for the extraction endpoint, read from the repository `.env` file only (default: empty)
-- `EXTRACTION_LLM_MAX_INPUT_CHARS` - Page text characters sent to the extraction endpoint before the cap cuts them (default: `60000`)
+- `EXTRACTION_LLM_API_KEY` - API key for the extraction endpoint, read from the repository `.env` file only (default: empty, `../../compose.ascend-web-hunter.yaml` falls back to `MINIMAX_API_KEY` when unset, `deploy-standalone/` has no fallback)
+- `EXTRACTION_LLM_MAX_INPUT_CHARS` - Characters of the cleaned page markup sent to the extraction endpoint before the cap cuts them (default: `60000`)
 - `EXTRACTION_LLM_TIMEOUT_SECONDS` - Timeout in seconds for one extraction model call (default: `60`)
 - `RECIPE_TTL_SECONDS` - TTL in seconds for a stored extraction recipe (default: `604800`)
 - `RECIPE_SELECTOR_MAX_CHARS` - Maximum characters of one stored CSS selector (default: `512`)
 - `DOCUMENT_MAX_BYTES` - Maximum bytes fetched for one routed PDF, image or audio file (default: `52428800`)
+- `DOCUMENT_FETCH_TIMEOUT_SECONDS` - Longest time one routed PDF, image or audio download may take, redirects included. A slower download is a failed download. (default: `300`)
+- `BROWSER_RESPONSE_MAX_BYTES` - Maximum bytes the browser tunnel carries from a site on one connection. A connection above it is closed. The limit is per connection (default: `52428800`)
+- `BROWSER_TUNNEL_CONNECT_TIMEOUT_SECONDS` - Longest wait for a browser request head and for one connection of the browser tunnel (default: `10.0`)
+- `BROWSER_TUNNEL_IDLE_TIMEOUT_SECONDS` - Longest time a browser tunnel connection may carry no bytes in either direction (default: `60.0`)
+- `BROWSER_TUNNEL_MAX_CONNECTIONS` - Most connections the browser tunnel carries at once. A connection above it answers 503 (default: `256`)
+- `READ_RESPONSE_MAX_BYTES` - Maximum bytes of one page answer the fast read tiers take, counted on the wire bytes and on the inflated bytes alike. A larger answer ends that tier as a failure (default: `52428800`)
 - `DOCLING_SERVE_URL` - Base URL of the docling-serve document conversion service; empty turns the PDF route off (default: `http://docling-serve:5001`)
 - `ASCEND_OCR_URL` - Base URL of the ascend-ocr service; empty turns the image route off (default: `http://ascend-ocr:7022`)
 - `OCR_ROUTE_TIMEOUT_SECONDS` - Timeout in seconds polling one ascend-ocr job (default: `300`)
+- `OCR_DELETE_DRAIN_SECONDS` - Seconds shutdown waits for the background ascend-ocr job deletes before it cancels them (default: `5`)
 - `AUDIO_SCRIBE_URL` - Base URL of the ascend-audio-scribe service; empty turns the audio route off (default: `http://ascend-audio-scribe:7017`)
 - `READ_CACHE_PURGE_RECONNECT_SECONDS` - Wait in seconds between two connection attempts of the read cache purge subscriber (default: `5`)
 - `NETWORKIDLE_POLL_MS` - Page-quiet poll interval in milliseconds for browser tiers (default: `1000`)
@@ -198,6 +238,7 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 - `CHALLENGE_WEIGHT_NO_ARTICLE` - Weight of the no_article signal (default: `20`)
 - `CHALLENGE_WEIGHT_RICH_CONTENT` - Weight of the rich_content guard signal (default: `-70`)
 - `CHALLENGE_WEIGHT_MANY_LINKS` - Weight of the many_links guard signal (default: `-20`)
+- `CHALLENGE_WEIGHT_SERVED_PAGE` - Weight of the served_page guard signal (default: `-30`)
 - `CHALLENGE_WEIGHT_PHRASE_TITLE` - Weight of the phrase_title signal (default: `60`)
 - `CHALLENGE_WEIGHT_PHRASE_BODY` - Weight of the phrase_body signal (default: `30`)
 - `NOVNC_MAX_CONCURRENT_FLOWS` - Maximum concurrent intervention windows per container, a memory constraint as much as a display one (default: `4`)
@@ -207,22 +248,22 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 - `NOVNC_WINDOW_CASCADE_OFFSET_PX` - Cascade step in pixels between intervention windows (default: `48`)
 - `NOVNC_FLOW_LEASE_GRACE_SECONDS` - Teardown grace added on top of the flow timeout before a held flow is reclaimed (default: `30.0`)
 - `NOVNC_FLOW_SWEEP_INTERVAL_SECONDS` - Interval in seconds between lease-sweeper runs (default: `30.0`)
-- `NOVNC_FLOW_CANCEL_GRACE_SECONDS` - Bounds reclamation and shutdown (default: `10.0`)
+- `NOVNC_FLOW_CANCEL_GRACE_SECONDS` - Bounds reclamation, shutdown and a window close (default: `10.0`)
 - `NOVNC_BUSY_RETRY_AFTER_SECONDS` - Short poll interval answered in the 409 Retry-After header (default: `30`)
 - `NOVNC_PUBLIC_URL` - One base address shared by every container, the address of the web-hunter edge proxy, with no path; unset keeps `PUBLIC_VNC_URL` and the one Ngrok tunnel (default: unset)
 - `VNC_PASSWORD` - Password for the NoVNC desktop. Consumed by `docker-entrypoint.sh`, not by `config.py`. Unset means
-  x11vnc runs with `-nopw` and the container logs a warning at boot. Required in the standalone deployment. The VNC
-  protocol truncates it to 8 characters.
+  x11vnc runs with `-nopw` and the container logs a warning at boot. Optional in the standalone deployment too.
+  Without a password anyone who reaches the NoVNC address can control the browser, so set one on a deployment
+  reachable beyond a trusted network. The VNC protocol truncates it to 8 characters.
 - `CRAWL_MAX_SEEDS` - Most seeds in one crawl request (default: `20`)
 - `CRAWL_MAX_PATTERNS` - Most include patterns and most exclude patterns in one crawl request (default: `50`)
 - `CRAWL_MAX_DEPTH` - Largest `max_depth` a crawl request may ask for (default: `5`)
 - `CRAWL_DEFAULT_DEPTH` - `max_depth` when the request has none, refused at startup above `CRAWL_MAX_DEPTH` (default: `2`)
 - `CRAWL_MAX_PAGES` - Largest `page_budget` a crawl request may ask for (default: `10000`)
 - `CRAWL_DEFAULT_PAGE_BUDGET` - `page_budget` when the request has none, refused at startup above `CRAWL_MAX_PAGES` (default: `100`)
-- `CRAWL_ROBOTS_OPT_OUT_DOMAINS` - Seed domains for which `respect_robots` false is accepted, a site the operator owns (default: empty)
 - `CRAWL_RESULT_S3_BUCKET` - Bucket of the crawl results (default: `web-hunter-crawls`)
 - `CRAWL_RESULT_S3_PREFIX` - Key prefix of the crawl results after the tenant prefix (default: `crawl-results/`)
-- `CRAWL_JOB_RETENTION_SECONDS` - Lifetime of job records, results, frontier keys and recrawl state (default: `604800`)
+- `CRAWL_JOB_RETENTION_SECONDS` - Lifetime of job records, frontier keys and recrawl state in Redis. Result objects expire within one day after it through a bucket lifecycle rule in whole days, which needs `s3:GetLifecycleConfiguration` and `s3:PutLifecycleConfiguration` (default: `604800`)
 - `CRAWL_DOMAIN_CONCURRENCY` - Pages of one domain read at once, all instances together (default: `2`)
 - `CRAWL_DEFAULT_DELAY_SECONDS` - Least time between two fetches of one domain (default: `1`)
 - `CRAWL_PROXY_URL` - Customer proxy for crawl fetches only, empty turns it off (default: empty)
@@ -231,9 +272,20 @@ A domain that succeeded at a tier before restarts at the remembered tier for `TI
 - `CRAWL_WORKER_CONCURRENCY` - Crawl worker tasks each instance starts (default: `4`)
 - `CRAWL_WORKER_IDLE_SECONDS` - Wait of a worker that found nothing to claim (default: `1`)
 - `CRAWL_POLL_AFTER_SECONDS` - The `poll_after_seconds` hint of a crawl submission (default: `5`)
+- `CRAWL_SITEMAP_MAX_DOCUMENTS` - Most sitemap files one instance fetches per job, over all its origins, sitemap indexes included (default: `50`)
+- `CRAWL_SITEMAP_MAX_BYTES` - Most bytes read from one sitemap file, before and after gzip inflation, a larger file is skipped and logged. A body that starts with the gzip signature bytes `1f 8b` is inflated whatever its address or Content-Type (default: `52428800`)
+- `CRAWL_ROBOTS_MAX_BYTES` - Most bytes read from one robots.txt, at least the 500 KiB RFC 9309 requires. Reading stops there, the whole lines before it are parsed and the rest is ignored and logged. A value below `512000` is refused at startup (default: `512000`)
+- `CRAWL_ROBOTS_MAX_RULES` - Most rule objects one robots.txt may expand to, counted as the rule sets of its user-agent lines times the rules of its other lines. A file above it disallows every page of its origin. (default: `1000000`)
+- `CRAWL_ROBOTS_CACHE_MAX_ORIGINS` - Most parsed robots.txt files one instance keeps. The least recently used is evicted and fetched again when needed. (default: `256`)
+- `CRAWL_ROBOTS_CACHE_MAX_RULES` - Most rule objects the parsed robots.txt files of one instance may hold together. The least recently used files are evicted until the total is back under it. A value below `CRAWL_ROBOTS_MAX_RULES` is refused at startup. (default: `2000000`)
+- `CRAWL_ROBOTS_SKIP_FACTOR` - A job ends once its pages skipped for robots.txt reach `page_budget` times this number. (default: `10`)
+- `CRAWL_ROBOTS_TIMEOUT_SECONDS` - Longest wait for one robots.txt. A file that takes longer counts as unreachable. (default: `30`)
+- `CRAWL_SITEMAP_TIMEOUT_SECONDS` - Longest sitemap work of one page. Over it the work is logged and dropped and the page is still read. Refused at startup at or above `CRAWL_CLAIM_LEASE_SECONDS`. (default: `60`)
+- `CRAWL_MAX_DELAY_SECONDS` - Largest `Crawl-delay` a robots.txt can ask for. A larger value is cut to this. (default: `60`)
 - `OBJECT_STORE_S3_ENDPOINT` - Address of the S3-compatible store (default: `http://localhost:9070`)
-- `OBJECT_STORE_S3_ACCESS_KEY` - Access key of the store (default: empty)
-- `OBJECT_STORE_S3_SECRET_KEY` - Secret key of the store (default: empty)
+- `OBJECT_STORE_S3_PUBLIC_ENDPOINT` - The address ascend-ocr signs its result addresses with. An OCR result on any other scheme, host or port, or an empty value, is the routing error `result_failed` (default: `http://localhost:9070`, `deploy-standalone/` leaves it empty because the image route is off there)
+- `OBJECT_STORE_S3_ACCESS_KEY` - Access key of the store (default: empty, `../../compose.ascend-web-hunter.yaml` sets the local Floci key `admin` when unset, `deploy-standalone/` sets none)
+- `OBJECT_STORE_S3_SECRET_KEY` - Secret key of the store (default: empty, `../../compose.ascend-web-hunter.yaml` sets the local Floci key `password` when unset, `deploy-standalone/` sets none)
 
 Two more are consumed by sibling containers rather than by this service, and both are mandatory for the scrapper stack:
 `SEARXNG_SECRET` (SearXNG's session key, which is why `infra/searxng/settings.yml` carries no `secret_key`) and
@@ -246,10 +298,12 @@ The full reference, including every timeout and threshold, is [docs/configuratio
 Two compose files run this service and they are deliberately different:
 
 - `../../compose.ascend-web-hunter.yaml` at the repo root. Development. Builds from source, publishes SearXNG
-  on loopback so the service can run natively against it, exports OTLP telemetry to the platform
-  collector.
+  on loopback so the service can run natively against it, and leaves `OTEL_EXPORTER_OTLP_ENDPOINT` empty by
+  default, so run alone (project `ascend-scrapper`) it exports no telemetry. The main stack includes it together
+  with `../../compose.ascend-web-hunter.platform.yaml`, which sets the endpoint to the platform collector
+  `http://otel-collector:4317`. A value in the root `.env` wins in both projects.
 - [`deploy-standalone/compose.yaml`](deploy-standalone/README.md). Standalone single-host deployment. Pulls published images pinned to
-  a version tag, publishes nothing but port 7021, no telemetry, requires `VNC_PASSWORD`.
+  a version tag, publishes nothing but port 7021, no telemetry.
 
 The full list of intended differences is in [deploy-standalone/README.md](deploy-standalone/README.md). Anything not on that list should be
 identical in both files.

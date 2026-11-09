@@ -113,6 +113,11 @@ browser rationale in
 - **PSL-aware cookie persistence.** Clearance cookies keyed by registrable domain via `tldextract`. Sites under
   shared ccTLDs (`*.co.uk`, `*.com.au`) stay isolated. See
   [ADR-002](docs/architecture/decisions/ADR-002-cloudflare-cookie-persistence-redis.md).
+- **Pinned browser requests.** Every browser tier reaches the network only through a local tunnel of the
+  service. The tunnel resolves each host once, refuses any address the SSRF guard refuses, connects only to the
+  checked address and copies bytes, so the browser keeps its own TLS and a name rebound to a private address
+  after the check is never connected to. WebSockets are closed. See the 2026-11-09 amendment of
+  [ADR-012](docs/architecture/decisions/ADR-012-connect-time-address-pinning.md).
 - **Singleton Chromium.** One browser process across requests, per-request context. Saves ~1 second per
   Playwright invocation versus the per-request launch pattern.
 - **Budget-bounded reads.** `READ_TOTAL_BUDGET=90s` caps wall-clock across tiers 1-5. NoVNC exempt.
@@ -124,12 +129,20 @@ browser rationale in
   counters), `X-Request-ID` middleware on every response.
 - **Remote CAPTCHA solving via Ngrok.** Solve from a phone, no SSH required. See
   [ADR-003](docs/architecture/decisions/ADR-003-novnc-ngrok-captcha-intervention.md).
+- **Saved logins and windows you can close.** A saved login counts while it holds a cookie or a localStorage
+  entry the site set on its own origin, and the browser tiers restore both. `GET /api/v2/session/interventions`
+  lists the open NoVNC windows, `DELETE /api/v2/session/interventions/{flow_id}` (MCP
+  `session_cancel_intervention`) closes one and frees its slot, and the session status names how the last window
+  ended in `last_window`. See [docs/api-examples.md](docs/api-examples.md).
 - **Polling crawl jobs.** `POST /api/v1/crawl/jobs` (answer 202), status, list and cancel, plus the
   `crawl_submit`, `crawl_job_status`, `crawl_list_jobs` and `crawl_cancel_job` MCP tools. Several
   instances share one crawl through Lua-claimed URLs in Redis with per-domain politeness; results land
   in Floci under `tenant/<tenantId>/`; recrawls copy unchanged pages forward server-side. Every seed,
   discovered link, redirect hop, robots.txt and sitemap fetch passes the same SSRF guard and
-  connect-time pinning as a single read. Honest ceiling: the hundreds-of-thousands-of-pages class per
+  connect-time pinning as a single read. A crawl job ignores the rules and `Crawl-delay` of robots.txt
+  unless the caller sends `respect_robots` true. The sitemaps robots.txt names and the
+  `CRAWL_DEFAULT_DELAY_SECONDS` delay per domain apply either way.
+  Honest ceiling: the hundreds-of-thousands-of-pages class per
   job across several workers. See
   [ADR-019](docs/architecture/decisions/ADR-019-crawl-jobs.md).
 
@@ -160,7 +173,7 @@ and `.env`. The most-used variables:
 | `NOVNC_WINDOW_CASCADE_OFFSET_PX` | `48`                | Cascade step in pixels between intervention windows  |
 | `NOVNC_FLOW_LEASE_GRACE_SECONDS` | `30.0`              | Teardown grace before a held flow is reclaimed       |
 | `NOVNC_FLOW_SWEEP_INTERVAL_SECONDS` | `30.0`           | Interval in seconds between lease-sweeper runs       |
-| `NOVNC_FLOW_CANCEL_GRACE_SECONDS` | `10.0`             | Bounds reclamation and shutdown                      |
+| `NOVNC_FLOW_CANCEL_GRACE_SECONDS` | `10.0`             | Bounds reclamation, shutdown and a window close      |
 | `NOVNC_BUSY_RETRY_AFTER_SECONDS` | `30`                | Short poll interval in the 409 Retry-After header    |
 | `NOVNC_PUBLIC_URL` | unset                            | One base address shared by every container; unset keeps `PUBLIC_VNC_URL` |
 | `RATE_LIMIT_DEFAULT` | `1200/minute`                    | Flood-protection rate limit for REST routes and MCP tools |
@@ -196,14 +209,19 @@ and `.env`. The most-used variables:
 | `EXTRACTION_LLM_BASE_URL` | empty                          | Base URL of the OpenAI-compatible extraction endpoint; empty turns the schema format off |
 | `EXTRACTION_LLM_MODEL` | empty                           | Model name sent to the extraction endpoint |
 | `EXTRACTION_LLM_API_KEY` | empty                          | API key for the extraction endpoint, read from the repository `.env` file only |
-| `EXTRACTION_LLM_MAX_INPUT_CHARS` | `60000`                 | Page text characters sent to the extraction endpoint before the cap cuts them |
+| `EXTRACTION_LLM_MAX_INPUT_CHARS` | `60000`                 | Characters of the cleaned page markup sent to the extraction endpoint before the cap cuts them |
 | `EXTRACTION_LLM_TIMEOUT_SECONDS` | `60`                   | Timeout in seconds for one extraction model call |
 | `RECIPE_TTL_SECONDS` | `604800`                          | TTL in seconds for a stored extraction recipe |
 | `RECIPE_SELECTOR_MAX_CHARS` | `512`                      | Maximum characters of one stored CSS selector |
 | `DOCUMENT_MAX_BYTES` | `52428800`                        | Maximum bytes fetched for one routed PDF, image or audio file |
+| `BROWSER_RESPONSE_MAX_BYTES` | `52428800`                | Maximum bytes the browser tunnel carries from a site on one connection |
+| `BROWSER_TUNNEL_CONNECT_TIMEOUT_SECONDS` | `10.0`    | Longest wait for a browser request head and for one connection of the browser tunnel. |
+| `BROWSER_TUNNEL_IDLE_TIMEOUT_SECONDS` | `60.0`       | Longest time a browser tunnel connection may carry no bytes in either direction. |
+| `BROWSER_TUNNEL_MAX_CONNECTIONS` | `256`             | Most connections the browser tunnel carries at once. A connection above it answers 503. |
 | `DOCLING_SERVE_URL` | `http://docling-serve:5001`          | Base URL of the docling-serve conversion service; empty turns the PDF route off |
 | `ASCEND_OCR_URL` | `http://ascend-ocr:7022`                | Base URL of the ascend-ocr service; empty turns the image route off |
 | `OCR_ROUTE_TIMEOUT_SECONDS` | `300`                       | Timeout in seconds polling one ascend-ocr job |
+| `OCR_DELETE_DRAIN_SECONDS` | `5`                          | Seconds shutdown waits for the background ascend-ocr job deletes before it cancels them |
 | `AUDIO_SCRIBE_URL` | `http://ascend-audio-scribe:7017`   | Base URL of the ascend-audio-scribe service; empty turns the audio route off |
 | `READ_CACHE_PURGE_RECONNECT_SECONDS` | `5`                | Wait in seconds between two connection attempts of the read cache purge subscriber |
 | `CRAWL_MAX_SEEDS` | `20`                                     | Most seeds in one crawl request |
@@ -212,10 +230,9 @@ and `.env`. The most-used variables:
 | `CRAWL_DEFAULT_DEPTH` | `2`                                  | `max_depth` when the request has none |
 | `CRAWL_MAX_PAGES` | `10000`                                   | Largest `page_budget` a crawl request may ask for |
 | `CRAWL_DEFAULT_PAGE_BUDGET` | `100`                          | `page_budget` when the request has none |
-| `CRAWL_ROBOTS_OPT_OUT_DOMAINS` | empty                      | Seed domains for which `respect_robots` false is accepted |
 | `CRAWL_RESULT_S3_BUCKET` | `web-hunter-crawls`                 | Bucket of the crawl results |
 | `CRAWL_RESULT_S3_PREFIX` | `crawl-results/`                   | Key prefix of the crawl results after the tenant prefix |
-| `CRAWL_JOB_RETENTION_SECONDS` | `604800`                     | Lifetime of job records, results, frontier keys and recrawl state |
+| `CRAWL_JOB_RETENTION_SECONDS` | `604800`                     | Lifetime of job records, frontier keys and recrawl state in Redis. Result objects expire within one day after it through a bucket lifecycle rule in whole days, which needs `s3:GetLifecycleConfiguration` and `s3:PutLifecycleConfiguration` |
 | `CRAWL_DOMAIN_CONCURRENCY` | `2`                            | Pages of one domain read at once, all instances together |
 | `CRAWL_DEFAULT_DELAY_SECONDS` | `1`                         | Least time between two fetches of one domain |
 | `CRAWL_PROXY_URL` | empty                                    | Customer proxy for crawl fetches only |
@@ -224,9 +241,11 @@ and `.env`. The most-used variables:
 | `CRAWL_WORKER_CONCURRENCY` | `4`                           | Crawl worker tasks each instance starts |
 | `CRAWL_WORKER_IDLE_SECONDS` | `1`                           | Wait of a worker that found nothing to claim |
 | `CRAWL_POLL_AFTER_SECONDS` | `5`                            | The `poll_after_seconds` hint of a crawl submission |
+| `CRAWL_ROBOTS_MAX_BYTES` | `512000`                         | Most bytes read from one robots.txt, the rest of a larger file is ignored |
 | `OBJECT_STORE_S3_ENDPOINT` | `http://localhost:9070`           | Address of the S3-compatible store |
-| `OBJECT_STORE_S3_ACCESS_KEY` | empty                        | Access key of the store |
-| `OBJECT_STORE_S3_SECRET_KEY` | empty                        | Secret key of the store |
+| `OBJECT_STORE_S3_PUBLIC_ENDPOINT` | `http://localhost:9070`    | The address ascend-ocr signs its result addresses with. An OCR result on any other address is the routing error `result_failed`. The download itself goes to the same path and query on `OBJECT_STORE_S3_ENDPOINT`, with the signed host and port in the `Host` header |
+| `OBJECT_STORE_S3_ACCESS_KEY` | empty                        | Access key of the store. The development compose file sets the local Floci key `admin` when unset |
+| `OBJECT_STORE_S3_SECRET_KEY` | empty                        | Secret key of the store. The development compose file sets the local Floci key `password` when unset |
 
 Full settings reference in [docs/configuration.md](docs/configuration.md).
 
@@ -234,11 +253,12 @@ Full settings reference in [docs/configuration.md](docs/configuration.md).
 
 ### Agent skill
 
-A drop-in skill ships at [skills/ascend-web-hunter/SKILL.md](skills/ascend-web-hunter/SKILL.md). Copy
-[skills/ascend-web-hunter/](skills/ascend-web-hunter/) into your agent's skills folder
+A drop-in skill ships at [../../.agents/skills/ascend-web-hunter/SKILL.md](../../.agents/skills/ascend-web-hunter/SKILL.md),
+imported from [agent-standards](https://github.com/Lukk17/agent-standards). Copy
+[../../.agents/skills/ascend-web-hunter/](../../.agents/skills/ascend-web-hunter/) into your agent's skills folder
 (`.claude/skills/`, `.agents/skills/`, `.opencode/skills/`) and the agent picks it up automatically. The
-skill covers search, read, and the session establish/status/clear endpoints, the
-`human_intervention_required` response shape, and the captcha-solve-then-resume flow.
+skill covers search, read, the session establish/status/clear endpoints, closing a NoVNC window by its `flow_id`,
+the `human_intervention_required` and `novnc_busy` problem bodies, and the captcha-solve-then-resume flow.
 
 ---
 

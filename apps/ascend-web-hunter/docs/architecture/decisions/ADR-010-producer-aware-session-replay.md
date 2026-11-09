@@ -12,6 +12,22 @@ the FlareSolverr tier stored get no special handling and no migration. Only
 the browser rule of this record survives. The rest of this record is
 unchanged. See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
 
+## Amendment, 2026-11-09 (automatic browser tiers save the clearance they earn)
+
+D1's sentence that `PlaywrightStrategy` saves no session no longer holds. `render_and_judge` in
+`src/reader/strategies/browser_read.py` saves through `CookieManager.save_storage_state` when a read of
+`4-playwright_stealth`, `4a-patchright` or `4b-camoufox` was judged a wall, ends on an accepted verdict and holds a
+`cf_clearance` cookie of the site. Each tier writes its own value, `PRODUCED_BY_PLAYWRIGHT`, `PRODUCED_BY_PATCHRIGHT`
+or `PRODUCED_BY_CAMOUFOX`, with the user agent read from the page. Only the WAF cookies are saved, so nothing is written
+as login state: a site cookie in the auth entry would make `has_auth_state` true and turn a later expiry into a
+`session_expired` answer for a site nobody logged in to. A stored login stays, by the rule in `CookieManager`.
+
+D3 stays as amended on 2026-10-20. No branch per producer was added, because the risk this record names did not
+happen. Measured in the container on `https://www.scrapingcourse.com/cloudflare-challenge`, three rounds with no
+stored session and no remembered tier: the cold read answered from `4a-patchright` in 21.2 to 24.0 s and saved the
+clearance, and each of the two reads after it answered from `4-playwright_stealth`, the first browser tier, in 4.3 to
+4.7 s without solving the challenge.
+
 ## Context
 
 `WebReader._prefer_browser` treated "a stored session exists for this URL" as a single boolean, regardless of

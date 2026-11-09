@@ -219,6 +219,88 @@ Response:
 
 ---
 
+### Session status (REST)
+
+`POST /api/v2/web/session/status`. Reports whether a saved login exists for a `url` + optional `profile`. A saved
+login counts while it holds a cookie, or a localStorage entry the site set on its own origin (a site that keeps its
+login only in browser storage sets no cookie). Analytics and consent keys and other sites' origins do not count.
+`last_window` tells how the last intervention window for that site and profile ended, or is `null` when none ended
+within `SESSION_AUTH_TTL_SECONDS`. Its `outcome` is one of `resolved`, `already_authenticated`, `timeout`,
+`rejected`, `browser_closed`, `cancelled` or `unsafe_uri`.
+
+Bash:
+
+```bash
+curl -X POST http://localhost:7021/api/v2/web/session/status -H "Content-Type: application/json" -d '{"url":"https://example.com","profile":"work"}'
+```
+
+PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:7021/api/v2/web/session/status -Method Post -ContentType "application/json" -Body '{"url":"https://example.com","profile":"work"}'
+```
+
+Response:
+
+```json
+{
+  "url": "https://example.com/",
+  "status": "active",
+  "auth_ttl_remaining_seconds": 86312.4,
+  "last_validated": 1762480000.5,
+  "profile": "work",
+  "last_window": {
+    "flow_id": "9f2c41ab77de",
+    "intervention_type": "login",
+    "outcome": "already_authenticated",
+    "finished_at": 1762480012.1
+  }
+}
+```
+
+The `session_status` MCP tool answers the same fields.
+
+---
+
+### Close an intervention window (REST)
+
+`DELETE /api/v2/session/interventions/{flow_id}`. Closes one open NoVNC window, frees its slot at once and saves
+nothing from it. The flow ends with the outcome `cancelled`, which `last_window` of the session status then shows.
+A window owned by another container is closed by that container within one `NOVNC_COOKIE_SYNC_POLL_SECONDS`, and it
+leaves the listing at once. Answers HTTP 204 with no body, or HTTP 404 with code `flow_not_found` when no open window
+has that `flow_id`. Take the `flow_id` from `GET /api/v2/session/interventions` or from a 428 answer.
+
+Bash:
+
+```bash
+curl -i -X DELETE http://localhost:7021/api/v2/session/interventions/9f2c41ab77de
+```
+
+PowerShell:
+
+```powershell
+Invoke-WebRequest -Uri http://localhost:7021/api/v2/session/interventions/9f2c41ab77de -Method Delete
+```
+
+Unknown or already finished flow:
+
+```json
+{
+  "type": "https://ascend.ai/errors/flow-not-found",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "No open intervention window has flow_id 9f2c41ab77de.",
+  "instance": "/api/v2/session/interventions/9f2c41ab77de",
+  "code": "flow_not_found",
+  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+}
+```
+
+The `session_cancel_intervention` MCP tool takes `flow_id`, answers `{"status": "cancelled", "flow_id": "..."}`,
+and fails with a tool error starting `flow_not_found: ` for an unknown flow.
+
+---
+
 ### MCP tools over HTTP
 
 The MCP server accepts JSON-RPC `tools/call` requests on `/mcp`.
@@ -301,6 +383,19 @@ Wall-clock budget hit before any tier resolved:
 }
 ```
 
+A document address refused for its size (above `DOCUMENT_MAX_BYTES`). No HTML tier and no human tier runs:
+
+```json
+{
+  "url": "https://example.com/big.pdf",
+  "content": "",
+  "status": "error",
+  "reason": "routing_error",
+  "route": "pdf",
+  "routing_error": "file_too_large"
+}
+```
+
 Human intervention required (HTTP 428 problem body on REST, structured result on MCP):
 
 ```json
@@ -309,11 +404,11 @@ Human intervention required (HTTP 428 problem body on REST, structured result on
   "title": "Precondition Required",
   "status": 428,
   "code": "human_intervention_required",
-  "detail": "Manual Captcha resolution required. Please visit: https://abc123.ngrok.app/vnc.html?autoconnect=true",
+  "detail": "Manual Captcha resolution required. Please visit: https://abc123.ngrok.app/vnc.html?autoconnect=true&v=0.0.15",
   "instance": "/api/v2/web/read",
   "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
   "intervention_type": "captcha",
-  "vnc_url": "https://abc123.ngrok.app/vnc.html?autoconnect=true"
+  "vnc_url": "https://abc123.ngrok.app/vnc.html?autoconnect=true&v=0.0.15"
 }
 ```
 

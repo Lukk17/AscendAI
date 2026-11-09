@@ -17,7 +17,7 @@
 | [ADR-009](../decisions/ADR-009-recall-pass-for-thin-precision-extractions.md) | Recall pass when the precision extraction is thin against the page | Accepted | A length ratio cannot tell dropped content from sidebars, so some news articles pay a second pass for no gain |
 | [ADR-010](../decisions/ADR-010-producer-aware-session-replay.md) | Route a stored session by who produced it | Accepted | A stored session of any producer starts the read at the browser tiers (ADR-018) |
 | [ADR-011](../decisions/ADR-011-caller-selectable-starting-tier.md) | A caller may name the tier the chain starts at | Accepted | A caller can now pick a worse tier than the service would have picked |
-| [ADR-012](../decisions/ADR-012-connect-time-address-pinning.md) | Pin the validated address through to connect time | Accepted | Only the in-process curl_cffi tier can be pinned; four tiers keep the rebinding window |
+| [ADR-012](../decisions/ADR-012-connect-time-address-pinning.md) | Pin the validated address through to connect time | Accepted | Amended 2026-11-07 and 2026-11-09: every tier is pinned, the browser tiers through the route handler and a local pinned tunnel, their only way out |
 
 ---
 

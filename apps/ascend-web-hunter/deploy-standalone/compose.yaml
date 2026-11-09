@@ -16,7 +16,7 @@ services:
   # ─── Search infrastructure ───
 
   searxng:
-    image: searxng/searxng:2026.8.14-094c33d40
+    image: searxng/searxng:2026.8.14-094c33d40@sha256:892cf809341915a4b7710d3c9045005b4c377d51335a089b6d4da0b28750788d
     container_name: searxng
     restart: unless-stopped
     logging: *default-logging
@@ -60,13 +60,13 @@ services:
   # is 10s against searxng's 30s, so this adds no
   # measurable startup time; it only closes the race where the first request
   # after a cold start would otherwise hit ascend-web-hunter before Redis is
-  # ready and get an avoidably degraded response. ascend-web-hunter's own
+  # ready and get an avoidably not-ready response. ascend-web-hunter's own
   # Redis client still tolerates Redis being absent or unreachable later
-  # (falls back to an in-memory cache, and GET /ready reports "degraded"
-  # rather than failing), so this is a startup-ordering improvement, not a
-  # hard requirement.
+  # (falls back to an in-memory cache, and GET /ready answers "not-ready"
+  # with the redis check reading "error" while the process keeps running),
+  # so this is a startup-ordering improvement, not a hard requirement.
   redis:
-    image: redis:8.10.1-alpine
+    image: redis:8.10.1-alpine@sha256:ef216d85ec44f4fdf7c0e6df2d1757a4734ed32fbb278cabd3181b5a27353b79
     container_name: redis
     restart: unless-stopped
     logging: *default-logging
@@ -99,7 +99,7 @@ services:
   # ─── Web search service ───
 
   ngrok-ascend-web-hunter:
-    image: ngrok/ngrok:3
+    image: ngrok/ngrok:3@sha256:ff3b5c3674432d14a786349908b7bdf28ee56c25662637afcbe7180d471993ef
     container_name: ngrok-ascend-web-hunter
     restart: unless-stopped
     logging: *default-logging
@@ -170,6 +170,7 @@ services:
       - CHALLENGE_WEIGHT_NO_ARTICLE=${CHALLENGE_WEIGHT_NO_ARTICLE:-20}
       - CHALLENGE_WEIGHT_RICH_CONTENT=${CHALLENGE_WEIGHT_RICH_CONTENT:--70}
       - CHALLENGE_WEIGHT_MANY_LINKS=${CHALLENGE_WEIGHT_MANY_LINKS:--20}
+      - CHALLENGE_WEIGHT_SERVED_PAGE=${CHALLENGE_WEIGHT_SERVED_PAGE:--30}
       - CHALLENGE_WEIGHT_PHRASE_TITLE=${CHALLENGE_WEIGHT_PHRASE_TITLE:-60}
       - CHALLENGE_WEIGHT_PHRASE_BODY=${CHALLENGE_WEIGHT_PHRASE_BODY:-30}
       - SEARXNG_USER_AGENT=ascend-web-hunter/1.0
@@ -190,12 +191,20 @@ services:
       - RECIPE_TTL_SECONDS=${RECIPE_TTL_SECONDS:-604800}
       - RECIPE_SELECTOR_MAX_CHARS=${RECIPE_SELECTOR_MAX_CHARS:-512}
       - DOCUMENT_MAX_BYTES=${DOCUMENT_MAX_BYTES:-52428800}
-      - DOCLING_SERVE_URL=${DOCLING_SERVE_URL:-http://docling-serve:5001}
-      - ASCEND_OCR_URL=${ASCEND_OCR_URL:-http://ascend-ocr:7022}
+      - DOCUMENT_FETCH_TIMEOUT_SECONDS=${DOCUMENT_FETCH_TIMEOUT_SECONDS:-300}
+      - BROWSER_RESPONSE_MAX_BYTES=${BROWSER_RESPONSE_MAX_BYTES:-52428800}
+      - BROWSER_TUNNEL_CONNECT_TIMEOUT_SECONDS=${BROWSER_TUNNEL_CONNECT_TIMEOUT_SECONDS:-10.0}
+      - BROWSER_TUNNEL_IDLE_TIMEOUT_SECONDS=${BROWSER_TUNNEL_IDLE_TIMEOUT_SECONDS:-60.0}
+      - BROWSER_TUNNEL_MAX_CONNECTIONS=${BROWSER_TUNNEL_MAX_CONNECTIONS:-256}
+      - READ_RESPONSE_MAX_BYTES=${READ_RESPONSE_MAX_BYTES:-52428800}
+      - DOCLING_SERVE_URL=${DOCLING_SERVE_URL:-}
+      - ASCEND_OCR_URL=${ASCEND_OCR_URL:-}
       - OCR_ROUTE_TIMEOUT_SECONDS=${OCR_ROUTE_TIMEOUT_SECONDS:-300}
-      - AUDIO_SCRIBE_URL=${AUDIO_SCRIBE_URL:-http://ascend-audio-scribe:7017}
+      - OCR_DELETE_DRAIN_SECONDS=${OCR_DELETE_DRAIN_SECONDS:-5}
+      - AUDIO_SCRIBE_URL=${AUDIO_SCRIBE_URL:-}
       - READ_CACHE_PURGE_RECONNECT_SECONDS=${READ_CACHE_PURGE_RECONNECT_SECONDS:-5}
       - OBJECT_STORE_S3_ENDPOINT=${OBJECT_STORE_S3_ENDPOINT:-http://host.docker.internal:9070}
+      - OBJECT_STORE_S3_PUBLIC_ENDPOINT=${OBJECT_STORE_S3_PUBLIC_ENDPOINT:-}
       - OBJECT_STORE_S3_ACCESS_KEY=${OBJECT_STORE_S3_ACCESS_KEY}
       - OBJECT_STORE_S3_SECRET_KEY=${OBJECT_STORE_S3_SECRET_KEY}
       - CRAWL_MAX_SEEDS=${CRAWL_MAX_SEEDS:-20}
@@ -204,18 +213,28 @@ services:
       - CRAWL_DEFAULT_DEPTH=${CRAWL_DEFAULT_DEPTH:-2}
       - CRAWL_MAX_PAGES=${CRAWL_MAX_PAGES:-10000}
       - CRAWL_DEFAULT_PAGE_BUDGET=${CRAWL_DEFAULT_PAGE_BUDGET:-100}
-      - CRAWL_ROBOTS_OPT_OUT_DOMAINS=${CRAWL_ROBOTS_OPT_OUT_DOMAINS:-}
       - CRAWL_RESULT_S3_BUCKET=${CRAWL_RESULT_S3_BUCKET:-web-hunter-crawls}
       - CRAWL_RESULT_S3_PREFIX=${CRAWL_RESULT_S3_PREFIX:-crawl-results/}
       - CRAWL_JOB_RETENTION_SECONDS=${CRAWL_JOB_RETENTION_SECONDS:-604800}
       - CRAWL_DOMAIN_CONCURRENCY=${CRAWL_DOMAIN_CONCURRENCY:-2}
       - CRAWL_DEFAULT_DELAY_SECONDS=${CRAWL_DEFAULT_DELAY_SECONDS:-1}
       - CRAWL_PROXY_URL=${CRAWL_PROXY_URL:-}
+      - PROXY_URL=${PROXY_URL:-}
       - CRAWL_CLAIM_LEASE_SECONDS=${CRAWL_CLAIM_LEASE_SECONDS:-120}
       - CRAWL_CLAIM_MAX_EXPIRIES=${CRAWL_CLAIM_MAX_EXPIRIES:-2}
       - CRAWL_WORKER_CONCURRENCY=${CRAWL_WORKER_CONCURRENCY:-4}
       - CRAWL_WORKER_IDLE_SECONDS=${CRAWL_WORKER_IDLE_SECONDS:-1}
       - CRAWL_POLL_AFTER_SECONDS=${CRAWL_POLL_AFTER_SECONDS:-5}
+      - CRAWL_SITEMAP_MAX_DOCUMENTS=${CRAWL_SITEMAP_MAX_DOCUMENTS:-50}
+      - CRAWL_SITEMAP_MAX_BYTES=${CRAWL_SITEMAP_MAX_BYTES:-52428800}
+      - CRAWL_ROBOTS_MAX_BYTES=${CRAWL_ROBOTS_MAX_BYTES:-512000}
+      - CRAWL_ROBOTS_MAX_RULES=${CRAWL_ROBOTS_MAX_RULES:-1000000}
+      - CRAWL_ROBOTS_CACHE_MAX_ORIGINS=${CRAWL_ROBOTS_CACHE_MAX_ORIGINS:-256}
+      - CRAWL_ROBOTS_CACHE_MAX_RULES=${CRAWL_ROBOTS_CACHE_MAX_RULES:-2000000}
+      - CRAWL_ROBOTS_SKIP_FACTOR=${CRAWL_ROBOTS_SKIP_FACTOR:-10}
+      - CRAWL_ROBOTS_TIMEOUT_SECONDS=${CRAWL_ROBOTS_TIMEOUT_SECONDS:-30}
+      - CRAWL_SITEMAP_TIMEOUT_SECONDS=${CRAWL_SITEMAP_TIMEOUT_SECONDS:-60}
+      - CRAWL_MAX_DELAY_SECONDS=${CRAWL_MAX_DELAY_SECONDS:-60}
       - PUBLIC_VNC_URL=http://ngrok-ascend-web-hunter:4040/api/tunnels
       # Defaults to the bundled Redis above, which now starts unconditionally
       # with the stack. Override to redis://host.docker.internal:6379/0 to
@@ -233,11 +252,7 @@ services:
       - NOVNC_FLOW_SWEEP_INTERVAL_SECONDS=${NOVNC_FLOW_SWEEP_INTERVAL_SECONDS:-30.0}
       - NOVNC_FLOW_CANCEL_GRACE_SECONDS=${NOVNC_FLOW_CANCEL_GRACE_SECONDS:-10.0}
       - NOVNC_BUSY_RETRY_AFTER_SECONDS=${NOVNC_BUSY_RETRY_AFTER_SECONDS:-30}
-      # Required here. The ngrok tunnel puts the NoVNC desktop on the public
-      # internet, so an unauthenticated desktop is not an option.
-      - "VNC_PASSWORD=${VNC_PASSWORD:?VNC_PASSWORD must be set in .env (8 characters, the VNC protocol truncates anything longer)}"
-    cap_add:
-      - SYS_ADMIN
+      - VNC_PASSWORD=${VNC_PASSWORD:-}
     # 1gb rather than the development stack's 2gb. /dev/shm is charged to this
     # container's memory cgroup, so shared memory eats the ceiling below.
     # Docker's 64m default is what crashes Chromium; 1gb is ample for one browser.
