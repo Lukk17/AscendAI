@@ -203,6 +203,37 @@ ends.
 - **THEN** its slot is freed regardless
 - **AND** the unfinished teardown is recorded
 
+### Requirement: An open window can be closed by its flow_id
+
+The service SHALL close one open intervention flow on request, over REST as
+`DELETE /api/v2/session/interventions/{flow_id}` and over MCP as the tool `session_cancel_intervention`, with the same
+rate limit as the listing and the same `Host` header check as every MCP tool. The close SHALL save nothing from the
+window, free its slot, and end the flow the way a timeout ends it, with the outcome `cancelled`.
+
+#### Scenario: Close an open window
+
+- **WHEN** a caller sends `DELETE /api/v2/session/interventions/{flow_id}` for an open flow of the container it reaches
+- **THEN** the answer is `204` with no body, the browser is closed, and the listing no longer shows the flow and its
+  slot is free before the answer
+- **AND** nothing from that window is saved and the session status shows `last_window.outcome` `cancelled`
+
+#### Scenario: Close over MCP
+
+- **WHEN** a caller calls `session_cancel_intervention` with the `flow_id` of an open flow
+- **THEN** the result is `{"status": "cancelled", "flow_id": "<flow_id>"}` and the flow is closed as over REST
+
+#### Scenario: Close an unknown or finished flow
+
+- **WHEN** a caller sends `DELETE /api/v2/session/interventions/{flow_id}` for a `flow_id` no open flow carries
+- **THEN** the answer is `404` with an RFC 7807 problem body and code `flow_not_found`
+- **AND** over MCP the tool error text starts with `flow_not_found: `
+
+#### Scenario: Close a window of another container
+
+- **WHEN** the close request reaches a container that does not own the flow
+- **THEN** the answer is `204`, the flow's shared record is removed at once so no container lists or joins it
+- **AND** the owner closes the window, saves nothing and frees its slot on its next poll
+
 ### Requirement: Shutdown ends every flow in progress
 
 On shutdown a container SHALL cancel every flow in progress on it and wait, within a bounded time, for each to close

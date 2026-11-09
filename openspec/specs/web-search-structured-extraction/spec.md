@@ -69,7 +69,7 @@ Page content sent to the extraction model SHALL be cut to `EXTRACTION_LLM_MAX_IN
 
 ### Requirement: Self-healing per-domain selector recipes
 
-On a schema extraction the model SHALL also return one CSS selector per field, stored under the registrable domain and the SHA-256 of the canonical schema with TTL `RECIPE_TTL_SECONDS`. A later extraction with the same domain and schema SHALL replay the selectors without calling the model. A replay that fails validation SHALL delete the recipe and call the model again.
+On a schema extraction the model SHALL be given the cleaned markup of the page (the title and the body, with scripts, styles and similar elements removed and only the `id`, `class`, `itemprop`, `name`, `role` and `datetime` attributes kept) and SHALL also return one CSS selector per field. The selectors SHALL be stored under the registrable domain and the SHA-256 of the canonical schema with TTL `RECIPE_TTL_SECONDS` only when replaying them on the same page gives exactly the values the model returned. When they do not, nothing SHALL be stored and the read SHALL still answer the model's values. A later extraction with the same domain and schema SHALL replay the stored selectors without calling the model. A replay that fails validation SHALL delete the recipe and call the model again.
 
 #### Scenario: Recipe replay skips the model
 
@@ -79,11 +79,19 @@ On a schema extraction the model SHALL also return one CSS selector per field, s
 #### Scenario: Drift rebuilds the recipe
 
 - **WHEN** a replay yields an object that fails the schema
-- **THEN** the recipe is deleted, the model is called, and the new selectors are stored
+- **THEN** the recipe is deleted and the model is called with the cleaned markup of the page
+- **AND** the new selectors are stored only if replaying them on the same page gives exactly the model's values
+
+#### Scenario: Selectors that do not replay are not stored
+
+- **WHEN** the model returns selectors that, replayed on the same page, do not give exactly the values it returned
+- **THEN** no recipe is stored
+- **AND** the read still answers the model's values with `recipe` `model`
+- **AND** the next schema extraction for the same domain and schema calls the model again
 
 ### Requirement: Non-HTML content routed to the platform services
 
-A PDF SHALL be converted by docling-serve, an image SHALL be read through the ascend-ocr job API (`POST /v1/ocr/jobs`, then `GET /v1/ocr/jobs/{job_id}`), and audio SHALL be transcribed by ascend-audio-scribe. Every routed document SHALL be fetched by the shared `stream_to_file` of `src/fetch/byte_fetch.py`, built on the one redirect loop of `src/fetch/pinned_fetch.py` that checks and pins every hop, and capped at `DOCUMENT_MAX_BYTES`. No route SHALL open an HTTP client of its own. A routing failure SHALL return the HTML extraction with a `routing_error` field rather than fail the read.
+A PDF SHALL be converted by docling-serve, an image SHALL be read through the ascend-ocr job API (`POST /v1/ocr/jobs`, then `GET /v1/ocr/jobs/{job_id}`, then `DELETE /v1/ocr/jobs/{job_id}` in a background task once the read ends with the result, a failed job, a timeout or a cancel, so the read answers without waiting for the delete and the stored page text does not wait out `OCR_JOB_RETENTION_SECONDS` in ascend-ocr, where a delete answered 404 is accepted and any other failed delete is a warning naming the job identifier that never fails the read), and audio SHALL be transcribed by ascend-audio-scribe. Every routed document SHALL be fetched by the shared `stream_to_file` of `src/fetch/byte_fetch.py`, built on the one redirect loop of `src/fetch/pinned_fetch.py` that checks and pins every hop, and capped at `DOCUMENT_MAX_BYTES`. No route SHALL open an HTTP client of its own. A routing failure SHALL return the HTML extraction with a `routing_error` field rather than fail the read, with one exception: a direct read of a document refused for its size SHALL end at once, answering HTTP 200 with `status` `error`, `reason` `routing_error` and `routing_error` `file_too_large`, and SHALL run no HTML tier and no human tier. A page whose main link is such a document SHALL keep the page's own text with a `routing_error` field.
 
 #### Scenario: PDF converted by docling-serve
 
@@ -94,12 +102,19 @@ A PDF SHALL be converted by docling-serve, an image SHALL be read through the as
 
 - **WHEN** a read targets a PDF whose `Content-Length` is above `DOCUMENT_MAX_BYTES`
 - **THEN** the body is not read and nothing is posted to docling-serve
-- **AND** the read returns the HTML extraction with a `routing_error` field
+- **AND** the read answers HTTP 200 with `routing_error` `file_too_large` and no HTML tier and no human tier runs, also when the server closes without sending a body
 
 #### Scenario: Image read through the OCR job API
 
 - **WHEN** a read targets a URL whose response is `image/png`
 - **THEN** an ascend-ocr job is submitted, polled to a terminal state, and its Markdown is returned
+- **AND** the job is then deleted in the background, so shortly after the read answers `GET /v1/ocr/jobs/{job_id}` on ascend-ocr answers 404 with code `JOB_NOT_FOUND`
+
+#### Scenario: OCR job deleted when the read does not succeed
+
+- **WHEN** an image read ends with a failed job, a poll that runs out of time, or a cancelled read
+- **THEN** ascend-web-hunter sends `DELETE /v1/ocr/jobs/{job_id}` for that job in the background
+- **AND** a delete that ascend-ocr does not accept is logged as a warning naming the job identifier and the read answers as it would have without it
 
 ### Requirement: Tables and screenshot output formats
 

@@ -179,8 +179,8 @@ metrics, only NoVNC, as today.
 ### D6: The VNC password stays
 
 Every copy starts its own x11vnc with the `VNC_PASSWORD` of the stack, as today. The proxy adds no login of its own.
-Required in the bundle, optional in development, unchanged. The bundle's NoVNC is now also reachable on port 7021 of the
-host under `/novnc/`, still behind that password, which the bundle README states.
+Optional in the bundle and in development (owner decision of 2026-11-07). The bundle's NoVNC is now also reachable on
+port 7021 of the host under `/novnc/`, behind that password when one is set, which the bundle README states.
 
 ### D7: Prometheus discovers every copy
 

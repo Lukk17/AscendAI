@@ -4,6 +4,11 @@ NEVER ARCHIVE: this living end-to-end suite change is never archived (owner deci
 
 ## Why
 
+Note 2026-11-06: the FlareSolverr tier this proposal names was removed on 2026-11-03 by `remove-flaresolverr-tier`
+(ascend-web-hunter ADR-018). The Cloudflare row is now cleared by the browser tiers (`4-playwright_stealth`,
+`4a-patchright`, `4b-camoufox`), and no spec of this suite checks a FlareSolverr container. The text below is the
+proposal as written.
+
 The ascend-web-hunter read path escalates across four extraction tiers - `curl_cffi` (fast static HTTP),
 FlareSolverr (Cloudflare WAF bypass), Playwright (client-side-rendered pages), and NoVNC (human CAPTCHA
 intervention). Today the e2e suite proves only the cheapest tier: test 3 reads `example.com`, a plain static page

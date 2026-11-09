@@ -142,7 +142,17 @@ The corpus SHALL contain, beside the wall fixtures, a counterexample set includi
 its comment form, a page hosting a challenge widget beside its own short text, a vendor's own page hosting its
 widget beside real content, a login page with a captcha, articles in at least five languages including two in
 non-Latin scripts, a 404 page, a 403 with a large real body, and a script-only application shell. The corpus test
-SHALL run every fixture through the scoring function and assert its expected verdict.
+SHALL run every fixture through the scoring function and assert its expected verdict. Until a public article served
+with 403 is captured, the 403 with a large real body SHALL be held by the e2e fake-site page `rich-403.html` through
+its verdict test, and the gap SHALL be listed with the probed addresses under "Known gaps" in the corpus README. A
+captured block page SHALL never be filed as that counterexample.
+
+#### Scenario: A large 403 block page is a wall
+
+- **WHEN** a 403 page larger than `CHALLENGE_WALL_MAX_BYTES` carries a catalogue body phrase behind inline styles
+  and inline images, such as Reddit's "You've been blocked by network security" page
+- **THEN** the verdict is a wall with `status_large_body` and `phrase_body` fired
+- **AND** an article that only quotes the phrase stays content
 
 #### Scenario: Every fixture has the expected verdict
 

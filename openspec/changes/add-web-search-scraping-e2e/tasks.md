@@ -49,7 +49,7 @@ NEVER ARCHIVE: this living end-to-end suite change is never archived (owner deci
 - [x] 5.4 Spec 7 Part 2 proved authenticated capture and replay: the cold read of `https://www.saucedemo.com/inventory.html` returned 283 characters reading "You can only access '/inventory.html' when you are logged in" with none of the auth-only markers, and after the harness stored a 621-byte `storage_state` under `session:saucedemo.com:e2e` the same URL with `profile=e2e` returned 1062 characters carrying `carry.allTheThings()`, "lighting modes", "ringspun combed cotton" and "quarter-zip fleece" through the `4-playwright_stealth` tier.
 - [x] 5.5 Spec 7 Part 1 proved the expected negatives: the dead domain answered HTTP 400 with no success body, and the login walls answered HTTP 428 with a `vnc_url`.
 - [x] 5.6 Spec 7's five retail anti-bot rows all took the success branch and all carried their product-identity canary with no interstitial marker, so the interstitial-reported-as-success defect those rows exist to catch did not appear.
-- [x] 5.7 Spec 12 proved clearance reuse, so register defect A61 did not reproduce on this run.
+- [x] 5.7 Spec 12 proved clearance reuse, so register defect F54 did not reproduce on this run.
 - [x] 5.8 Spec 11 was correctly excluded, since scenario 6 has no human at the keyboard.
 
 ## 6. Still open

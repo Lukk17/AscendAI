@@ -1,4 +1,4 @@
-Not started. Start only after `enhance-web-search-tier-ladder` is archived and has shipped for one release with
+Complete: every task is done and the change was archived on 2026-11-03. It started after `enhance-web-search-tier-ladder` shipped with
 `FLARESOLVERR_ENABLED=false`. Every command runs from `apps/ascend-web-hunter/` through `.venv/Scripts/python.exe -m`
 (Windows) or `.venv/bin/python -m` (Linux and macOS).
 

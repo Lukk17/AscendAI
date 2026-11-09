@@ -5,10 +5,10 @@ Build order: build group 3, position 4 of the owner build order of 2026-10-04, a
 ## 0. Already true in the code (checked 2026-10-01, no work)
 
 - [x] 0.1 `SEARXNG_SECRET` is required by compose (`compose.ascend-web-hunter.yaml:28`) and `infra/searxng/settings.yml` has no `secret_key`
-- [x] 0.2 SearXNG and FlareSolverr are bound to `127.0.0.1` (`compose.ascend-web-hunter.yaml:26`, `:63`)
+- [x] 0.2 SearXNG and FlareSolverr are bound to `127.0.0.1` (`compose.ascend-web-hunter.yaml:26`, `:63`). Checked 2026-10-01. FlareSolverr was removed since by `remove-flaresolverr-tier`, so only the SearXNG half still holds.
 - [x] 0.3 `compose.ascend-web-hunter.yaml` defines `x-logging: &default-logging` (`:6-10`) and every service in it uses it
 - [x] 0.4 The ngrok image is pinned by digest (`compose.ascend-web-hunter.yaml:147`) and every other pulled image carries a version and a digest
-- [x] 0.5 SearXNG and FlareSolverr have healthchecks, and ascend-web-hunter waits on both with `condition: service_healthy` (`compose.ascend-web-hunter.yaml:211-215`)
+- [x] 0.5 SearXNG and FlareSolverr have healthchecks, and ascend-web-hunter waits on both with `condition: service_healthy` (`compose.ascend-web-hunter.yaml:211-215`). Checked 2026-10-01. FlareSolverr was removed since by `remove-flaresolverr-tier`, so only the SearXNG half still holds.
 
 ## 1. Port bindings and compose mechanics
 

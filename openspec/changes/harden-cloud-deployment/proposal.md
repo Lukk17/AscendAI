@@ -4,7 +4,7 @@
 
 The compose stack is a setup for one developer's workstation. On a cloud VM with a public IP it is a security incident. Line numbers below were checked against the files on 2026-10-01.
 
-Services in `compose.yaml` publish their ports on every host interface: Docling with its UI enabled (`compose.yaml:14-15`, UI flag at `:25`), Unstructured (`:37-38`), ascend-ocr (`:58-59`), ascend-agent (`:121-122`), ascend-memory (`:180-181`), ascend-weather-mcp (`:239-240`), ascend-audio-scribe (`:266-267`), Prometheus (`:347-348`) and Grafana with anonymous Editor access (`:368-369`, anonymous flags at `:371-372`). In `compose.ascend-web-hunter.yaml`, ascend-web-hunter publishes `7021` on every interface (`:178-179`). SearXNG and FlareSolverr are already bound to `127.0.0.1` (`compose.ascend-web-hunter.yaml:26` and `:63`). The observability services loki, otel-collector, tempo and container-metrics-exporter publish no host port today, and that must stay true.
+Services in `compose.yaml` publish their ports on every host interface: Docling with its UI enabled (`compose.yaml:14-15`, UI flag at `:25`), Unstructured (`:37-38`), ascend-ocr (`:58-59`), ascend-agent (`:121-122`), ascend-memory (`:180-181`), ascend-weather-mcp (`:239-240`), ascend-audio-scribe (`:266-267`), Prometheus (`:347-348`) and Grafana with anonymous Editor access (`:368-369`, anonymous flags at `:371-372`). In `compose.ascend-web-hunter.yaml`, ascend-web-hunter publishes `7021` on every interface (`:178-179`). SearXNG is already bound to `127.0.0.1` (`compose.ascend-web-hunter.yaml:26`), and so was FlareSolverr (`:63`) until `remove-flaresolverr-tier` removed it. The observability services loki, otel-collector, tempo and container-metrics-exporter publish no host port today, and that must stay true.
 
 Further problems:
 
@@ -51,7 +51,7 @@ Earlier text of this change carried an interim production check that refused to 
 - SearXNG limiter stays off by an explicit decision (design D6), so `infra/searxng/settings.yml` and its copy are not changed.
 - Deployment guide: `docs/DEPLOYMENT.md` gains a section for one cloud VM per customer. Later changes that need a host step add it to that section themselves (see Build order).
 
-Already true in the code and not repeated by this change: `SEARXNG_SECRET` is required by compose and `infra/searxng/settings.yml` has no `secret_key`, SearXNG and FlareSolverr are bound to `127.0.0.1`, `compose.ascend-web-hunter.yaml` has its own `x-logging` anchor on every service, the ngrok image is pinned by digest, SearXNG and FlareSolverr have healthchecks, and ascend-web-hunter waits on both with `condition: service_healthy`.
+Already true in the code and not repeated by this change: `SEARXNG_SECRET` is required by compose and `infra/searxng/settings.yml` has no `secret_key`, SearXNG is bound to `127.0.0.1`, `compose.ascend-web-hunter.yaml` has its own `x-logging` anchor on every service, the ngrok image is pinned by digest, SearXNG has a healthcheck, and ascend-web-hunter waits on it with `condition: service_healthy` (FlareSolverr had the same until `remove-flaresolverr-tier` removed it).
 
 ## Capabilities
 

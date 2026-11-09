@@ -10,7 +10,8 @@ score came to the threshold, and which vendor's wall the service is seeing, with
 
 The service SHALL count every signal that fires on a verdict, labelled by the signal id and by the vendor the signal
 points at, with a fixed label for signals that point at no vendor. The set of vendor label values SHALL be bounded
-by the catalogue's vendor names plus that fixed label.
+by the catalogue's vendor names plus that fixed label. Each read tier SHALL count the signals of every read. An
+intervention window SHALL count only the signals of its last check, once per window when the window ends.
 
 #### Scenario: A wall with four signals
 
@@ -22,15 +23,28 @@ by the catalogue's vendor names plus that fixed label.
 - **WHEN** every fixture in the corpus is run through the scoring function
 - **THEN** the set of vendor label values recorded is a subset of the catalogue's vendor names plus the fixed label
 
+#### Scenario: A window counts the signals of its last check only
+
+- **WHEN** an intervention window checks its page on four polls and then ends
+- **THEN** only the signals of the fourth check are counted, once each
+
 ### Requirement: Every verdict is counted by outcome and tier
 
 The service SHALL count every verdict, labelled by its outcome, one of wall, content or no content, and by the tier
-that requested it, including the human-intervention monitor and the orchestrator's second look.
+that requested it, including the human-intervention monitor and the orchestrator's second look. Each read tier SHALL
+count one verdict per read. The human-intervention monitor rechecks its page on every poll while it waits for a human,
+and SHALL count only the verdict of its last check, once per window when the window ends. A window that checked no
+page SHALL count no verdict.
 
 #### Scenario: A wall at the first tier
 
 - **WHEN** the first tier's fetch is judged a wall
 - **THEN** one verdict is counted under wall and that tier's name
+
+#### Scenario: A window counts one verdict however often it rechecks
+
+- **WHEN** an intervention window checks its page on four polls and then ends
+- **THEN** exactly one verdict is counted under the monitor's tier name, the outcome of the fourth check
 
 #### Scenario: No content is distinct from a wall
 
@@ -41,7 +55,8 @@ that requested it, including the human-intervention monitor and the orchestrator
 
 The service SHALL record every verdict's score in a histogram whose buckets fall on the weight sums that matter, so
 that verdicts just under and just over the threshold are distinguishable from one another and from verdicts far from
-it. The buckets SHALL always include a boundary at the configured threshold.
+it. The buckets SHALL always include a boundary at the configured threshold. Each read tier SHALL record one score
+per read. An intervention window SHALL record only its last check's score, once, when it ends.
 
 #### Scenario: A near miss is visible
 
@@ -52,6 +67,16 @@ it. The buckets SHALL always include a boundary at the configured threshold.
 
 - **WHEN** the operator sets the threshold to a value that is not one of the default bucket boundaries
 - **THEN** the histogram has a bucket boundary at that value
+
+#### Scenario: A window records one score however often it rechecks
+
+- **WHEN** an intervention window checks its page on four polls and then ends
+- **THEN** exactly one score is recorded, the score of the fourth check
+
+#### Scenario: A window that checked no page records no score
+
+- **WHEN** an intervention window ends before it checked its page
+- **THEN** no score is recorded
 
 ### Requirement: The verdict is logged with its evidence and without the page
 

@@ -41,7 +41,7 @@ timeout, and from a rejected intervention. The outcome SHALL be recorded even wh
 
 #### Scenario: A cancelled flow
 
-- **WHEN** a flow is cancelled by reclamation or by shutdown
+- **WHEN** a flow is cancelled by reclamation, by shutdown or by a close request
 - **THEN** its outcome is recorded as cancelled, not as a timeout
 
 #### Scenario: Teardown fails

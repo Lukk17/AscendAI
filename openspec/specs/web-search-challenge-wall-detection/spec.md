@@ -148,13 +148,27 @@ because parsing failed.
 
 Every fetch tier and the human-intervention monitor SHALL obtain their decision about a page from the same scoring
 function, passing the response status, the response headers and the cookie names each has available. A tier that
-has headers SHALL pass them. The orchestrator's second look at a tier's output SHALL use the same function with the
-markup alone.
+has headers SHALL pass them. A browser tier SHALL pass the status and headers of the latest main-frame document
+response it received for the page, not those of the first one, so a challenge that clears itself and navigates to the
+real page is judged by the response that served the real page. The orchestrator's second look at a tier's output SHALL
+use the same function with the markup alone.
 
 #### Scenario: A header-only wall at the first tier
 
 - **WHEN** the first tier receives a 403 whose only wall evidence is a definitive challenge header
 - **THEN** that tier escalates rather than returning the body
+
+#### Scenario: A challenge that clears itself in the browser
+
+- **WHEN** a browser tier's first main-frame response is a 403 challenge page and the page then clears itself and
+  navigates to the real page, which answers 200
+- **THEN** the tier judges the page with the 200 status and that response's headers
+- **AND** the page is returned as content when its markup is content
+
+#### Scenario: A challenge that does not clear
+
+- **WHEN** a browser tier's latest main-frame response is still the 403 challenge page when the tier judges the page
+- **THEN** the verdict uses that 403 response and the tier escalates
 
 #### Scenario: The monitor and the reader agree
 

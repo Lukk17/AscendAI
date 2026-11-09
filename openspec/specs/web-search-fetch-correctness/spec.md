@@ -16,8 +16,11 @@ inspecting a response history afterwards, because the tier follows the chain its
 history of hops it did not follow exists to inspect. A `Location` that is a relative reference, whether
 root-relative, path-relative or protocol-relative, SHALL first be resolved against the URL of the hop that
 returned it, as RFC 9110 section 10.2.2 requires, and the resolved absolute URL SHALL then face exactly the same
-validation a `Location` that was absolute to begin with faces. The tiers that fetch outside this process,
-FlareSolverr and Crawlee, SHALL be validated before dispatch, which is the only check available for them.
+validation a `Location` that was absolute to begin with faces. The browser tiers, `4-playwright_stealth`,
+`4a-patchright`, `4b-camoufox`, `5-crawlee_adaptive` and `6-novnc`, do not follow redirects in this process. They
+SHALL pass every request their browser makes, every redirect hop included, through the shared browser URI guard of
+`web-search-tier-ladder` before the browser connects to it, and the Crawlee tier SHALL also validate its seed URL
+before the crawler runs.
 
 #### Scenario: Redirect to an internal address
 
@@ -48,11 +51,11 @@ FlareSolverr and Crawlee, SHALL be validated before dispatch, which is the only 
 - **THEN** the hop is refused and no request is issued for it
 - **AND** the read returns no content
 
-#### Scenario: Out-of-process tier dispatch
+#### Scenario: Browser tier dispatch
 
-- **WHEN** a read is dispatched to FlareSolverr or Crawlee
-- **THEN** the target URL is validated before dispatch
-- **AND** the redirect hops those tiers take internally are accepted as residual risk, since they are not observable from this process
+- **WHEN** a read is dispatched to a browser tier
+- **THEN** the target URL is validated before the browser connects to it
+- **AND** every redirect hop the browser takes passes the same guard before it is fetched
 
 ### Requirement: Challenge and login detection regardless of page size
 
@@ -108,6 +111,16 @@ The Crawlee tier SHALL honour the `PLAYWRIGHT_HEADLESS` setting rather than hard
 - **WHEN** `PLAYWRIGHT_HEADLESS` is true and a read escalates to the Crawlee tier
 - **THEN** the Crawlee browser launches headless and does not fail for lack of a display
 
+### Requirement: Crawlee tier leaves the process logging unchanged
+
+The Crawlee tier SHALL build its crawler with Crawlee's own logging setup turned off (`configure_logging=False`), so a read through it SHALL NOT change the handlers, formatters or levels of the root, web server or `httpx` loggers, and Crawlee's own records SHALL reach the service's handlers.
+
+#### Scenario: Service logs keep their format after a Crawlee read
+
+- **WHEN** a read runs through `5-crawlee_adaptive` in a service that logs with `LOG_FORMAT=json`
+- **THEN** every later service log line, access lines included, is still JSON with `correlation_id` and `trace_id`
+- **AND** Crawlee's own log records are written by the service's handler
+
 ### Requirement: The validated address is the address connected to
 
 An in-process fetch SHALL connect to an address that was validated by the same name resolution that authorised it.
@@ -118,10 +131,11 @@ the connection. A host that resolves to no public address SHALL NOT be connected
 A URL whose host is already an IP literal SHALL be checked against the same address rules, and SHALL carry no pin,
 because there is no name there for a second resolution to answer differently.
 
-This applies to the initial URL and to every redirect hop the in-process tier follows. The tiers that fetch outside
-this process, FlareSolverr and Crawlee, and the tiers that fetch through the shared browser, Playwright and NoVNC,
-SHALL keep pre-dispatch validation, which remains the only check available for them, and the residual DNS-rebinding
-window for those four tiers SHALL be recorded as an accepted risk.
+This applies to the initial URL and to every redirect hop the in-process tier follows. It applies to the browser
+tiers too, `4-playwright_stealth`, `4a-patchright`, `4b-camoufox`, `5-crawlee_adaptive` and `6-novnc`, and to the
+screenshot capture: every request the browser guard allows SHALL be sent through the same pinned fetch the in-process
+tier uses and answered to the browser with `route.fulfill`, so the browser never resolves the name of a routed
+request. Owner decision, security fix 19 of 2026-11-07.
 
 #### Scenario: The name answers differently after it has been validated
 
@@ -141,6 +155,13 @@ window for those four tiers SHALL be recorded as an accepted risk.
 
 - **WHEN** an in-process fetch follows a redirect to a second host
 - **THEN** that host is resolved and validated once, and the hop connects to an address from that same resolution
+
+#### Scenario: A browser tier reads the validated address after the name is rebound
+
+- **WHEN** a browser tier reads a page whose host resolves to a public address at validation time and to a loopback
+  address by the time a connection would be made
+- **THEN** the page and its subresources are read from the validated address
+- **AND** the loopback address is never connected to
 
 #### Scenario: A host with several public addresses
 

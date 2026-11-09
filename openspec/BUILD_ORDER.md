@@ -18,7 +18,7 @@ Status "started" means at least one implementation task is ticked. A change whos
 
 | Position | Change | What it delivers | Status | Tasks done | Tasks open |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `add-observability` | Metrics, logs and traces for every service, with Prometheus, Loki, Tempo and Grafana dashboards. | started (recounted 2026-10-08) | 78 | 36 |
+| 1 | `add-observability` | Metrics, logs and traces for every service, with Prometheus, Loki, Tempo and Grafana dashboards. | archived 2026-11-03, every task done (recounted 2026-11-06) | 114 | 0 |
 | 2 | `add-github-actions-pipeline` | A CI pipeline with build, test and coverage gates and a manual release workflow. | started (recounted 2026-10-08) | 41 | 20 |
 | 3 | `add-web-search-scraping-e2e` | End-to-end tests for web search and page extraction of ascend-web-hunter. | started, one rework task open by owner decision 90 of 2026-10-08 (recounted 2026-10-08) | 44 | 1 |
 | 4 | `fix-linux-docker-host-access` | Everything in the existing setup that breaks on Linux Docker Engine is fixed, the rule is written for developers, and four findings of its audit are fixed. No test and no live run (owner answer 84.2 of 2026-10-08). | not started (added 2026-10-08, recounted 2026-10-08 after owner answer 84) | 0 | 25 |
@@ -27,15 +27,15 @@ Status "started" means at least one implementation task is ticked. A change whos
 
 | Position | Change | What it delivers | Status | Tasks done | Tasks open |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `add-ascend-python-common` | One shared Python library for errors, settings, logging, tracing, rate limits and the URL guard of the four Python services. | started, built in parallel with group 1 by owner decision of 2026-10-07 (recounted 2026-10-08 after owner answers 94.2 and 94.3) | 81 | 39 |
-| 2 | `add-python-runtime-upgrades` | Newer FastAPI, uvicorn, FastMCP 4 and MCP SDK 2 for the Python services. | not started (recounted 2026-10-08) | 0 | 43 |
-| 3 | `open-several-novnc-windows-at-once` | Several sites can wait for human help in the remote browser at the same time. | not started (recounted 2026-10-08 after owner answers 94.4 and 95.1) | 0 | 58 |
-| 4 | `detect-challenge-walls-in-any-language` | Bot challenge pages are found by a score, in any language. | not started (recounted 2026-10-08) | 0 | 70 |
-| 5 | `enhance-web-search-tier-ladder` | Two new free browser tiers in the extraction ladder. | not started (its one ticked task records an owner answer, recounted 2026-10-08 after owner answer 94.6) | 1 | 29 |
-| 6 | `enhance-web-search-extraction-and-tiers` | Structured data, metadata and better extraction from pages. | not started (recounted 2026-10-08) | 0 | 28 |
-| 7 | `remove-flaresolverr-tier` | The FlareSolverr tier and its container are removed. | not started (its one ticked task records an owner decision, recounted 2026-10-08) | 1 | 11 |
-| 8 | `add-web-session-import` | A browser login session can be imported into ascend-web-hunter. | not started (recounted 2026-10-08) | 0 | 16 |
-| 9 | `enhance-web-search-crawl-at-scale` | Crawl jobs over many pages, with polling. | not started (recounted 2026-10-08) | 0 | 30 |
+| 1 | `add-ascend-python-common` | One shared Python library for errors, settings, logging, tracing, rate limits and the URL guard of the four Python services. | archived 2026-11-03, every task done (recounted 2026-11-06) | 120 | 0 |
+| 2 | `add-python-runtime-upgrades` | Newer FastAPI, uvicorn, FastMCP 4 and MCP SDK 2 for the Python services. | archived 2026-11-03, every task done (recounted 2026-11-06) | 43 | 0 |
+| 3 | `open-several-novnc-windows-at-once` | Several sites can wait for human help in the remote browser at the same time. | archived 2026-11-03, every task done (recounted 2026-11-06) | 58 | 0 |
+| 4 | `detect-challenge-walls-in-any-language` | Bot challenge pages are found by a score, in any language. | archived 2026-11-03, every task done (recounted 2026-11-06) | 70 | 0 |
+| 5 | `enhance-web-search-tier-ladder` | Two new free browser tiers in the extraction ladder. | archived 2026-11-03, every task done (recounted 2026-11-06) | 30 | 0 |
+| 6 | `enhance-web-search-extraction-and-tiers` | Structured data, metadata and better extraction from pages. | archived 2026-11-02, every task done (recounted 2026-11-06) | 28 | 0 |
+| 7 | `remove-flaresolverr-tier` | The FlareSolverr tier and its container were removed (ADR-018 of ascend-web-hunter). | archived 2026-11-03, every task done (recounted 2026-11-06) | 12 | 0 |
+| 8 | `add-web-session-import` | A browser login session can be imported into ascend-web-hunter. | archived 2026-10-25, every task done (recounted 2026-11-06) | 16 | 0 |
+| 9 | `enhance-web-search-crawl-at-scale` | Crawl jobs over many pages, with polling. | archived 2026-10-25, every task done (recounted 2026-11-06) | 30 | 0 |
 | 10 | `add-file-download` | ascend-web-hunter downloads files from the web and keeps them for a short time. | not started (recounted 2026-10-08) | 0 | 48 |
 | 11 | `scale-web-hunter-across-containers` | ascend-web-hunter runs as several containers of one compose service behind a small edge proxy that publishes port 7021 and routes each NoVNC window to its container, in the development stack and in the standalone bundle, with one two container e2e check of every shared mechanism of the group. | not started (added 2026-10-08 by owner answer 96, fixed Ngrok domain setting `NGROK_DOMAIN` added by owner answer 97 of 2026-10-08) | 0 | 34 |
 
