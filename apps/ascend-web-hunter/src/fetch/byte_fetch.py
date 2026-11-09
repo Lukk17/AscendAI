@@ -1,4 +1,4 @@
-"""Bounded byte fetch for routed files (design D6).
+"""Bounded byte fetch for routed files.
 
 ``stream_to_file`` downloads one URL to a temporary file without ever holding
 the whole body in memory. The first URL and every redirect hop pass the same
@@ -6,18 +6,22 @@ guard the read tiers face, each hop pinned through ``CURLOPT_RESOLVE`` by
 ``src.fetch.pinned_fetch``, and the redirect chain itself is the library's
 ``follow_guarded_redirects``. This module writes no redirect loop of its own.
 
-The body streams in chunks with ``stream=True``: a declared ``Content-Length``
-above *max_bytes* is refused before one body byte is read, and a body that
-passes the limit mid-stream is stopped and its partial file deleted.
+The body streams in chunks with ``stream=True``: a final answer outside 2xx is
+refused before one body byte is read, a declared ``Content-Length`` above
+*max_bytes* is refused the same way, also when the server closes before
+sending a body and curl fails the transfer, and a body that passes the limit
+mid-stream is stopped and its partial file deleted. libcurl decoding is off,
+so a compressed body is inflated here and the limit counts the inflated bytes,
+and a compressed file that stops before its content coding ends is a failure.
+A written file that the caller does not receive is deleted on every exit.
+Each redirect answer is stopped, undrained, before the next hop is sent.
 """
 
 import logging
 import tempfile
-from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
-from ascend_python_common.startup_banner import strip_user_info
 from ascend_python_common.uri_guard import (
     FetchPolicy,
     FetchTarget,
@@ -27,10 +31,19 @@ from ascend_python_common.uri_guard import (
     follow_guarded_redirects,
 )
 from curl_cffi import CurlOpt, requests
+from curl_cffi.requests.exceptions import RequestException
 
-from src.fetch.pinned_fetch import _resolve_entries
+from src.fetch.capped_inflate import BodyOverLimitError, declared_content_length, drain_inflated
+from src.fetch.pinned_fetch import _resolve_entries, leave_bodies_undecoded, stopping_hops
+from src.observability.safe_address import address_without_query
 
 logger = logging.getLogger(__name__)
+
+_SUCCESS_STATUSES = range(200, 300)
+
+
+class DocumentTooLargeError(Exception):
+    """The answer declares or delivers more bytes than the cap allows."""
 
 
 def _discard_spool(path: Path) -> None:
@@ -48,12 +61,14 @@ async def stream_to_file(
 ) -> Path | None:
     """Fetch *url* to a temporary file capped at *max_bytes*.
 
-    Returns the file path when the whole body fits the cap, and None when the
-    guard refuses a hop, a declared length is already above the cap, the stream
-    passes the cap, the chain runs past the hop budget, or the transport fails.
-    A partial file never survives: it is deleted before None is returned.
+    Returns the file path when a 2xx body fits the cap, and None when the
+    guard refuses a hop, the final answer is not 2xx, the chain runs past the
+    hop budget, or the transport fails. A partial file never survives.
+
+    Raises:
+        DocumentTooLargeError: a 2xx answer declares or delivers more than *max_bytes*.
     """
-    safe_url = strip_user_info(url)
+    safe_url = address_without_query(url)
     try:
         first = await check_fetch_uri(url, policy)
     except UnsafeUriError:
@@ -62,79 +77,82 @@ async def stream_to_file(
 
     sent_headers: dict[str, str] = headers or {}
     sent_cookies: dict[str, str] = cookies or {}
+    spool: Path | None = None
+    delivered = False
 
     try:
-        # noinspection PyArgumentList
         async with requests.AsyncSession(impersonate="chrome120") as session:
-            open_responses: list[Any] = []
+            leave_bodies_undecoded(session)
 
             async def send_hop(target: FetchTarget) -> HopAnswer[Any]:
                 session.curl_options[CurlOpt.RESOLVE] = _resolve_entries(target)
-                response = await session.request(
-                    "GET",
-                    target.url,
-                    headers=sent_headers,
-                    cookies=sent_cookies,
-                    timeout=timeout_seconds,
-                    allow_redirects=False,
-                    stream=True,
-                )
-                open_responses.append(response)
+                try:
+                    response = await session.request(
+                        "GET",
+                        target.url,
+                        headers=sent_headers,
+                        cookies=sent_cookies,
+                        timeout=timeout_seconds,
+                        allow_redirects=False,
+                        stream=True,
+                    )
+                except RequestException as failure:
+                    _refuse_declared_oversize(failure.response, max_bytes, safe_url)
+                    raise
                 return HopAnswer(
                     status=response.status_code,
                     location=response.headers.get("location"),
                     answer=response,
                 )
 
-            final = await _follow_and_close_intermediates(first, policy, send_hop, open_responses)
-            return await _drain_final_to_file(final, max_bytes, safe_url)
+            async with stopping_hops(send_hop) as tracked_hop:
+                final = await follow_guarded_redirects(first, policy, tracked_hop)
+                spool = await _drain_final_to_file(final, max_bytes, safe_url)
+        delivered = True
+
+        return spool
+    except DocumentTooLargeError:
+        raise
     except Exception as e:
-        logger.warning("byte_fetch failed for URL %s: %s", safe_url, strip_user_info(str(e)))
+        logger.warning("byte_fetch failed for URL %s: %s", safe_url, type(e).__name__)
         return None
+    finally:
+        if spool is not None and not delivered:
+            _discard_spool(spool)
 
 
-async def _follow_and_close_intermediates(
-    first: FetchTarget,
-    policy: FetchPolicy,
-    send_hop: Callable[[FetchTarget], Awaitable[HopAnswer[Any]]],
-    open_responses: list[Any],
-) -> HopAnswer[Any]:
-    """Run the library redirect loop, then close every hop but the final one."""
-    final = await follow_guarded_redirects(first, policy, send_hop)
-    for response in open_responses:
-        if response is not final.answer:
-            await response.aclose()
-    return final
+def _refuse_declared_oversize(response: Any, max_bytes: int, safe_url: str) -> None:
+    """Raise when a 2xx answer declares a body above the cap."""
+    if response is None or response.status_code not in _SUCCESS_STATUSES:
+        return
+    declared = declared_content_length(response.headers)
+    if declared is not None and declared > max_bytes:
+        logger.warning("byte_fetch refused %s: declared %d bytes above the cap", safe_url, declared)
+        raise DocumentTooLargeError(safe_url)
 
 
 async def _drain_final_to_file(final: HopAnswer[Any], max_bytes: int, safe_url: str) -> Path | None:
     """Write the final hop body to a temp file, honouring the byte cap."""
     response: Any = final.answer
+    if response.status_code not in _SUCCESS_STATUSES:
+        logger.warning("byte_fetch refused %s: the answer was HTTP %d", safe_url, response.status_code)
+        return None
+    _refuse_declared_oversize(response, max_bytes, safe_url)
+    over = False
+    tmp_path: Path | None = None
     try:
-        raw_length: str | None = response.headers.get("content-length")
-        declared: int | None = int(raw_length) if raw_length is not None else None
-        if declared is not None and declared > max_bytes:
-            logger.warning("byte_fetch refused %s: declared %d bytes above the cap", safe_url, declared)
-            return None
-        over = False
-        try:
-            with tempfile.NamedTemporaryFile(delete=False) as tmp:
-                tmp_path = Path(tmp.name)
-                total = 0
-                async for chunk in response.aiter_content():
-                    data = bytes(chunk)
-                    total += len(data)
-                    if total > max_bytes:
-                        logger.warning("byte_fetch stopped %s: body passed the cap", safe_url)
-                        over = True
-                        break
-                    tmp.write(data)
-        except Exception:
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+            try:
+                await drain_inflated(response, max_bytes, tmp.write, require_whole=True)
+            except BodyOverLimitError:
+                logger.warning("byte_fetch stopped %s: body passed the cap", safe_url)
+                over = True
+    except BaseException:
+        if tmp_path is not None:
             _discard_spool(tmp_path)
-            raise
-        if over:
-            _discard_spool(tmp_path)
-            return None
-        return tmp_path
-    finally:
-        await response.aclose()
+        raise
+    if over:
+        _discard_spool(tmp_path)
+        raise DocumentTooLargeError(safe_url)
+    return tmp_path

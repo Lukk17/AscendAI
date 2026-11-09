@@ -34,6 +34,7 @@ _PHRASE_IDS = [
     "akamai_access_denied",
     "perimeterx_automation_tools",
     "ddosguard_title",
+    "generic_blocked_by_network_security",
 ]
 
 _LANGUAGE_CODES = [
@@ -165,6 +166,31 @@ def test_login_title_patterns_verbatim() -> None:
     assert list(raw["login_title_patterns"]) == ["sign in", "log in", "login", "sign into", "create account"]
 
 
+def test_login_path_segments_verbatim() -> None:
+    # given
+    raw = _raw()
+
+    # when / then
+    assert list(raw["login_path_segments"]) == ["login", "log-in", "signin", "sign-in", "logon"]
+
+
+def test_login_return_parameters_verbatim() -> None:
+    # given
+    raw = _raw()
+
+    # when / then
+    assert list(raw["login_return_parameters"]) == [
+        "next",
+        "dest",
+        "return_to",
+        "returnTo",
+        "redirect",
+        "redirect_uri",
+        "continue",
+        "from",
+    ]
+
+
 def test_marker_match_key_shapes() -> None:
     """Each signal's markers carry the match key the signal reads, so the loader
     can resolve them once at import without a silent fallback."""
@@ -232,7 +258,7 @@ def test_phrase_by_language_table(capsys: pytest.CaptureFixture[str]) -> None:
     # then
     out = capsys.readouterr().out
     assert len(_LANGUAGE_CODES) == 30
-    assert len(_PHRASE_IDS) == 16
+    assert len(_PHRASE_IDS) == 17
     assert challenge_signals._NORMALISED_PHRASES
     for phrase_id in _PHRASE_IDS:
         assert phrase_id in out

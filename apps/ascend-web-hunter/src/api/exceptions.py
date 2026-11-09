@@ -71,8 +71,13 @@ class NoVNCFlowBusyException(Exception):
         super().__init__(self.message)
 
 
-class InvalidProfileError(ValueError):
-    pass
+class NoVNCFlowNotFoundError(Exception):
+    """Raised when no open intervention window carries the given flow_id."""
+
+    def __init__(self, flow_id: str):
+        self.flow_id = flow_id
+        self.message = f"No open intervention window has flow_id {flow_id}."
+        super().__init__(self.message)
 
 
 class NoCookiesForDomainError(ValueError):
@@ -94,7 +99,7 @@ class TierDisabledError(ValueError):
 
 class ExtractionNotConfiguredError(Exception):
     """Raised when `output_format` `schema` is asked for while no extraction
-    endpoint is configured (design D3).
+    endpoint is configured.
 
     The message names the missing setting, so the REST problem body `detail`
     and the MCP tool error text name it too.
@@ -108,7 +113,7 @@ class ExtractionNotConfiguredError(Exception):
 
 class ScreenshotUnavailableError(Exception):
     """Raised when `output_format` `screenshot` is asked for while no browser
-    tier can produce one (design D7).
+    tier can produce one.
     """
 
     def __init__(self, reason: str = "no browser tier is enabled"):
@@ -119,7 +124,7 @@ class ScreenshotUnavailableError(Exception):
 
 class FormatCombinationError(Exception):
     """Raised when `include_links` is combined with an `output_format` other
-    than `text` (design D7).
+    than `text`.
 
     The message names the combination, so the REST problem body `detail` and
     the MCP tool error text name it too.
@@ -136,7 +141,7 @@ class FormatCombinationError(Exception):
 
 class ExtractionFailedError(Exception):
     """Raised when the extraction model's answer is not JSON that validates
-    against the caller's schema (design D5).
+    against the caller's schema.
 
     An expected upstream code: it reports the model's answer, not a defect of
     this service, so its detail keeps what failed validation.

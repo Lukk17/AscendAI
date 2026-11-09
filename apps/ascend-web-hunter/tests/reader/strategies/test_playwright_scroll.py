@@ -65,12 +65,12 @@ async def test_scroll_called_configured_number_of_times() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch("src.reader.strategies.playwright_strategy.proxy_provider.for_playwright", return_value=None),
-        patch("src.reader.strategies.playwright_strategy.settings.SCROLL_ITERATIONS", scroll_iters),
-        patch("src.reader.strategies.playwright_strategy.settings.SCROLL_STEP_PX", scroll_step),
+        patch("src.reader.strategies.browser_read.settings.SCROLL_ITERATIONS", scroll_iters),
+        patch("src.reader.strategies.browser_read.settings.SCROLL_STEP_PX", scroll_step),
     ):
         strategy = PlaywrightStrategy(lambda: "UA", _make_url_validator())
         await strategy.get_html("https://example.com/page")
@@ -103,12 +103,12 @@ async def test_scroll_uses_configured_step_px() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch("src.reader.strategies.playwright_strategy.proxy_provider.for_playwright", return_value=None),
-        patch("src.reader.strategies.playwright_strategy.settings.SCROLL_ITERATIONS", 1),
-        patch("src.reader.strategies.playwright_strategy.settings.SCROLL_STEP_PX", scroll_step),
+        patch("src.reader.strategies.browser_read.settings.SCROLL_ITERATIONS", 1),
+        patch("src.reader.strategies.browser_read.settings.SCROLL_STEP_PX", scroll_step),
     ):
         strategy = PlaywrightStrategy(lambda: "UA", _make_url_validator())
         await strategy.get_html("https://example.com/page")

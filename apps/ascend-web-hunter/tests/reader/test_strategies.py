@@ -1,3 +1,6 @@
+import asyncio
+import threading
+from collections.abc import AsyncIterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -6,12 +9,20 @@ from crawlee.statistics import FinalStatistics
 from playwright.async_api import Error as PlaywrightError
 
 from src.api.exceptions import ChallengeDetectedException
+from src.config.config import settings
+from src.reader.cloudflare.challenge_signals import ChallengeVerdict, assess
+from src.reader.strategies import browser_read
+from src.reader.strategies.base_strategy import FetchedHtml
 from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
+from src.reader.strategies.browser_read import PageNotMeasuredError, PageTooLargeError
 from src.reader.strategies.crawlee_strategy import CrawleeStrategy
 from src.reader.strategies.curl_cffi_fetcher import fetch_with_curl_cffi
+from src.reader.strategies.main_frame_response import MainFrameResponses
 from src.reader.strategies.playwright_strategy import PlaywrightStrategy
 from src.reader.strategies.trafilatura_strategy import TrafilaturaStrategy
 from tests.reader.crawlee_test_support import final_statistics
+from tests.reader.login_title_pages import SIGN_IN_HTML, WIKIPEDIA_LOGIN_ARTICLE_HTML
+from tests.reader.strategies.conftest import make_streaming
 
 SAMPLE_HTML = "<html><body><p>Text</p><script>bad</script></body></html>"
 
@@ -34,9 +45,9 @@ class _MockResponse:
         self, html: str = SAMPLE_HTML, status: int = 200, headers: dict[str, str] | None = None
     ) -> None:
         self.status_code = status
-        self.text = html
         self.url = "http://test.com"
         self.headers: dict[str, str] = dict(headers or {})
+        make_streaming(self, html)
 
     def raise_for_status(self) -> Any:
         return None
@@ -137,6 +148,39 @@ async def test_curl_cffi_fetcher_raises_on_login_wall(
 
 
 @pytest.mark.asyncio
+async def test_curl_cffi_fetcher_raises_login_on_a_sign_in_page_with_an_email_first_form(
+    patch_cookies_none: Any, pinned_public_host: Any
+) -> None:
+    # given
+    session = _make_curl_session(_MockResponse(SIGN_IN_HTML))
+
+    # when
+    with (
+        patch("src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession", return_value=session),
+        pytest.raises(ChallengeDetectedException) as exc,
+    ):
+        await fetch_with_curl_cffi("http://test.com", lambda: "ua", "TestStrat")
+
+    # then
+    assert exc.value.intervention_type == "login"
+
+
+@pytest.mark.asyncio
+async def test_curl_cffi_fetcher_returns_a_page_titled_login_with_rich_article_text(
+    patch_cookies_none: Any, pinned_public_host: Any
+) -> None:
+    # given
+    session = _make_curl_session(_MockResponse(WIKIPEDIA_LOGIN_ARTICLE_HTML))
+
+    # when
+    with patch("src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession", return_value=session):
+        result = await fetch_with_curl_cffi("http://test.com", lambda: "ua", "TestStrat")
+
+    # then
+    assert result == WIKIPEDIA_LOGIN_ARTICLE_HTML
+
+
+@pytest.mark.asyncio
 async def test_curl_cffi_fetcher_raises_on_waf_block(
     patch_cookies_none: Any, pinned_public_host: Any
 ) -> None:
@@ -188,6 +232,38 @@ async def test_curl_cffi_fetcher_passes_status_headers_and_cookie_names_to_verdi
     assert mock_assess.call_args.args[0] == 200
     assert mock_assess.call_args.args[2] == headers
     assert mock_assess.call_args.args[3] == ["datadome"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("max_bytes", [None, 1024])
+async def test_curl_cffi_fetcher_answers_empty_when_the_body_never_ends(
+    max_bytes: int | None,
+    patch_cookies_none: Any,
+    pinned_public_host: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    monkeypatch.setattr(settings, "EXTRACT_TIMEOUT", 0.01)
+    response = _MockResponse()
+
+    async def never_ending() -> AsyncIterator[bytes]:
+        yield b"<html>"
+        await asyncio.Event().wait()
+
+    response.aiter_content = never_ending  # type: ignore[attr-defined]
+
+    # when
+    with patch(
+        "src.reader.strategies.curl_cffi_fetcher.requests.AsyncSession",
+        return_value=_make_curl_session(response),
+    ):
+        async with asyncio.timeout(5):
+            body = await fetch_with_curl_cffi(
+                "http://test.com", lambda: "ua", "TestStrat", max_bytes=max_bytes
+            )
+
+    # then
+    assert body == ""
 
 
 @pytest.mark.asyncio
@@ -305,7 +381,7 @@ async def test_trafilatura_extract_falls_back_to_readability_when_trafilatura_re
         result = await strategy.extract("http://test.com")
 
     # then
-    assert result == "<p>Fallback content</p>"
+    assert result == "Fallback content"
 
 
 # Playwright strategy: use the singleton browser_pool which the conftest already mocked.
@@ -333,6 +409,7 @@ def _wire_browser_pool(monkeypatch: Any, page: Any) -> None:
     context.new_page = AsyncMock(return_value=page)
     context.close = AsyncMock()
     context.cookies = AsyncMock(return_value=[])
+    context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
     context.route = AsyncMock()
     context.route_web_socket = None
     page.context = context
@@ -362,7 +439,7 @@ async def test_playwright_extract_happy_path(monkeypatch: Any) -> None:
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=accepted,
         ),
         patch(
@@ -370,7 +447,7 @@ async def test_playwright_extract_happy_path(monkeypatch: Any) -> None:
             return_value="Extracted",
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             return_value=0.0,
         ),
     ):
@@ -399,7 +476,7 @@ async def test_playwright_extract_returns_empty_when_trafilatura_none(monkeypatc
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=accepted,
         ),
         patch(
@@ -407,7 +484,7 @@ async def test_playwright_extract_returns_empty_when_trafilatura_none(monkeypatc
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             return_value=0.0,
         ),
     ):
@@ -450,7 +527,7 @@ async def test_playwright_raises_challenge_on_login_wall_during_poll(monkeypatch
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             return_value=0.0,
         ),
     ):
@@ -478,7 +555,7 @@ async def test_playwright_raises_challenge_on_blocked_during_poll(monkeypatch: A
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             side_effect=perf_values,
         ),
     ):
@@ -513,7 +590,7 @@ async def test_playwright_waits_for_challenge_to_auto_clear_then_succeeds(monkey
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             side_effect=[wall, wall, cleared, cleared],
         ),
         patch(
@@ -521,7 +598,7 @@ async def test_playwright_waits_for_challenge_to_auto_clear_then_succeeds(monkey
             return_value="Extracted",
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             return_value=0.0,
         ),
     ):
@@ -549,7 +626,7 @@ async def test_playwright_escalates_when_challenge_never_clears(monkeypatch: Any
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             side_effect=perf_values,
         ),
     ):
@@ -578,7 +655,7 @@ async def test_playwright_still_blocked_after_deadline_raises_not_returns_html(m
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             side_effect=perf_values,
         ),
     ):
@@ -616,11 +693,11 @@ async def test_playwright_passes_initial_response_headers_to_post_render_assess(
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             wraps=real_assess,
         ) as mock_assess,
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             side_effect=perf_values,
         ),
     ):
@@ -658,11 +735,11 @@ async def test_playwright_raises_late_login_wall(monkeypatch: Any) -> Any:
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             side_effect=[cleared, login_wall],
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             return_value=0.0,
         ),
     ):
@@ -696,7 +773,7 @@ async def test_playwright_retries_after_transient_content_read_error(monkeypatch
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=accepted,
         ),
         patch(
@@ -704,7 +781,7 @@ async def test_playwright_retries_after_transient_content_read_error(monkeypatch
             return_value="Extracted",
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             return_value=0.0,
         ),
     ):
@@ -736,7 +813,7 @@ async def test_playwright_retries_after_transient_networkidle_wait_error(monkeyp
             return_value=MagicMock(apply_stealth_async=AsyncMock()),
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=accepted,
         ),
         patch(
@@ -744,7 +821,7 @@ async def test_playwright_retries_after_transient_networkidle_wait_error(monkeyp
             return_value="Extracted",
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.time.perf_counter",
+            "src.reader.strategies.browser_read.time.perf_counter",
             return_value=0.0,
         ),
     ):
@@ -804,6 +881,7 @@ async def test_crawlee_strategy_raises_challenge_on_login_wall() -> None:
     captured: dict[str, Any] = {}
     fake_context = MagicMock()
     fake_context.page.content = AsyncMock(return_value=html)
+    fake_context.page.url = "http://test.com"
 
     # when
     with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
@@ -821,6 +899,116 @@ async def test_crawlee_strategy_raises_challenge_on_login_wall() -> None:
 
 
 @pytest.mark.asyncio
+async def test_crawlee_strategy_returns_a_page_titled_login_with_rich_article_text() -> None:
+    # given
+    async def fake_run(urls: list[str]) -> FinalStatistics:
+        await captured["default"](fake_context)
+        return final_statistics(1)
+
+    captured: dict[str, Any] = {}
+    fake_context = MagicMock()
+    fake_context.page.content = AsyncMock(return_value=WIKIPEDIA_LOGIN_ARTICLE_HTML)
+    fake_context.page.url = "http://test.com"
+
+    # when
+    with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
+        mock_crawler = MagicMock()
+        mock_crawler.run = AsyncMock(side_effect=fake_run)
+        mock_crawler.router.default_handler = lambda fn: captured.setdefault("default", fn)
+        mock_crawler.pre_navigation_hook = lambda fn: captured.setdefault("pre_nav", fn)
+        mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
+        strategy = CrawleeStrategy(MagicMock())
+        html = await strategy.get_html("http://test.com")
+
+    # then
+    assert html == WIKIPEDIA_LOGIN_ARTICLE_HTML
+
+
+@pytest.mark.asyncio
+async def test_crawlee_strategy_raises_a_login_wall_when_the_read_ended_on_a_login_path() -> None:
+    # given
+    async def fake_run(urls: list[str]) -> FinalStatistics:
+        await captured["default"](fake_context)
+        return final_statistics(1)
+
+    captured: dict[str, Any] = {}
+    fake_context = MagicMock()
+    fake_context.page.content = AsyncMock(return_value=WIKIPEDIA_LOGIN_ARTICLE_HTML)
+    fake_context.page.url = "http://test.com/login/?dest=%2Fpage"
+
+    # when
+    with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
+        mock_crawler = MagicMock()
+        mock_crawler.run = AsyncMock(side_effect=fake_run)
+        mock_crawler.router.default_handler = lambda fn: captured.setdefault("default", fn)
+        mock_crawler.pre_navigation_hook = lambda fn: captured.setdefault("pre_nav", fn)
+        mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
+        strategy = CrawleeStrategy(MagicMock())
+        with pytest.raises(ChallengeDetectedException) as exc:
+            await strategy.get_html("http://test.com/page")
+
+    # then
+    assert exc.value.intervention_type == "login"
+
+
+@pytest.mark.asyncio
+async def test_crawlee_handle_request_keeps_the_address_the_snapshot_was_loaded_from() -> None:
+    # given
+    from crawlee.crawlers import AdaptivePlaywrightCrawlingContext
+
+    strategy = CrawleeStrategy(MagicMock())
+    context = MagicMock(spec=AdaptivePlaywrightCrawlingContext)
+    context.page = MagicMock()
+    context.page.content = AsyncMock(side_effect=RuntimeError("page detached"))
+    context.get_snapshot = AsyncMock(return_value=MagicMock(html="<html>snapshot</html>"))
+    context.request = MagicMock(url="http://test.com/page", loaded_url="http://test.com/login/")
+    result_container: dict[str, Any] = {"html": "", "status": 200, "headers": {}}
+
+    # when
+    await strategy._handle_crawlee_request(context, result_container)
+
+    # then
+    assert result_container["final_url"] == "http://test.com/login/"
+
+
+@pytest.mark.asyncio
+async def test_a_crawlee_verdict_runs_off_the_event_loop() -> None:
+    # given
+    html = "<html><body><p>" + "word " * 200 + "</p></body></html>"
+    threads: list[threading.Thread] = []
+
+    def recording(*args: Any, **kwargs: Any) -> ChallengeVerdict:
+        threads.append(threading.current_thread())
+
+        return assess(*args, **kwargs)
+
+    async def fake_run(urls: list[str]) -> FinalStatistics:
+        await captured["default"](fake_context)
+        return final_statistics(1)
+
+    captured: dict[str, Any] = {}
+    fake_context = MagicMock()
+    fake_context.page.content = AsyncMock(return_value=html)
+    fake_context.page.url = "http://test.com"
+
+    # when
+    with (
+        patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls,
+        patch("src.reader.strategies.crawlee_strategy.assess", new=recording),
+    ):
+        mock_crawler = MagicMock()
+        mock_crawler.run = AsyncMock(side_effect=fake_run)
+        mock_crawler.router.default_handler = lambda fn: captured.setdefault("default", fn)
+        mock_crawler.pre_navigation_hook = lambda fn: captured.setdefault("pre_nav", fn)
+        mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
+        await CrawleeStrategy(MagicMock()).get_html("http://test.com")
+
+    # then
+    assert threads
+    assert threads[0] is not threading.current_thread()
+
+
+@pytest.mark.asyncio
 async def test_crawlee_strategy_raises_challenge_on_waf_block() -> None:
     """A wall behind the crawler escalates with the captcha type and the vendor."""
     # given
@@ -834,6 +1022,7 @@ async def test_crawlee_strategy_raises_challenge_on_waf_block() -> None:
     captured: dict[str, Any] = {}
     fake_context = MagicMock()
     fake_context.page.content = AsyncMock(return_value=html)
+    fake_context.page.url = "http://test.com"
 
     # when
     with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
@@ -852,10 +1041,18 @@ async def test_crawlee_strategy_raises_challenge_on_waf_block() -> None:
     assert exc.value.verdict.wall is True
 
 
+def _recorded_main_frame_responses(response: MagicMock) -> MainFrameResponses:
+    page = MagicMock()
+    responses = MainFrameResponses(page)
+    page.on.call_args.args[1](response)
+
+    return responses
+
+
 @pytest.mark.asyncio
-async def test_crawlee_result_container_carries_final_status_and_headers() -> None:
-    """The result container carries the final status and headers so the verdict
-    sees the same response the crawler rendered."""
+async def test_crawlee_result_container_carries_final_status_and_all_headers() -> None:
+    """The result container carries the final status and every header, set-cookie included,
+    so the verdict sees the same response the crawler rendered."""
     # given
     from crawlee.crawlers import AdaptivePlaywrightCrawlingContext
 
@@ -863,16 +1060,23 @@ async def test_crawlee_result_container_carries_final_status_and_headers() -> No
     context = MagicMock(spec=AdaptivePlaywrightCrawlingContext)
     context.page = MagicMock()
     context.page.content = AsyncMock(return_value="<html>final</html>")
-    last_response = {"status": 403, "headers": {"cf-mitigated": "challenge"}}
-    result_container: dict[str, Any] = {"html": "", "status": 200, "headers": {}}
+    all_headers = {"cf-mitigated": "challenge", "set-cookie": "__cf_bm=abc; Path=/"}
+    response = _crawlee_response(403, all_headers)
+    response.headers = {"cf-mitigated": "challenge"}
+    result_container: dict[str, Any] = {
+        "html": "",
+        "status": 200,
+        "headers": {},
+        "responses": _recorded_main_frame_responses(response),
+    }
 
     # when
-    await strategy._handle_crawlee_request(context, result_container, last_response)
+    await strategy._handle_crawlee_request(context, result_container)
 
     # then
     assert result_container["html"] == "<html>final</html>"
     assert result_container["status"] == 403
-    assert result_container["headers"] == {"cf-mitigated": "challenge"}
+    assert result_container["headers"] == all_headers
 
 
 @pytest.mark.asyncio
@@ -887,7 +1091,7 @@ async def test_crawlee_handle_request_playwright_context() -> None:
     result_container: dict[str, Any] = {"html": "", "status": 200, "headers": {}}
 
     # when
-    await strategy._handle_crawlee_request(context, result_container, {})
+    await strategy._handle_crawlee_request(context, result_container)
 
     # then
     assert "playwright" in result_container["html"]
@@ -908,10 +1112,11 @@ async def test_crawlee_handle_request_falls_back_to_snapshot_when_page_content_r
     snapshot = MagicMock()
     snapshot.html = "<html>snapshot</html>"
     context.get_snapshot = AsyncMock(return_value=snapshot)
+    context.request = MagicMock(url="http://test.com", loaded_url=None)
     result_container: dict[str, Any] = {"html": "", "status": 200, "headers": {}}
 
     # when
-    await strategy._handle_crawlee_request(context, result_container, {})
+    await strategy._handle_crawlee_request(context, result_container)
 
     # then
     assert result_container["html"] == "<html>snapshot</html>"
@@ -919,35 +1124,60 @@ async def test_crawlee_handle_request_falls_back_to_snapshot_when_page_content_r
 
 
 @pytest.mark.asyncio
-async def test_crawlee_response_summary_tolerates_broken_response() -> None:
+@pytest.mark.parametrize(
+    "failure",
+    [PageTooLargeError("too large"), PageNotMeasuredError("not measured")],
+    ids=["above the cap", "not measured"],
+)
+async def test_crawlee_handle_request_fails_rather_than_snapshot_a_page_it_could_not_size(
+    failure: Exception,
+) -> None:
     # given
-    from typing import TYPE_CHECKING, cast
+    from crawlee.crawlers import AdaptivePlaywrightCrawlingContext
 
-    from src.reader.strategies.crawlee_strategy import _response_summary
+    strategy = CrawleeStrategy(MagicMock())
+    context = MagicMock(spec=AdaptivePlaywrightCrawlingContext)
+    context.page = MagicMock()
+    context.page.content = AsyncMock(return_value="<html></html>")
+    context.get_snapshot = AsyncMock()
+    result_container: dict[str, Any] = {"html": "", "status": 200, "headers": {}}
 
-    if TYPE_CHECKING:
-        from playwright.async_api import Response as PlaywrightResponse
+    # when / then
+    with (
+        patch.object(browser_read, "_page_html_length", new=AsyncMock(side_effect=failure)),
+        pytest.raises(type(failure)),
+    ):
+        await strategy._handle_crawlee_request(context, result_container)
 
-    class _BrokenHeaders:
-        @property
-        def headers(self) -> dict[str, str]:
-            raise RuntimeError("gone")
+    context.page.content.assert_not_awaited()
+    context.get_snapshot.assert_not_awaited()
 
-        @property
-        def status(self) -> int:
-            raise RuntimeError("gone")
 
-    good = MagicMock()
-    good.headers = {"cf-mitigated": "challenge"}
-    good.status = 403
+@pytest.mark.asyncio
+async def test_crawlee_handle_request_fails_when_the_main_frame_headers_cannot_be_read() -> None:
+    """A response whose headers cannot be read fails the request instead of passing as a 200."""
+    # given
+    from crawlee.crawlers import AdaptivePlaywrightCrawlingContext
 
-    # when
-    broken = _response_summary(cast("PlaywrightResponse", _BrokenHeaders()))
-    ok = _response_summary(cast("PlaywrightResponse", good))
+    strategy = CrawleeStrategy(MagicMock())
+    context = MagicMock(spec=AdaptivePlaywrightCrawlingContext)
+    context.page = MagicMock()
+    context.page.content = AsyncMock(return_value="<html>final</html>")
+    response = _crawlee_response(403, {})
+    response.all_headers = AsyncMock(
+        side_effect=PlaywrightError("Target page, context or browser has been closed")
+    )
+    result_container: dict[str, Any] = {
+        "html": "",
+        "status": 200,
+        "headers": {},
+        "responses": _recorded_main_frame_responses(response),
+    }
 
-    # then
-    assert broken == {"status": 200, "headers": {}}
-    assert ok == {"status": 403, "headers": {"cf-mitigated": "challenge"}}
+    # when / then
+    with pytest.raises(PlaywrightError):
+        await strategy._handle_crawlee_request(context, result_container)
+    assert result_container["status"] == 200
 
 
 @pytest.mark.asyncio
@@ -998,6 +1228,116 @@ async def test_crawlee_decorated_handlers_executed() -> Any:
     plain_context = MagicMock()
     plain_context.page.content = AsyncMock(return_value="<html>handled</html>")
     await container_handler(plain_context)
+
+
+def _crawlee_response(
+    status: int, headers: dict[str, str], *, navigation: bool = True, main_frame: bool = True
+) -> MagicMock:
+    response = MagicMock(status=status)
+    response.all_headers = AsyncMock(return_value=headers)
+    response.request.is_navigation_request = MagicMock(return_value=navigation)
+    response.frame.parent_frame = None if main_frame else MagicMock()
+
+    return response
+
+
+@pytest.mark.asyncio
+async def test_crawlee_verdict_ignores_subresource_and_child_frame_responses() -> None:
+    """Only main-frame document responses count as the last response, so a
+    subresource or iframe answering with a challenge header does not turn a
+    clean page into a wall."""
+    # given
+    captured: dict[str, Any] = {}
+    page = MagicMock()
+    page.content = AsyncMock(return_value=_RICH_HTML)
+    page.url = "http://test.com"
+    page.context.route = AsyncMock()
+    page.context.route_web_socket = None
+
+    def capture_default(fn: Any) -> Any:
+        captured["default"] = fn
+
+        return fn
+
+    def capture_pre_nav(fn: Any) -> Any:
+        captured["pre_nav"] = fn
+
+        return fn
+
+    async def run_crawl(_urls: list[str]) -> FinalStatistics:
+        crawl_context = MagicMock()
+        crawl_context.page = page
+        await captured["pre_nav"](crawl_context)
+        listener = next(call.args[1] for call in page.on.call_args_list if call.args[0] == "response")
+        listener(_crawlee_response(200, {}))
+        listener(_crawlee_response(403, {"cf-mitigated": "challenge"}, navigation=False))
+        listener(_crawlee_response(403, {"cf-mitigated": "challenge"}, main_frame=False))
+        await captured["default"](crawl_context)
+
+        return final_statistics(1)
+
+    with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
+        mock_crawler = MagicMock()
+        mock_crawler.run = AsyncMock(side_effect=run_crawl)
+        mock_crawler.router.default_handler = capture_default
+        mock_crawler.pre_navigation_hook = capture_pre_nav
+        mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
+
+        # when
+        html = await CrawleeStrategy(MagicMock(should_block=MagicMock(return_value=False))).get_html(
+            "http://test.com"
+        )
+
+    # then
+    assert html == _RICH_HTML
+
+
+@pytest.mark.asyncio
+async def test_crawlee_page_carries_the_validators_of_the_last_main_frame_response() -> None:
+    # given
+    captured: dict[str, Any] = {}
+    page = MagicMock()
+    page.content = AsyncMock(return_value=_RICH_HTML)
+    page.url = "http://test.com"
+    page.context.route = AsyncMock()
+    page.context.route_web_socket = None
+
+    def capture_default(fn: Any) -> Any:
+        captured["default"] = fn
+
+        return fn
+
+    def capture_pre_nav(fn: Any) -> Any:
+        captured["pre_nav"] = fn
+
+        return fn
+
+    async def run_crawl(_urls: list[str]) -> FinalStatistics:
+        crawl_context = MagicMock()
+        crawl_context.page = page
+        await captured["pre_nav"](crawl_context)
+        listener = next(call.args[1] for call in page.on.call_args_list if call.args[0] == "response")
+        listener(_crawlee_response(200, {"etag": '"c1"', "last-modified": "Sat"}))
+        listener(_crawlee_response(200, {"etag": '"script"'}, navigation=False))
+        await captured["default"](crawl_context)
+
+        return final_statistics(1)
+
+    with patch("src.reader.strategies.crawlee_strategy.AdaptivePlaywrightCrawler") as mock_crawler_cls:
+        mock_crawler = MagicMock()
+        mock_crawler.run = AsyncMock(side_effect=run_crawl)
+        mock_crawler.router.default_handler = capture_default
+        mock_crawler.pre_navigation_hook = capture_pre_nav
+        mock_crawler_cls.with_beautifulsoup_static_parser.return_value = mock_crawler
+
+        # when
+        html = await CrawleeStrategy(MagicMock(should_block=MagicMock(return_value=False))).get_html(
+            "http://test.com"
+        )
+
+    # then
+    assert isinstance(html, FetchedHtml)
+    assert (html.etag, html.last_modified) == ('"c1"', "Sat")
 
 
 @pytest.mark.asyncio

@@ -294,6 +294,12 @@
       "match": ["title"],
       "provenance": {"source": "FlareSolverr CHALLENGE_TITLES", "via": "flaresolverr-challenge-titles", "on": "2026-09-10"},
       "translations": {}
+    },
+    "generic_blocked_by_network_security": {
+      "en": "You've been blocked by network security",
+      "match": ["body"],
+      "provenance": {"source": "https://old.reddit.com/login/ block page, 403 with a large body", "via": "curl and curl_cffi", "on": "2026-11-07"},
+      "translations": {}
     }
   },
   "login_title_patterns": [
@@ -302,5 +308,22 @@
     "login",
     "sign into",
     "create account"
+  ],
+  "login_path_segments": [
+    "login",
+    "log-in",
+    "signin",
+    "sign-in",
+    "logon"
+  ],
+  "login_return_parameters": [
+    "next",
+    "dest",
+    "return_to",
+    "returnTo",
+    "redirect",
+    "redirect_uri",
+    "continue",
+    "from"
   ]
 }

@@ -121,7 +121,7 @@ async def test_the_read_runs_the_tier_it_was_asked_for() -> Any:
     # when
     with (
         patch(
-            "src.reader.web_reader.cookie_manager.has_auth_cookies",
+            "src.reader.web_reader.cookie_manager.has_auth_state",
             new=AsyncMock(return_value=False),
         ),
         patch.object(reader, "_execute_strategy", side_effect=_execute),

@@ -1,4 +1,4 @@
-"""Self-healing per-domain CSS selector recipes (design D4).
+"""Self-healing per-domain CSS selector recipes.
 
 Key ``recipe:{registrable_domain}:{sha256 of canonical schema}`` in Redis,
 TTL ``RECIPE_TTL_SECONDS``. A replay runs the stored selectors with
@@ -6,7 +6,12 @@ TTL ``RECIPE_TTL_SECONDS``. A replay runs the stored selectors with
 replay that fails validation, or that leaves a required field empty, deletes
 the recipe so the caller runs the model again. Selectors are plain CSS
 strings, never JavaScript and never XPath, and a selector longer than
-``RECIPE_SELECTOR_MAX_CHARS`` is never stored.
+``RECIPE_SELECTOR_MAX_CHARS`` is never stored. A recipe is stored only when
+its selectors, replayed on the page they came from, give exactly the values the
+model returned. A recipe with a selector that
+names the whole document (its first match is ``html``, ``head`` or ``body``,
+or holds the whole text of the page) is never stored and never replayed,
+because any page would replay it into an object that still validates.
 """
 
 import json
@@ -23,9 +28,11 @@ from src.reader.schema_extraction import sanitize_selectors
 
 logger = logging.getLogger(__name__)
 
+_DOCUMENT_TAGS = frozenset({"html", "head", "body"})
+
 
 def recipe_key(domain: str, digest: str) -> str:
-    """Redis key shape for one domain and schema (design D4)."""
+    """Redis key shape for one domain and schema."""
     return f"recipe:{domain}:{digest}"
 
 
@@ -70,19 +77,62 @@ async def lookup(domain: str, digest: str) -> dict[str, str] | None:
     return selectors
 
 
-async def store(domain: str, digest: str, selectors: dict[str, str]) -> bool:
-    """Store selectors that passed `sanitize_selectors`, honouring the TTL."""
+def _normalised_text(element: Any) -> str:
+    return " ".join(element.text_content().split())
+
+
+def names_whole_document(page_html: str, selectors: dict[str, str]) -> bool:
+    """True when a selector's first match on *page_html* is the document rather than one field.
+
+    The selectors already passed `sanitize_selectors`. A page that cannot be
+    parsed counts as matched, so nothing unverified is stored.
+    """
+    try:
+        tree = lxml_html.document_fromstring(page_html)
+    except Exception:
+        return True
+    bodies = tree.xpath("//body")
+    whole_text = _normalised_text(bodies[0] if bodies else tree)
+    for selector in selectors.values():
+        matches = tree.cssselect(selector)
+        if not matches:
+            continue
+        first = matches[0]
+        if first.tag in _DOCUMENT_TAGS or (whole_text and _normalised_text(first) == whole_text):
+            return True
+
+    return False
+
+
+async def store(
+    domain: str,
+    digest: str,
+    selectors: dict[str, str],
+    page_html: str,
+    *,
+    expected: dict[str, Any],
+    schema: dict[str, Any],
+) -> bool:
+    """Store selectors that pass `sanitize_selectors` and replay *expected* on *page_html*, with the TTL."""
     kept = sanitize_selectors(selectors)
     if not kept:
+        return False
+    if names_whole_document(page_html, kept):
+        logger.warning("recipe_store: refusing a document-wide recipe for %s", domain)
+
+        return False
+    if build_object(page_html, kept, schema) != expected:
+        logger.info("recipe_store: refusing a recipe that does not replay the model values for %s", domain)
+
         return False
     client = recipe_redis()
     if client is None:
         return False
     try:
-        await client.setex(
+        await client.set(
             recipe_key(domain, digest),
-            settings.RECIPE_TTL_SECONDS,
             json.dumps({"selectors": kept}),
+            ex=settings.RECIPE_TTL_SECONDS,
         )
     except Exception:
         logger.warning("recipe_store: store failed for %s", domain)
@@ -104,7 +154,7 @@ async def delete(domain: str, digest: str) -> None:
 
 
 def apply_selectors(page_html: str, selectors: dict[str, str]) -> dict[str, Any]:
-    """Run stored selectors against page HTML, never raising (design D4)."""
+    """Run stored selectors against page HTML, never raising."""
     try:
         tree = lxml_html.fromstring(page_html)
     except Exception:
@@ -137,7 +187,7 @@ def replay_valid(obj: dict[str, Any], schema: dict[str, Any]) -> bool:
 
 
 def coerce_field(value: Any, field_schema: dict[str, Any]) -> Any:
-    """Coerce replayed selector text to the schema's scalar type (design D4)."""
+    """Coerce replayed selector text to the schema's scalar type."""
     if not isinstance(value, str):
         return value
     declared = field_schema.get("type")
@@ -187,6 +237,7 @@ __all__ = [
     "coerce_field",
     "delete",
     "lookup",
+    "names_whole_document",
     "recipe_key",
     "recipe_redis",
     "replay_valid",

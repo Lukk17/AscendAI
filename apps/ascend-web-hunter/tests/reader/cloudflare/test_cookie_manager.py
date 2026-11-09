@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src.config.config import settings
 from src.reader.cloudflare.cookie_manager import CookieManager
 
 
@@ -155,14 +156,15 @@ async def test_save_via_redis_success() -> None:
     # given
     manager = _fresh_manager()
     mock_redis = AsyncMock()
-    mock_redis.setex = AsyncMock()
+    mock_redis.set = AsyncMock()
     manager.redis_client = mock_redis
 
     # when
     await manager.save_session_data("https://example.com", {"k": "v"}, "UA")
 
     # then
-    mock_redis.setex.assert_awaited_once()
+    mock_redis.set.assert_awaited_once()
+    assert mock_redis.set.await_args.kwargs["ex"] == settings.SESSION_AUTH_TTL_SECONDS
 
 
 @pytest.mark.asyncio
@@ -170,7 +172,7 @@ async def test_save_via_redis_error_falls_back_to_memory() -> None:
     # given
     manager = _fresh_manager()
     mock_redis = AsyncMock()
-    mock_redis.setex = AsyncMock(side_effect=RuntimeError("down"))
+    mock_redis.set = AsyncMock(side_effect=RuntimeError("down"))
     manager.redis_client = mock_redis
 
     # when
@@ -375,3 +377,34 @@ async def test_schemeless_url_resolves_to_same_apex_as_scheme_qualified() -> Non
     # then
     assert data is not None
     assert data["cookies"]["k"] == "v"
+
+
+@pytest.mark.asyncio
+async def test_a_session_address_whose_user_info_looks_like_a_port_is_keyed_by_its_real_host() -> None:
+    # given
+    manager = _fresh_manager()
+    mock_redis = AsyncMock()
+    mock_redis.delete = AsyncMock(return_value=1)
+    manager.redis_client = mock_redis
+
+    # when
+    await manager.clear_session("https://x.com:443@y.com/")
+
+    # then
+    assert CookieManager.registrable_domain("https://x.com:443@y.com/") == "y.com"
+    mock_redis.delete.assert_awaited_once_with("session:y.com:default")
+
+
+@pytest.mark.parametrize(
+    ("address", "domain"),
+    [
+        ("https://WWW.Example.COM:8443/path", "example.com"),
+        ("www.shop-site.com", "shop-site.com"),
+        ("example.com:8080/path", "example.com"),
+        ("", ""),
+        ("/relative/path", ""),
+    ],
+)
+def test_registrable_domain_reads_the_host_of_full_and_bare_addresses(address: str, domain: str) -> None:
+    # when / then
+    assert CookieManager.registrable_domain(address) == domain

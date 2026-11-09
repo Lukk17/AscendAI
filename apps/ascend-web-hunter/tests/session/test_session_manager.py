@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.api.exceptions import HumanInterventionRequiredException
-from src.session.session_manager import SessionManager
+from src.session.session_manager import EstablishedFlow, SessionManager
 
 
 @pytest.fixture
@@ -243,7 +243,7 @@ async def test_establish_returns_vnc_url(mgr: SessionManager) -> None:
         result = await mgr.establish("https://example.com/login")
 
     # then
-    assert result == "http://vnc:7900"
+    assert result.vnc_url == "http://vnc:7900"
 
 
 @pytest.mark.asyncio
@@ -266,7 +266,7 @@ async def test_establish_forwards_named_profile_to_novnc_strategy(mgr: SessionMa
             result = await mgr.establish("https://example.com", "work")
 
     # then
-    assert result == "http://vnc:7900"
+    assert result.vnc_url == "http://vnc:7900"
     mock_init.assert_called_once_with("work")
 
 
@@ -300,3 +300,95 @@ async def test_establish_raises_runtime_error_when_no_intervention(mgr: SessionM
     ):
         with pytest.raises(RuntimeError, match="NoVNC flow did not surface a VNC URL"):
             await mgr.establish("https://example.com/login")
+
+
+@pytest.mark.asyncio
+async def test_establish_returns_the_flow_details_of_the_intervention(mgr: SessionManager) -> None:
+    """A joined flow answers its own flow_id, window and intervention type, and
+    the intervention is counted with its real labels."""
+    # given
+    from prometheus_client import REGISTRY
+
+    window = {"slot": 1, "x": 48, "y": 48, "width": 1280, "height": 800}
+    exc = HumanInterventionRequiredException(
+        "http://vnc:7900", "captcha", flow_id="9f2c41ab77de", joined=True, window=window
+    )
+    labels = {"intervention_type": "captcha", "joined": "true"}
+    before = REGISTRY.get_sample_value("human_intervention_total", labels) or 0.0
+
+    # when
+    with patch(
+        "src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html",
+        new=AsyncMock(side_effect=exc),
+    ):
+        result = await mgr.establish("https://example.com")
+
+    # then
+    assert result == EstablishedFlow(
+        vnc_url="http://vnc:7900",
+        intervention_type="captcha",
+        flow_id="9f2c41ab77de",
+        joined=True,
+        window=window,
+    )
+    assert (REGISTRY.get_sample_value("human_intervention_total", labels) or 0.0) - before == 1.0
+
+
+@pytest.mark.asyncio
+async def test_establish_opens_a_login_flow(mgr: SessionManager) -> None:
+    # given
+    exc = HumanInterventionRequiredException("http://vnc:7900", "login", flow_id="abc", window=None)
+    get_html = AsyncMock(side_effect=exc)
+
+    # when
+    with patch("src.reader.strategies.novnc_strategy.NoVNCStrategy.get_html", new=get_html):
+        await mgr.establish("https://example.com/")
+
+    # then
+    assert get_html.await_args is not None
+    assert get_html.await_args.kwargs == {"intervention_type": "login"}
+
+
+_USER_INFO_URL = "https://reader:hunter2@example.com/feed?X-Amz-Signature=secret"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("ttl_remaining", "storage_state"),
+    [
+        (0.0, None),
+        (60.0, None),
+        (60.0, {"cookies": [{"name": "session", "value": "s", "domain": "example.com"}], "origins": []}),
+    ],
+    ids=["expired", "no-login-state", "slid"],
+)
+async def test_session_log_lines_name_the_site_without_user_info(
+    mgr: SessionManager,
+    caplog: pytest.LogCaptureFixture,
+    ttl_remaining: float,
+    storage_state: dict[str, object] | None,
+) -> None:
+    # given
+    import logging
+
+    # when
+    with (
+        caplog.at_level(logging.DEBUG),
+        patch(
+            "src.session.session_manager.cookie_manager.get_auth_ttl_remaining",
+            new=AsyncMock(return_value=ttl_remaining),
+        ),
+        patch(
+            "src.session.session_manager.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value=storage_state),
+        ),
+        patch("src.session.session_manager.cookie_manager.slide_auth_ttl", new=AsyncMock()),
+        patch("src.session.session_manager.cookie_manager.clear_session", new=AsyncMock(return_value=True)),
+    ):
+        await mgr.validate(_USER_INFO_URL)
+        await mgr.clear(_USER_INFO_URL)
+
+    # then
+    assert "https://example.com/feed" in caplog.text
+    assert "hunter2" not in caplog.text
+    assert "X-Amz-Signature" not in caplog.text

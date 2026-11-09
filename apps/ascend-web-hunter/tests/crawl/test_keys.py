@@ -2,7 +2,7 @@ import re
 
 from fakeredis.aioredis import FakeRedis
 
-from src.crawl.frontier import Frontier
+from src.crawl.frontier import Frontier, claim_entry
 from src.crawl.keys import (
     RUNNABLE_KEY,
     claims_key,
@@ -15,6 +15,7 @@ from src.crawl.keys import (
     runnable_member,
     seen_key,
 )
+from src.crawl.models import CrawlRequest
 from src.crawl.result_store import recrawl_scope
 
 
@@ -72,6 +73,10 @@ async def test_job_writes_only_own_tenant_keys() -> None:
         member=runnable_member("acme", "j1"),
         max_expiries=2,
         updated_at="2026-10-19T00:00:00+00:00",
+        tenant_id="acme",
+        job_id="j1",
+        domain="example.com",
+        robots_skip_factor=10,
     )
     await frontier.finish(
         job_key=job_key("acme", "j1"),
@@ -79,7 +84,7 @@ async def test_job_writes_only_own_tenant_keys() -> None:
         claims_key=claims_key("acme", "j1"),
         pages_key=pages_key("acme", "j1"),
         runnable_key=RUNNABLE_KEY,
-        entry="0\thttps://example.com/",
+        entry=claim_entry(0, "example.com", "https://example.com/"),
         outcome="ok",
         page_line='{"url": "https://example.com/"}',
         max_depth=2,
@@ -91,6 +96,7 @@ async def test_job_writes_only_own_tenant_keys() -> None:
         links_json="[]",
         updated_at="2026-10-19T00:00:00+00:00",
         member=runnable_member("acme", "j1"),
+        robots_skip_factor=10,
     )
 
     # then every key matches the tenant pattern and equals a D13 shape
@@ -110,4 +116,5 @@ async def test_job_writes_only_own_tenant_keys() -> None:
     }
     for name in tenant_names:
         assert any(re.fullmatch(shape, name) for shape in shapes), name
-    assert recrawl_scope(["https://example.com/"], []) == recrawl_scope(["https://example.com/"], [])
+    request = CrawlRequest(seeds=["https://example.com/"])  # type: ignore[list-item]
+    assert re.fullmatch(r"[0-9a-f]{64}", recrawl_scope(request)) is not None

@@ -5,6 +5,7 @@ import fnmatch
 import json
 import time
 from collections.abc import AsyncIterator
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -26,6 +27,7 @@ class FakeRedis:
     def __init__(self) -> None:
         self._data: dict[str, tuple[str, float | None]] = {}
         self.fail_on: set[str] = set()
+        self.yield_on_set = False
 
     def _purge(self, name: str) -> None:
         entry = self._data.get(name)
@@ -48,6 +50,8 @@ class FakeRedis:
     ) -> bool | None:
         if "set" in self.fail_on:
             raise RuntimeError("boom-set")
+        if self.yield_on_set:
+            await asyncio.sleep(0)
         if nx and self._alive(name):
             return None
         if xx and not self._alive(name):
@@ -68,6 +72,8 @@ class FakeRedis:
     async def eval(self, script: str, numkeys: int, *keys_and_args: str) -> int:
         if "eval" in self.fail_on:
             raise RuntimeError("boom-eval")
+        if len(keys_and_args) == 4:
+            return await self._takeover(*keys_and_args)
         key = keys_and_args[0]
         flow_id = keys_and_args[1]
         raw = await self.get(key)
@@ -77,6 +83,13 @@ class FakeRedis:
             return 1
 
         return 0
+
+    async def _takeover(self, key: str, expected: str, value: str, px: str | int) -> int:
+        if await self.get(key) != expected:
+            return 0
+        self._data[key] = (value, time.monotonic() + int(px) / 1000.0)
+
+        return 1
 
     async def scan_iter(self, match: str | None = None) -> AsyncIterator[str]:
         if "scan" in self.fail_on:
@@ -97,13 +110,19 @@ async def _reserve(
     url: str,
     profile: str = "default",
     intervention_type: str = "captcha",
+    vnc_url: str = "http://vnc/vnc.html",
 ) -> NoVNCFlow:
     key = flow_key_for(url, profile)
 
-    return await registry.reserve(key=key, url=url, profile=profile, intervention_type=intervention_type)
+    async def resolve(_flow: NoVNCFlow) -> str:
+        return vnc_url
+
+    return await registry.reserve(
+        key=key, url=url, profile=profile, intervention_type=intervention_type, resolve_vnc_url=resolve
+    )
 
 
-async def _cancel(task: asyncio.Task[None]) -> None:
+async def _cancel(task: asyncio.Task[Any]) -> None:
     if not task.done():
         task.cancel()
     await asyncio.gather(task, return_exceptions=True)
@@ -315,63 +334,16 @@ async def test_process_only_registry_without_redis(
 
     # when
     found = await registry.find(flow.key)
-    updated = await registry.set_vnc_url(flow.flow_id, "http://vnc/vnc.html")
     listed = await registry.active()
     await registry.release(flow.flow_id)
 
     # then
     assert found is not None
     assert found.flow_id == flow.flow_id
-    assert updated is True
+    assert found.vnc_url == "http://vnc/vnc.html"
+    assert registry.owns(found) is False
     assert [local.flow_id for local in listed] == [flow.flow_id]
     assert registry.local() == []
-
-
-async def test_set_vnc_url_updates_local_flow_and_record() -> None:
-    # given
-    fake = FakeRedis()
-    registry = _registry(fake)
-    flow = await _reserve(registry, "https://site-a.com/1")
-
-    # when
-    updated = await registry.set_vnc_url(flow.flow_id, "http://vnc/vnc.html?autoconnect=true")
-
-    # then
-    assert updated is True
-    assert flow.vnc_url == "http://vnc/vnc.html?autoconnect=true"
-    raw = await fake.get("novnc_flow:site-a.com:default")
-    assert raw is not None
-    assert json.loads(raw)["vnc_url"] == "http://vnc/vnc.html?autoconnect=true"
-
-
-async def test_set_vnc_url_of_unknown_flow_is_false() -> None:
-    # given
-    registry = _registry(FakeRedis())
-
-    # when
-    updated = await registry.set_vnc_url("deadbeefcafe", "http://vnc/vnc.html")
-
-    # then
-    assert updated is False
-
-
-async def test_set_vnc_url_redis_error_keeps_local_value(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    # given
-    fake = FakeRedis()
-    registry = _registry(fake)
-    flow = await _reserve(registry, "https://site-a.com/1")
-    fake.fail_on.add("set")
-
-    # when
-    with caplog.at_level("WARNING", logger="src.reader.novnc.flow_registry"):
-        updated = await registry.set_vnc_url(flow.flow_id, "http://vnc/vnc.html")
-
-    # then
-    assert updated is True
-    assert flow.vnc_url == "http://vnc/vnc.html"
-    assert [record for record in caplog.records if record.levelname == "WARNING"] != []
 
 
 async def test_active_and_local_are_ordered_by_start_time(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -443,7 +415,7 @@ async def test_reserve_retries_when_winner_record_vanished(monkeypatch: pytest.M
     # given
     fake = FakeRedis()
     registry = _registry(fake)
-    other = await _reserve(registry, "https://site-a.com/1")
+    other = await _reserve(_registry(fake), "https://site-a.com/1")
     calls = {"count": 0}
     original_get = fake.get
 
@@ -462,20 +434,6 @@ async def test_reserve_retries_when_winner_record_vanished(monkeypatch: pytest.M
     # then
     assert joined.flow_id == other.flow_id
     assert calls["count"] == 2
-
-
-async def test_reserve_raises_busy_when_winner_record_never_readable() -> None:
-    # given
-    fake = FakeRedis()
-    await fake.set("novnc_flow:site-a.com:default", "{not json", px=60_000)
-    registry = _registry(fake)
-
-    # when / then
-    with pytest.raises(NoVNCFlowBusyException):
-        await _reserve(registry, "https://site-a.com/1")
-
-    # then
-    assert registry.local() == []
 
 
 async def test_reserve_read_error_after_lost_write_keeps_process_only(
@@ -701,8 +659,7 @@ async def test_flow_reserved_on_first_is_found_and_joined_from_second() -> None:
     fake = FakeRedis()
     first = _registry(fake)
     second = _registry(fake)
-    flow = await _reserve(first, "https://site-a.com/1")
-    await first.set_vnc_url(flow.flow_id, "http://edge/novnc/host-1/vnc.html")
+    flow = await _reserve(first, "https://site-a.com/1", vnc_url="http://edge/novnc/host-1/vnc.html")
 
     # when
     found = await second.find(flow.key)
@@ -821,7 +778,6 @@ async def test_registry_log_lines_carry_flow_id_slot_and_request_id(
     # when
     with caplog.at_level("INFO", logger="src.reader.novnc.flow_registry"):
         flow = await _reserve(registry, "https://log-site.com/1")
-        await registry.set_vnc_url(flow.flow_id, "http://vnc/vnc.html")
         await registry.release(flow.flow_id)
 
     # then
@@ -837,18 +793,20 @@ async def test_registry_log_lines_carry_flow_id_slot_and_request_id(
     assert all(flow.request_id in record.getMessage() for record in reserve_lines)
 
 
-async def test_is_local_distinguishes_won_and_joined_flows() -> None:
+async def test_owns_distinguishes_won_and_joined_flows() -> None:
     # given
     fake = FakeRedis()
     first = _registry(fake)
     second = _registry(fake)
     flow = await _reserve(first, "https://site-a.com/1")
     joined = await _reserve(second, "https://site-a.com/1")
+    joined_here = await _reserve(first, "https://site-a.com/2")
 
     # when / then
-    assert first.is_local(flow.flow_id) is True
-    assert second.is_local(joined.flow_id) is False
-    assert first.is_local("deadbeefcafe") is False
+    assert first.owns(flow) is True
+    assert second.owns(joined) is False
+    assert first.owns(joined_here) is False
+    assert joined_here.flow_id == flow.flow_id
 
 
 def test_flow_shape_carries_decision_9_fields() -> None:
@@ -926,3 +884,538 @@ async def test_busy_carries_oldest_holder_and_all_flows_in_shape(
         expires_in_seconds = entry["expires_in_seconds"]
         assert isinstance(expires_in_seconds, float)
         assert expires_in_seconds > 0
+
+
+# ---------------------------------------------------------------------------
+# Concurrent reservations, teardown grace, publication and stale records
+# ---------------------------------------------------------------------------
+
+
+def _reclaimed(reason: str) -> float:
+    from prometheus_client import REGISTRY
+
+    return REGISTRY.get_sample_value("novnc_flows_reclaimed_total", {"reason": reason}) or 0.0
+
+
+async def test_concurrent_reserves_for_distinct_keys_never_share_a_slot_or_pass_the_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Three reads for three sites reserve at the same moment under a cap of 2:
+    two flows on two different slots, and the third is refused."""
+    # given
+    fake = FakeRedis()
+    fake.yield_on_set = True
+    registry = _registry(fake)
+    monkeypatch.setattr(settings, "NOVNC_MAX_CONCURRENT_FLOWS", 2)
+
+    # when
+    results = await asyncio.gather(
+        _reserve(registry, "https://race-a.com/1"),
+        _reserve(registry, "https://race-b.com/1"),
+        _reserve(registry, "https://race-c.com/1"),
+        return_exceptions=True,
+    )
+
+    # then
+    flows = [result for result in results if isinstance(result, NoVNCFlow)]
+    refusals = [result for result in results if isinstance(result, NoVNCFlowBusyException)]
+    assert len(flows) == 2
+    assert len(refusals) == 1
+    assert {flow.window.slot for flow in flows} == {0, 1}
+    assert len(registry.local()) == 2
+
+
+async def test_cancelled_reservation_frees_its_slot() -> None:
+    """A reservation cancelled while it waits on Redis holds no slot afterwards."""
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+    gate = asyncio.Event()
+
+    async def blocked_resolver(_flow: NoVNCFlow) -> str:
+        await gate.wait()
+
+        return "http://vnc/vnc.html"
+
+    pending = asyncio.create_task(
+        registry.reserve(
+            key=flow_key_for("https://cancel-site.com/1", "default"),
+            url="https://cancel-site.com/1",
+            profile="default",
+            intervention_type="captcha",
+            resolve_vnc_url=blocked_resolver,
+        )
+    )
+    await asyncio.sleep(0.01)
+    assert len(registry.local()) == 1
+
+    # when
+    await _cancel(pending)
+
+    # then
+    assert registry.local() == []
+    assert await fake.get("novnc_flow:cancel-site.com:default") is None
+
+
+async def test_record_is_published_only_with_its_vnc_url() -> None:
+    """While the owner resolves its address, no other container sees a record
+    with an empty vnc_url: it sees nothing, then the complete record."""
+    # given
+    fake = FakeRedis()
+    owner = _registry(fake)
+    other = _registry(fake)
+    gate = asyncio.Event()
+
+    async def slow_resolver(_flow: NoVNCFlow) -> str:
+        await gate.wait()
+
+        return "http://edge/novnc/host-1/vnc.html"
+
+    key = flow_key_for("https://slow-site.com/1", "default")
+    reserving = asyncio.create_task(
+        owner.reserve(
+            key=key,
+            url="https://slow-site.com/1",
+            profile="default",
+            intervention_type="captcha",
+            resolve_vnc_url=slow_resolver,
+        )
+    )
+    await asyncio.sleep(0.01)
+
+    # when
+    during = await other.find(key)
+    gate.set()
+    flow = await reserving
+    after = await other.find(key)
+
+    # then
+    assert during is None
+    assert after is not None
+    assert after.flow_id == flow.flow_id
+    assert after.vnc_url == "http://edge/novnc/host-1/vnc.html"
+
+
+async def test_same_process_duplicate_waits_for_the_address_and_joins() -> None:
+    """A second request for the same key in the same process, arriving while
+    the owner resolves its address, takes no slot and joins with the address."""
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+    gate = asyncio.Event()
+
+    async def slow_resolver(_flow: NoVNCFlow) -> str:
+        await gate.wait()
+
+        return "http://vnc/vnc.html?autoconnect=true"
+
+    key = flow_key_for("https://dup-site.com/1", "default")
+
+    async def reserve_one() -> NoVNCFlow:
+        return await registry.reserve(
+            key=key,
+            url="https://dup-site.com/1",
+            profile="default",
+            intervention_type="captcha",
+            resolve_vnc_url=slow_resolver,
+        )
+
+    first = asyncio.create_task(reserve_one())
+    await asyncio.sleep(0.01)
+    second = asyncio.create_task(reserve_one())
+    await asyncio.sleep(0.01)
+    slots_while_pending = {flow.window.slot for flow in registry.local()}
+
+    # when
+    gate.set()
+    owner, joiner = await asyncio.gather(first, second)
+
+    # then
+    assert slots_while_pending == {0}
+    assert registry.owns(owner) is True
+    assert registry.owns(joiner) is False
+    assert joiner.flow_id == owner.flow_id
+    assert joiner.vnc_url == "http://vnc/vnc.html?autoconnect=true"
+    assert len(registry.local()) == 1
+
+
+async def test_find_waits_for_a_local_reservation_still_resolving() -> None:
+    """With Redis unreachable, find answers a local reservation only once it
+    carries its address."""
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+    gate = asyncio.Event()
+
+    async def slow_resolver(_flow: NoVNCFlow) -> str:
+        await gate.wait()
+
+        return "http://vnc/vnc.html"
+
+    key = flow_key_for("https://local-site.com/1", "default")
+    reserving = asyncio.create_task(
+        registry.reserve(
+            key=key,
+            url="https://local-site.com/1",
+            profile="default",
+            intervention_type="captcha",
+            resolve_vnc_url=slow_resolver,
+        )
+    )
+    await asyncio.sleep(0.01)
+    finding = asyncio.create_task(registry.find(key))
+    await asyncio.sleep(0.01)
+    assert not finding.done()
+
+    # when
+    gate.set()
+    owner = await reserving
+    found = await finding
+
+    # then
+    assert found is not None
+    assert found.flow_id == owner.flow_id
+    assert found.vnc_url == "http://vnc/vnc.html"
+
+
+async def test_waiter_on_a_failed_local_reservation_reserves_its_own() -> None:
+    """When the owner's address resolution fails, a waiting duplicate does not
+    join a flow that never existed: it reserves a flow of its own."""
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+    gate = asyncio.Event()
+
+    async def failing_resolver(_flow: NoVNCFlow) -> str:
+        await gate.wait()
+
+        raise RuntimeError("tunnel down")
+
+    async def working_resolver(_flow: NoVNCFlow) -> str:
+        return "http://vnc/vnc.html"
+
+    key = flow_key_for("https://retry-site.com/1", "default")
+    first = asyncio.create_task(
+        registry.reserve(
+            key=key,
+            url="https://retry-site.com/1",
+            profile="default",
+            intervention_type="captcha",
+            resolve_vnc_url=failing_resolver,
+        )
+    )
+    await asyncio.sleep(0.01)
+    second = asyncio.create_task(
+        registry.reserve(
+            key=key,
+            url="https://retry-site.com/1",
+            profile="default",
+            intervention_type="captcha",
+            resolve_vnc_url=working_resolver,
+        )
+    )
+    await asyncio.sleep(0.01)
+
+    # when
+    gate.set()
+    first_result, second_result = await asyncio.gather(first, second, return_exceptions=True)
+
+    # then
+    assert isinstance(first_result, RuntimeError)
+    assert isinstance(second_result, NoVNCFlow)
+    assert registry.owns(second_result) is True
+    assert second_result.vnc_url == "http://vnc/vnc.html"
+
+
+async def test_find_answers_none_for_a_local_reservation_that_failed() -> None:
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+    gate = asyncio.Event()
+
+    async def failing_resolver(_flow: NoVNCFlow) -> str:
+        await gate.wait()
+
+        raise RuntimeError("tunnel down")
+
+    key = flow_key_for("https://gone-site.com/1", "default")
+    reserving = asyncio.create_task(
+        registry.reserve(
+            key=key,
+            url="https://gone-site.com/1",
+            profile="default",
+            intervention_type="captcha",
+            resolve_vnc_url=failing_resolver,
+        )
+    )
+    await asyncio.sleep(0.01)
+    finding = asyncio.create_task(registry.find(key))
+    await asyncio.sleep(0.01)
+
+    # when
+    gate.set()
+    await asyncio.gather(reserving, return_exceptions=True)
+    found = await finding
+
+    # then
+    assert found is None
+    assert registry.local() == []
+
+
+async def test_a_failed_reservation_released_meanwhile_leaves_the_registry_alone() -> None:
+    """A release that lands while the address is resolved frees the slot at
+    once, and the resolver failing afterwards surfaces its own error."""
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+
+    async def released_then_failing(flow: NoVNCFlow) -> str:
+        await registry.release(flow.flow_id)
+
+        raise RuntimeError("tunnel down")
+
+    # when
+    with pytest.raises(RuntimeError, match="tunnel down"):
+        await registry.reserve(
+            key=flow_key_for("https://released-site.com/1", "default"),
+            url="https://released-site.com/1",
+            profile="default",
+            intervention_type="captcha",
+            resolve_vnc_url=released_then_failing,
+        )
+
+    # then
+    assert registry.local() == []
+    assert await fake.get("novnc_flow:released-site.com:default") is None
+
+
+async def test_record_lease_is_measured_from_the_flow_start() -> None:
+    """The record expires one lease after the flow's own start, so it outlives
+    the monitor's deadline by the grace however long the address took."""
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+
+    async def slow_resolver(_flow: NoVNCFlow) -> str:
+        await asyncio.sleep(0.2)
+
+        return "http://vnc/vnc.html"
+
+    # when
+    flow = await registry.reserve(
+        key=flow_key_for("https://lease-site.com/1", "default"),
+        url="https://lease-site.com/1",
+        profile="default",
+        intervention_type="captcha",
+        resolve_vnc_url=slow_resolver,
+    )
+
+    # then
+    expire_at = fake._data["novnc_flow:lease-site.com:default"][1]
+    assert expire_at is not None
+    lease = settings.NOVNC_TIMEOUT_SECONDS + settings.NOVNC_FLOW_LEASE_GRACE_SECONDS
+    assert abs(expire_at - (flow.lease_started + lease)) < 0.1
+    monitor_deadline = flow.lease_started + settings.NOVNC_TIMEOUT_SECONDS
+    assert expire_at - monitor_deadline >= settings.NOVNC_FLOW_LEASE_GRACE_SECONDS - 0.1
+
+
+async def test_reserve_takes_over_an_unreadable_record(caplog: pytest.LogCaptureFixture) -> None:
+    """A record nobody can read is stale: the reservation replaces it and owns
+    the flow instead of refusing below the cap."""
+    # given
+    fake = FakeRedis()
+    await fake.set("novnc_flow:site-a.com:default", "{not json", px=60_000)
+    registry = _registry(fake)
+
+    # when
+    with caplog.at_level("WARNING", logger="src.reader.novnc.flow_registry"):
+        flow = await _reserve(registry, "https://site-a.com/1")
+
+    # then
+    assert registry.owns(flow) is True
+    raw = await fake.get("novnc_flow:site-a.com:default")
+    assert raw is not None
+    assert json.loads(raw)["flow_id"] == flow.flow_id
+    warnings = [record.getMessage() for record in caplog.records if record.levelname == "WARNING"]
+    assert warnings
+    for line in warnings:
+        assert flow.flow_id in line
+        assert f"slot={flow.window.slot}" in line
+
+
+async def test_takeover_that_loses_its_compare_rereads_and_joins(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the unreadable record changes before the takeover lands, the
+    reservation reads again and joins the flow that replaced it."""
+    # given
+    fake = FakeRedis()
+    await fake.set("novnc_flow:site-a.com:default", "{not json", px=60_000)
+    other = _registry(fake)
+    winner = NoVNCFlow(
+        flow_id="0123456789ab",
+        key="site-a.com:default",
+        url="https://site-a.com/1",
+        profile="default",
+        intervention_type="captcha",
+        window=WindowRect(slot=0, x=0, y=0, width=1280, height=800),
+        vnc_url="http://edge/novnc/host-9/vnc.html",
+        started_at=time.time(),
+        request_id="winner",
+    )
+    original_takeover = fake._takeover
+
+    async def overtaken(key: str, expected: str, value: str, px: str | int) -> int:
+        await fake.set(key, json.dumps(winner.to_record()), px=60_000)
+
+        return await original_takeover(key, expected, value, px)
+
+    monkeypatch.setattr(fake, "_takeover", overtaken)
+
+    # when
+    joined = await _reserve(other, "https://site-a.com/1")
+
+    # then
+    assert joined.flow_id == "0123456789ab"
+    assert other.owns(joined) is False
+    assert other.local() == []
+
+
+async def test_reserve_whose_winner_keeps_vanishing_keeps_the_flow_process_only(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A lost write whose winner vanishes on every read never refuses below the
+    cap: the flow is kept in the process, like any other Redis trouble."""
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+    await fake.set("novnc_flow:site-a.com:default", '{"flow_id": "someone"}', px=60_000)
+
+    async def vanished(_name: str) -> str | None:
+        return None
+
+    monkeypatch.setattr(fake, "get", vanished)
+
+    # when
+    with caplog.at_level("WARNING", logger="src.reader.novnc.flow_registry"):
+        flow = await _reserve(registry, "https://site-a.com/1")
+
+    # then
+    assert registry.owns(flow) is True
+    warnings = [record.getMessage() for record in caplog.records if record.levelname == "WARNING"]
+    assert warnings
+    assert all(flow.flow_id in line and f"slot={flow.window.slot}" in line for line in warnings)
+
+
+async def test_takeover_redis_error_keeps_the_flow_process_only() -> None:
+    # given
+    fake = FakeRedis()
+    await fake.set("novnc_flow:site-a.com:default", "{not json", px=60_000)
+    fake.fail_on.add("eval")
+    registry = _registry(fake)
+
+    # when
+    flow = await _reserve(registry, "https://site-a.com/1")
+
+    # then
+    assert registry.owns(flow) is True
+
+
+async def test_sweep_waits_for_a_cancelled_teardown_before_freeing_the_slot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The sweep frees an expired flow's slot only once its monitor finished
+    tearing down, so the window is gone before the slot is reused."""
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+    monkeypatch.setattr(settings, "NOVNC_FLOW_CANCEL_GRACE_SECONDS", 2.0)
+    flow = await _reserve(registry, "https://slow-close.com/1")
+    torn_down = {"done": False}
+
+    async def monitor() -> None:
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            await asyncio.sleep(0.05)
+            torn_down["done"] = True
+            raise
+
+    task = asyncio.create_task(monitor())
+    registry.attach_task(flow.flow_id, task)
+    await asyncio.sleep(0.01)
+    flow.lease_started -= settings.NOVNC_TIMEOUT_SECONDS + settings.NOVNC_FLOW_LEASE_GRACE_SECONDS + 5.0
+    before = _reclaimed("lease_expired")
+
+    # when
+    expired = await registry.sweep()
+
+    # then
+    assert torn_down["done"] is True
+    assert [entry.flow_id for entry in expired] == [flow.flow_id]
+    assert registry.local() == []
+    assert _reclaimed("lease_expired") - before == 1.0
+
+
+async def test_sweep_frees_a_stubborn_flow_after_the_grace_and_records_cancel_timeout(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # given
+    fake = FakeRedis()
+    registry = _registry(fake)
+    monkeypatch.setattr(settings, "NOVNC_FLOW_CANCEL_GRACE_SECONDS", 0.1)
+    flow = await _reserve(registry, "https://stubborn.com/1")
+
+    async def stubborn() -> None:
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            await asyncio.sleep(3600)
+
+    task = asyncio.create_task(stubborn())
+    registry.attach_task(flow.flow_id, task)
+    await asyncio.sleep(0.01)
+    flow.lease_started -= settings.NOVNC_TIMEOUT_SECONDS + settings.NOVNC_FLOW_LEASE_GRACE_SECONDS + 5.0
+    before = _reclaimed("cancel_timeout")
+
+    # when
+    started = time.monotonic()
+    with caplog.at_level("WARNING", logger="src.reader.novnc.flow_registry"):
+        await registry.sweep()
+    elapsed = time.monotonic() - started
+
+    # then
+    assert 0.1 <= elapsed < 2.0
+    assert registry.local() == []
+    assert await fake.get("novnc_flow:stubborn.com:default") is None
+    assert _reclaimed("cancel_timeout") - before == 1.0
+    orphan_lines = [
+        record.getMessage() for record in caplog.records if "did not finish" in record.getMessage()
+    ]
+    assert len(orphan_lines) == 1
+    assert flow.flow_id in orphan_lines[0]
+    assert f"slot={flow.window.slot}" in orphan_lines[0]
+
+    # cleanup
+    await _cancel(task)
+
+
+async def test_busy_and_flow_shape_never_show_another_callers_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    from src.reader.novnc.flow_registry import flow_shape
+
+    registry = _registry(FakeRedis())
+    monkeypatch.setattr(settings, "NOVNC_MAX_CONCURRENT_FLOWS", 1)
+    holder = await _reserve(registry, "https://user:pw@holder.com/inbox?token=SECRET#frag=SECRET")
+
+    # when
+    with pytest.raises(NoVNCFlowBusyException) as exc:
+        await _reserve(registry, "https://new-d.com/4")
+    listed = flow_shape(holder)
+
+    # then
+    assert exc.value.holder_url == "https://holder.com/inbox"
+    assert [entry["url"] for entry in exc.value.flows] == ["https://holder.com/inbox"]
+    assert listed["url"] == "https://holder.com/inbox"
+    assert "SECRET" not in exc.value.message
+    assert "pw@" not in exc.value.message

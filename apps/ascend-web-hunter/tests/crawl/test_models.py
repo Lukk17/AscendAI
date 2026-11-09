@@ -19,6 +19,7 @@ from src.crawl.models import (
     JobRecord,
     match_glob,
 )
+from src.session.profile import MAX_URL_LENGTH, InvalidProfileError
 
 
 def _seeds(count: int) -> list[Any]:
@@ -29,6 +30,62 @@ def _req(seeds: list[Any], **kwargs: Any) -> CrawlRequest:
     return CrawlRequest(seeds=seeds, **kwargs)
 
 
+@pytest.mark.parametrize("profile", ["a\nb", "a" * 65], ids=["newline", "too-long"])
+def test_request_refuses_a_bad_profile_as_invalid_profile(profile: str) -> None:
+    # when
+    with pytest.raises(InvalidProfileError):
+        _req(seeds=["https://example.com/"], profile=profile)
+
+
+def test_request_refuses_a_too_long_seed() -> None:
+    # given
+    seed = "https://example.com/" + "a" * MAX_URL_LENGTH
+
+    # when
+    with pytest.raises(ValidationError) as exc:
+        _req(seeds=[seed])
+
+    # then
+    assert exc.value.errors(include_input=False)[0]["loc"] == ("seeds", 0)
+
+
+def test_request_refuses_a_seed_that_normalizes_past_the_limit() -> None:
+    # given
+    seed = "https://example.com/" + "é" * (MAX_URL_LENGTH // 2)
+
+    # when
+    with pytest.raises(ValidationError):
+        _req(seeds=[seed])
+
+
+def test_request_keeps_a_seed_at_the_limit_readable_after_storage() -> None:
+    # given
+    url = "https://example.com/"
+    seed = url + "a" * (MAX_URL_LENGTH - len(url))
+
+    # when
+    stored = _req(seeds=[seed]).model_dump_json()
+
+    # then
+    assert [str(item) for item in CrawlRequest.model_validate_json(stored).seeds] == [seed]
+
+
+def test_request_reads_an_empty_profile_as_the_default_profile() -> None:
+    # when
+    request = _req(seeds=["https://example.com/"], profile="")
+
+    # then
+    assert request.profile is None
+
+
+def test_request_keeps_a_good_profile() -> None:
+    # when
+    request = _req(seeds=["https://example.com/"], profile="work_1-a")
+
+    # then
+    assert request.profile == "work_1-a"
+
+
 def test_request_defaults_come_from_settings() -> None:
     # when
     request = _req(seeds=["https://example.com/"])
@@ -37,7 +94,7 @@ def test_request_defaults_come_from_settings() -> None:
     assert request.max_depth == settings.CRAWL_DEFAULT_DEPTH == 2
     assert request.page_budget == settings.CRAWL_DEFAULT_PAGE_BUDGET == 100
     assert request.same_domain_only is True
-    assert request.respect_robots is True
+    assert request.respect_robots is False
     assert request.output_format == "text"
     assert request.include_patterns == []
     assert request.exclude_patterns == []

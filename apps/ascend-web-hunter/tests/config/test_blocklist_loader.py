@@ -160,3 +160,79 @@ async def test_refresh_serialises_concurrent_calls(tmp_path: Any) -> Any:
     assert len(throttled) == 1
     # The second call's lock wait must not overlap the first call's network call.
     assert call_order == ["start", "end"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            b"<!DOCTYPE html>\n<html><body><p>Sign in to the wifi ||portal^</p></body></html>\n", id="doctype"
+        ),
+        pytest.param(b"  <HTML>\n<head><title>502</title></head>\n##.banner\n</HTML>\n", id="html-tag"),
+        pytest.param(b"Service temporarily unavailable\nPlease try again later\n", id="plain-text"),
+    ],
+)
+async def test_refresh_rejects_a_body_that_is_not_an_adblock_list_and_leaves_file_untouched(
+    tmp_path: Any, body: bytes
+) -> None:
+    # given
+    loader = _make_loader(tmp_path)
+    original_content = loader.blocklist_path.read_bytes()
+
+    # when
+    with patch("httpx.AsyncClient.get", return_value=_mock_response(body)):
+        with pytest.raises(BlocklistValidationError):
+            await loader.refresh()
+
+    # then
+    assert loader.blocklist_path.read_bytes() == original_content
+    assert loader.state is None
+
+
+@pytest.mark.asyncio
+async def test_refresh_accepts_path_and_element_hiding_rules(tmp_path: Any) -> None:
+    # given
+    loader = _make_loader(tmp_path)
+    body = b"[Adblock Plus 2.0]\n! Title: list\n/akam-sw.js\nexample.com##.cookie-banner\n"
+
+    # when
+    with patch("httpx.AsyncClient.get", return_value=_mock_response(body)):
+        _, state = await loader.refresh()
+
+    # then
+    assert state.rule_count == 3
+    assert loader.blocklist_path.read_bytes() == body
+
+
+@pytest.mark.asyncio
+async def test_refresh_parses_and_writes_off_the_event_loop_thread(tmp_path: Any) -> None:
+    # given
+    import threading
+
+    from adblockparser import AdblockRules
+
+    loader = _make_loader(tmp_path)
+    loop_thread = threading.get_ident()
+    threads: dict[str, int] = {}
+    real_write = loader._atomic_write
+
+    def parse(rules: list[str]) -> AdblockRules:
+        threads["parse"] = threading.get_ident()
+        return AdblockRules(rules)
+
+    def write(content: bytes) -> None:
+        threads["write"] = threading.get_ident()
+        real_write(content)
+
+    # when
+    with (
+        patch("httpx.AsyncClient.get", return_value=_mock_response(b"||example.com^\n")),
+        patch("src.config.blocklist_loader.AdblockRules", side_effect=parse),
+        patch.object(loader, "_atomic_write", side_effect=write),
+    ):
+        await loader.refresh()
+
+    # then
+    assert threads["parse"] != loop_thread
+    assert threads["write"] != loop_thread

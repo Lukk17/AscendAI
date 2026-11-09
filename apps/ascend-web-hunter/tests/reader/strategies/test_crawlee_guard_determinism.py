@@ -165,3 +165,105 @@ async def test_crawlee_forces_the_browser_rendering_type() -> None:
     assert isinstance(predictor, RenderingTypePredictor)
     assert predictor.predict(MagicMock()) == RenderingTypePrediction("client only", 0.0)
     assert predictor.store_result(MagicMock(), "client only") is None
+
+
+_CRAWLEE_ATTEMPTS = 4
+"""One navigation plus crawlee's three default retries."""
+
+
+def _retrying_crawler(fetches: list[str], refuse: bool) -> tuple[MagicMock, Any]:
+    """A crawler that retries a failed navigation the way crawlee does: the error handler
+    runs before each retry, and a stopped crawler starts no further attempt."""
+    captured: dict[str, Any] = {}
+    refused_lists: list[list[str]] = []
+    fake_context = MagicMock()
+
+    async def install_guard(_browser_context: Any, _validator: Any, *, family: Any) -> list[str]:
+        refused_lists.append([])
+        return refused_lists[-1]
+
+    crawler = MagicMock()
+    crawler.router = MagicMock()
+    crawler.router.default_handler = lambda f: f
+    crawler.pre_navigation_hook = lambda f: captured.setdefault("pre_nav", f)
+    crawler.error_handler = lambda f: captured.setdefault("error_handler", f)
+
+    async def fake_run(_urls: list[str]) -> FinalStatistics:
+        for _attempt in range(_CRAWLEE_ATTEMPTS):
+            await captured["pre_nav"](fake_context)
+            fetches.append(_URL)
+            if refuse:
+                refused_lists[-1].append("http://169.254.169.254/")
+            await captured["error_handler"](MagicMock(), RuntimeError("net::ERR_BLOCKED_BY_CLIENT"))
+            if crawler.stop.called:
+                break
+        return final_statistics(0)
+
+    crawler.run = AsyncMock(side_effect=fake_run)
+
+    return crawler, install_guard
+
+
+@pytest.mark.asyncio
+async def test_refused_navigation_is_fetched_once_and_never_retried() -> None:
+    """A navigation the guard refused stops the crawl, so crawlee sends no retry to the site."""
+    # given
+    fetches: list[str] = []
+    crawler, install_guard = _retrying_crawler(fetches, refuse=True)
+
+    # when
+    with (
+        patch(_CRAWLER_FACTORY_PATH, return_value=crawler),
+        _hermetic(),
+        patch("src.reader.strategies.crawlee_strategy.install_browser_guard", new=install_guard),
+        pytest.raises(UnsafeUriError),
+    ):
+        await CrawleeStrategy(MagicMock()).get_html(_URL)
+
+    # then
+    assert fetches == [_URL]
+    crawler.stop.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_transient_navigation_failure_keeps_crawlee_retries() -> None:
+    """A failure the guard did not cause is still retried by crawlee."""
+    # given
+    fetches: list[str] = []
+    crawler, install_guard = _retrying_crawler(fetches, refuse=False)
+
+    # when
+    with (
+        patch(_CRAWLER_FACTORY_PATH, return_value=crawler),
+        _hermetic(),
+        patch("src.reader.strategies.crawlee_strategy.install_browser_guard", new=install_guard),
+        pytest.raises(ExtractionFailedError),
+    ):
+        await CrawleeStrategy(MagicMock()).get_html(_URL)
+
+    # then
+    assert fetches == [_URL] * _CRAWLEE_ATTEMPTS
+    crawler.stop.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_crawl_runs_one_task_at_a_time_so_a_stop_lands_before_any_retry() -> None:
+    """A second worker would fetch the requeued request before the stop is seen."""
+    # given
+    captured: dict[str, Any] = {}
+
+    def fake_crawler_factory(**kwargs: Any) -> MagicMock:
+        captured.update(kwargs)
+
+        async def fake_run(_urls: list[str]) -> FinalStatistics:
+            return final_statistics(1)
+
+        return _fake_crawler(fake_run)
+
+    # when
+    with patch(_CRAWLER_FACTORY_PATH, side_effect=fake_crawler_factory), _hermetic():
+        await CrawleeStrategy(MagicMock()).get_html(_URL)
+
+    # then
+    settings = captured["concurrency_settings"]
+    assert (settings.max_concurrency, settings.desired_concurrency) == (1, 1)

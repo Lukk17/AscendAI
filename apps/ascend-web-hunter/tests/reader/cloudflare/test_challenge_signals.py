@@ -748,6 +748,72 @@ def test_definitive_header_beside_guards_is_wall() -> None:
     assert "many_links" in _ids(verdict)
 
 
+_TURNSTILE_SCRIPT = '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>'
+_CLOUDFLARE_HEADERS = {"server": "cloudflare", "cf-ray": "a57d1b77acd63eae-WAW"}
+
+
+def _served_page(*extra: str, shell: str = "main") -> str:
+    body = f"<{shell}><h1>Heading</h1><p>{_words(60)}</p></{shell}>"
+
+    return f"<html><head>{_TURNSTILE_SCRIPT}</head><body>{body}{''.join(extra)}</body></html>"
+
+
+def test_a_page_answered_200_with_only_vendor_script_and_presence_is_content() -> None:
+    # when
+    verdict = assess(200, _served_page(), headers=_CLOUDFLARE_HEADERS)
+
+    # then
+    assert "served_page" in _ids(verdict)
+    assert verdict.score == 60 + 30 + 20 - 30
+    assert verdict.wall is False
+
+
+def test_the_served_page_guard_needs_status_200() -> None:
+    # when
+    verdict = assess(403, _served_page(), headers=_CLOUDFLARE_HEADERS)
+
+    # then
+    assert "served_page" not in _ids(verdict)
+    assert verdict.wall is True
+
+
+def test_the_served_page_guard_needs_a_vendor_signal() -> None:
+    # when
+    verdict = assess(200, f"<html><body><main><p>{_words(60)}</p></main></body></html>")
+
+    # then
+    assert "served_page" not in _ids(verdict)
+
+
+@pytest.mark.parametrize(
+    ("extra", "shell", "evidence"),
+    [
+        ('<div class="cf-turnstile"></div>', "main", "captcha_element"),
+        ('<input name="g-recaptcha-response">', "main", "captcha_input"),
+        ("", "div", "no_article"),
+    ],
+)
+def test_the_served_page_guard_does_not_fire_beside_challenge_evidence(
+    extra: str, shell: str, evidence: str
+) -> None:
+    # when
+    verdict = assess(200, _served_page(extra, shell=shell), headers=_CLOUDFLARE_HEADERS)
+
+    # then
+    assert evidence in _ids(verdict)
+    assert "served_page" not in _ids(verdict)
+    assert verdict.wall is True
+
+
+def test_a_definitive_header_beats_the_served_page_guard() -> None:
+    # when
+    verdict = assess(200, _served_page(), headers={**_CLOUDFLARE_HEADERS, "cf-mitigated": "challenge"})
+
+    # then
+    assert "served_page" not in _ids(verdict)
+    assert verdict.wall is True
+
+
 _WORKED_EXAMPLES = [
     ("cloudflare-curl", 250, True),
     ("cloudflare-browser", 140, True),
@@ -889,3 +955,23 @@ def test_moved_threshold_flips_boundary() -> None:
     # then
     assert verdict.score == 160
     assert verdict.wall is False
+
+
+def test_the_verdict_log_line_names_the_read_without_its_user_info(caplog: pytest.LogCaptureFixture) -> None:
+    # given
+    import logging
+
+    from src.reader.cloudflare.challenge_signals import log_verdict
+
+    verdict = assess(
+        200, "<html><body><div id='cf-challenge-running'></div></body></html>", record_metrics=False
+    )
+
+    # when
+    with caplog.at_level(logging.DEBUG):
+        log_verdict(verdict, "reader", "https://reader:hunter2@test.com/page?X-Amz-Signature=secret")
+
+    # then
+    assert "url=https://test.com/page" in caplog.text
+    assert "hunter2" not in caplog.text
+    assert "X-Amz-Signature" not in caplog.text

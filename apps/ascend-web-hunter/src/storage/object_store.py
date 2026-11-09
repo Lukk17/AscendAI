@@ -1,4 +1,4 @@
-"""One shared S3 client of the service (design D3).
+"""One shared S3 client of the service.
 
 Every feature that writes objects shares this client and its connection
 settings ``OBJECT_STORE_S3_ENDPOINT``, ``OBJECT_STORE_S3_ACCESS_KEY`` and
@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 from src.config.config import settings
 
 logger = logging.getLogger(__name__)
+
+EXPIRY_RULE_ID = "ascend-web-hunter-retention"
 
 
 def build_client() -> "S3Client":
@@ -110,6 +112,39 @@ class ObjectStore:
                 raise
             await asyncio.to_thread(self._client.create_bucket, Bucket=bucket)
             logger.info("object store: created bucket %s", bucket)
+
+    async def set_expiry(self, bucket: str, prefix: str, days: int) -> None:
+        """Expire every object under *prefix* *days* after it was written, through a bucket lifecycle rule.
+
+        The rule is merged into the bucket's lifecycle configuration by its ID, so
+        every other rule and bucket setting stays as it was.
+
+        Raises:
+            ClientError: when the store refuses to read or write the configuration.
+        """
+        current = await self._lifecycle_configuration(bucket)
+        rules: list[Any] = [rule for rule in current.get("Rules", []) if rule.get("ID") != EXPIRY_RULE_ID]
+        rules.append(
+            {
+                "ID": EXPIRY_RULE_ID,
+                "Status": "Enabled",
+                "Filter": {"Prefix": prefix},
+                "Expiration": {"Days": days},
+            }
+        )
+        kwargs: dict[str, Any] = {"Bucket": bucket, "LifecycleConfiguration": {"Rules": rules}}
+        if "TransitionDefaultMinimumObjectSize" in current:
+            kwargs["TransitionDefaultMinimumObjectSize"] = current["TransitionDefaultMinimumObjectSize"]
+        await asyncio.to_thread(self._client.put_bucket_lifecycle_configuration, **kwargs)
+
+    async def _lifecycle_configuration(self, bucket: str) -> dict[str, Any]:
+        try:
+            response = await asyncio.to_thread(self._client.get_bucket_lifecycle_configuration, Bucket=bucket)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "NoSuchLifecycleConfiguration":
+                return {}
+            raise
+        return dict(response)
 
     async def presign_get(self, bucket: str, key: str, expires_seconds: int = 3600) -> str:
         url: str = await asyncio.to_thread(

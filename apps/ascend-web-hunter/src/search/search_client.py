@@ -12,6 +12,7 @@ from src.observability.metrics import (
     SEARXNG_DURATION_SECONDS,
     SEARXNG_REQUESTS_TOTAL,
 )
+from src.reader.html_utils import collapsed_text
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +87,10 @@ class SearxngClient:
                 continue
 
             url = title_tag.get("href")
-            title = title_tag.get_text(strip=True)
+            title = collapsed_text(title_tag)
 
             content_tag = article.select_one("p.content")
-            content = content_tag.get_text(strip=True) if content_tag else ""
+            content = collapsed_text(content_tag) if content_tag else ""
 
             results.append({"title": title, "url": url, "content": content})
 

@@ -1,3 +1,5 @@
+import logging
+from logging.handlers import BufferingHandler
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -91,3 +93,33 @@ async def test_read_endpoint(client: AsyncClient) -> None:
         # then
         assert resp.status_code == 200
         assert resp.json()["content"] == "Read Content"
+
+
+@pytest.mark.parametrize(
+    ("message", "args", "kept"),
+    [
+        ("discarding data: %s", (None,), False),
+        ("recall retry failed: %s %s", ("error", "address"), True),
+        ("justext candidate failed: %s %s", ("error", "address"), True),
+        ("blacklisted URL: %s", ("address",), True),
+    ],
+)
+def test_only_the_trafilatura_no_text_warning_is_dropped_after_the_app_is_built(
+    message: str, args: tuple[object, ...], kept: bool
+) -> None:
+    # given
+    from src import main
+
+    main.create_app()
+    quieted = logging.getLogger("trafilatura.core")
+    captured = BufferingHandler(capacity=2)
+    quieted.addHandler(captured)
+
+    # when
+    try:
+        quieted.warning(message, *args)
+    finally:
+        quieted.removeHandler(captured)
+
+    # then
+    assert [record.msg for record in captured.buffer] == ([message] if kept else [])

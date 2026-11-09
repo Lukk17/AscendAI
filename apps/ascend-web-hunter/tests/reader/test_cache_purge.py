@@ -1,18 +1,21 @@
 """Task 5.5: the read-cache purge reaches every container over Redis pub/sub."""
 
 import asyncio
-from collections.abc import AsyncIterator
 from typing import Any
 from unittest.mock import patch
 
 import pytest
+import redis.exceptions
 
 from src.reader.cache_purge import (
     _message_domain,
     publish_purge,
     run_subscriber,
 )
-from src.reader.web_reader import WebReader
+from tests.reader.cache_purge_support import domain_key, seeded_reader, wait_until_gone
+
+_SERVER_CLOSED_CONNECTION = "Connection closed by server."
+_SOCKET_TIMEOUT_ERROR = "Timeout reading from 127.0.0.1:6379"
 
 
 class _FakePubSub:
@@ -32,15 +35,15 @@ class _FakePubSub:
         if self.owner.fail_unsubscribe:
             raise ConnectionError("unsubscribe blew up")
 
-    async def listen(self) -> AsyncIterator[dict[str, Any]]:
-        while not self.owner.stop.is_set():
-            if self.queue:
-                yield {"type": "message", "channel": "read_cache_purge", "data": self.queue.pop(0)}
-            elif self.owner.explode_listen:
-                self.owner.explode_listen = False
-                raise ConnectionError("connection lost")
-            else:
-                await asyncio.sleep(0.01)
+    async def get_message(self, **_options: object) -> dict[str, Any] | None:
+        if self.queue:
+            return {"type": "message", "channel": "read_cache_purge", "data": self.queue.pop(0)}
+        if self.owner.explode_listen:
+            self.owner.explode_listen = False
+            raise redis.exceptions.ConnectionError(_SERVER_CLOSED_CONNECTION)
+        await asyncio.sleep(0.01)
+
+        return None
 
 
 class _FakeRedis:
@@ -99,23 +102,12 @@ def stop() -> asyncio.Event:
     return asyncio.Event()
 
 
-def _seeded_reader(entries: dict[str, str]) -> WebReader:
-    reader = WebReader()
-    for key, content in entries.items():
-        reader._memory_cache[key] = ({"content": content, "status": "success", "mode": "t"}, 9999999999.0)
-    return reader
-
-
-def _domain_key(domain: str, path: str) -> str:
-    return f"https://{domain}/{path}|heavy=False|links=False|profile=|fmt=text|tier=|schema="
-
-
 @pytest.mark.asyncio
 async def test_clear_through_first_reader_drops_second_reader_entry(stop: asyncio.Event) -> None:
     # given
     fake = _FakeRedis(stop)
-    first = _seeded_reader({_domain_key("example.com", "a"): "first"})
-    second = _seeded_reader({_domain_key("example.com", "b"): "second"})
+    first = seeded_reader({domain_key("example.com", "a"): "first"})
+    second = seeded_reader({domain_key("example.com", "b"): "second"})
     first_task = asyncio.create_task(run_subscriber(first, lambda: fake, stop))
     second_task = asyncio.create_task(run_subscriber(second, lambda: fake, stop))
     await asyncio.sleep(0.05)
@@ -137,8 +129,8 @@ async def test_clear_through_first_reader_drops_second_reader_entry(stop: asynci
 async def test_count_returned_is_the_first_reader_own(stop: asyncio.Event) -> None:
     # given
     fake = _FakeRedis(stop)
-    first = _seeded_reader({_domain_key("example.com", "a"): "first"})
-    second = _seeded_reader({_domain_key("other.com", "b"): "second"})
+    first = seeded_reader({domain_key("example.com", "a"): "first"})
+    second = seeded_reader({domain_key("other.com", "b"): "second"})
     second_task = asyncio.create_task(run_subscriber(second, lambda: fake, stop))
     await asyncio.sleep(0.05)
 
@@ -158,9 +150,7 @@ async def test_count_returned_is_the_first_reader_own(stop: asyncio.Event) -> No
 async def test_subscriber_drops_whole_cache_once_after_reconnect(stop: asyncio.Event) -> None:
     # given
     fake = _FakeRedis(stop)
-    reader = _seeded_reader(
-        {_domain_key("example.com", "a"): "stale", _domain_key("other.com", "b"): "fresh"}
-    )
+    reader = seeded_reader({domain_key("example.com", "a"): "stale", domain_key("other.com", "b"): "fresh"})
     fake.explode_listen = True
     task = asyncio.create_task(run_subscriber(reader, lambda: fake, stop))
 
@@ -181,7 +171,7 @@ async def test_subscribe_failure_warns_and_retries(
     # given
     fake = _FakeRedis(stop)
     fake.fail_subscribe = True
-    reader = _seeded_reader({})
+    reader = seeded_reader({})
 
     # when
     with (
@@ -200,7 +190,7 @@ async def test_subscribe_failure_warns_and_retries(
 @pytest.mark.asyncio
 async def test_missing_client_waits_for_reconnect(stop: asyncio.Event) -> None:
     # given
-    reader = _seeded_reader({})
+    reader = seeded_reader({})
     calls = {"count": 0}
 
     def missing() -> None:
@@ -263,7 +253,7 @@ async def test_unsubscribe_failure_warns(stop: asyncio.Event, caplog: pytest.Log
     # given
     fake = _FakeRedis(stop)
     fake.fail_unsubscribe = True
-    reader = _seeded_reader({})
+    reader = seeded_reader({})
 
     # when
     with (
@@ -293,8 +283,8 @@ def test_process_reader_adapter_clears_every_instance() -> None:
     # given
     from src.main import _ProcessPurgeReader
 
-    first = _seeded_reader({_domain_key("adapter-one.example", "a"): "first"})
-    second = _seeded_reader({_domain_key("adapter-one.example", "b"): "second"})
+    first = seeded_reader({domain_key("adapter-one.example", "a"): "first"})
+    second = seeded_reader({domain_key("adapter-one.example", "b"): "second"})
 
     # when
     dropped = _ProcessPurgeReader.clear_cache_for_domain("adapter-one.example")
@@ -309,8 +299,8 @@ def test_process_reader_adapter_counts_remaining() -> None:
     # given
     from src.main import _ProcessPurgeReader
 
-    first = _seeded_reader({_domain_key("adapter-two.example", "a"): "first"})
-    second = _seeded_reader({_domain_key("adapter-two.example", "b"): "second"})
+    first = seeded_reader({domain_key("adapter-two.example", "a"): "first"})
+    second = seeded_reader({domain_key("adapter-two.example", "b"): "second"})
 
     # when
     total = _ProcessPurgeReader.clear_cache()
@@ -325,7 +315,7 @@ def test_process_reader_adapter_counts_remaining() -> None:
 async def test_non_message_shapes_skip_the_purge(stop: asyncio.Event) -> None:
     # given
     fake = _FakeRedis(stop)
-    reader = _seeded_reader({_domain_key("example.com", "a"): "kept"})
+    reader = seeded_reader({domain_key("example.com", "a"): "kept"})
 
     # when
     with patch("src.reader.cache_purge.settings.READ_CACHE_PURGE_RECONNECT_SECONDS", 0.01):
@@ -347,20 +337,20 @@ async def test_non_message_shapes_skip_the_purge(stop: asyncio.Event) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stop_during_listen_breaks_out(stop: asyncio.Event) -> None:
+async def test_stop_while_reading_messages_ends_the_loop(stop: asyncio.Event) -> None:
     # given
     class _StopMidListenPubSub(_FakePubSub):
-        async def listen(self) -> AsyncIterator[dict[str, Any]]:
-            yield {"type": "message", "channel": "read_cache_purge", "data": "example.com"}
+        async def get_message(self, **_options: object) -> dict[str, Any] | None:
             stop.set()
-            yield {"type": "message", "channel": "read_cache_purge", "data": "example.com"}
+
+            return {"type": "message", "channel": "read_cache_purge", "data": "example.com"}
 
     class _StoppingRedis(_FakeRedis):
         def pubsub(self) -> _FakePubSub:
             return _StopMidListenPubSub(self)
 
     fake = _StoppingRedis(stop)
-    reader = _seeded_reader({_domain_key("example.com", "a"): "kept"})
+    reader = seeded_reader({domain_key("example.com", "a"): "kept"})
 
     # when
     with patch("src.reader.cache_purge.settings.READ_CACHE_PURGE_RECONNECT_SECONDS", 0.01):
@@ -378,7 +368,7 @@ async def test_subscribe_failure_closes_pubsub(stop: asyncio.Event, caplog: pyte
     # given
     fake = _ClosingFakeRedis(stop)
     fake.fail_subscribe = True
-    reader = _seeded_reader({})
+    reader = seeded_reader({})
 
     # when
     with (
@@ -405,7 +395,7 @@ async def test_reconnect_closes_previous_pubsub(stop: asyncio.Event) -> None:
     # given
     fake = _ClosingFakeRedis(stop)
     fake.explode_listen = True
-    reader = _seeded_reader({_domain_key("example.com", "a"): "stale"})
+    reader = seeded_reader({domain_key("example.com", "a"): "stale"})
 
     # when
     with patch("src.reader.cache_purge.settings.READ_CACHE_PURGE_RECONNECT_SECONDS", 0.01):
@@ -431,7 +421,7 @@ async def test_close_failure_warns_and_continues(
     # given
     fake = _ClosingFakeRedis(stop)
     fake.fail_close = True
-    reader = _seeded_reader({})
+    reader = seeded_reader({})
 
     # when
     with (
@@ -453,7 +443,7 @@ async def test_pubsub_creation_failure_retries_without_close(
 ) -> None:
     # given
     fake = _PubsubRaisesRedis(stop)
-    reader = _seeded_reader({_domain_key("example.com", "a"): "kept"})
+    reader = seeded_reader({domain_key("example.com", "a"): "kept"})
 
     # when
     with (
@@ -468,3 +458,101 @@ async def test_pubsub_creation_failure_retries_without_close(
     # then
     assert fake.pubsub_calls >= 2
     assert any("subscribe failed" in record.message for record in caplog.records)
+
+
+class _SocketTimeoutPubSub(_FakePubSub):
+    """Answers a quiet channel like redis-py: None after a caller timeout, TimeoutError after a socket one."""
+
+    def __init__(self, owner: "_FakeRedis", socket_timeout: float) -> None:
+        super().__init__(owner)
+        self.socket_timeout = socket_timeout
+
+    async def get_message(self, **options: object) -> dict[str, Any] | None:
+        if self.queue:
+            return {"type": "message", "channel": "read_cache_purge", "data": self.queue.pop(0)}
+        caller_timeout = options.get("timeout")
+        if not isinstance(caller_timeout, float):
+            await asyncio.sleep(self.socket_timeout)
+            raise redis.exceptions.TimeoutError(_SOCKET_TIMEOUT_ERROR)
+        await asyncio.sleep(caller_timeout)
+
+        return None
+
+
+class _SocketTimeoutRedis(_FakeRedis):
+    def __init__(self, stop: asyncio.Event, socket_timeout: float) -> None:
+        super().__init__(stop)
+        self.socket_timeout = socket_timeout
+
+    def pubsub(self) -> _SocketTimeoutPubSub:
+        return _SocketTimeoutPubSub(self, self.socket_timeout)
+
+
+_FAKE_SOCKET_TIMEOUT_SECONDS = 0.02
+_FAKE_MESSAGE_WAIT_SECONDS = 0.05
+_FAKE_SILENCE_SECONDS = 0.3
+
+
+@pytest.mark.asyncio
+async def test_quiet_channel_past_the_socket_timeout_keeps_the_subscription_and_the_cache(
+    stop: asyncio.Event,
+) -> None:
+    # given
+    fake = _SocketTimeoutRedis(stop, socket_timeout=_FAKE_SOCKET_TIMEOUT_SECONDS)
+    kept_key = domain_key("silence-kept.invalid", "a")
+    purged_key = domain_key("silence-purged.invalid", "b")
+    reader = seeded_reader({kept_key: "kept", purged_key: "purged"})
+
+    # when
+    with (
+        patch("src.reader.cache_purge._MESSAGE_WAIT_SECONDS", _FAKE_MESSAGE_WAIT_SECONDS),
+        patch("src.reader.cache_purge.settings.READ_CACHE_PURGE_RECONNECT_SECONDS", 0.01),
+    ):
+        task = asyncio.create_task(run_subscriber(reader, lambda: fake, stop))
+        await asyncio.sleep(_FAKE_SILENCE_SECONDS)
+        await fake.publish("read_cache_purge", "silence-purged.invalid")
+        await wait_until_gone(reader, purged_key)
+        stop.set()
+        await task
+
+    # then
+    assert len(fake.subscribers) == 1
+    assert kept_key in reader._memory_cache
+    assert purged_key not in reader._memory_cache
+
+
+@pytest.mark.asyncio
+async def test_connection_closed_by_server_reconnects_and_drops_the_cache_once(
+    stop: asyncio.Event, caplog: pytest.LogCaptureFixture
+) -> None:
+    # given
+    fake = _FakeRedis(stop)
+    fake.explode_listen = True
+    stale_key = domain_key("killed-stale.invalid", "a")
+    reader = seeded_reader({stale_key: "stale"})
+    cleared: list[int] = []
+    real_clear = reader.clear_cache
+
+    def counting_clear() -> int:
+        cleared.append(1)
+        return real_clear()
+
+    # when
+    with (
+        patch("src.reader.cache_purge.settings.READ_CACHE_PURGE_RECONNECT_SECONDS", 0.01),
+        patch.object(reader, "clear_cache", counting_clear),
+        caplog.at_level("WARNING", logger="src.reader.cache_purge"),
+    ):
+        task = asyncio.create_task(run_subscriber(reader, lambda: fake, stop))
+        await wait_until_gone(reader, stale_key)
+        await asyncio.sleep(_FAKE_SILENCE_SECONDS)
+        stop.set()
+        await task
+
+    # then
+    assert cleared == [1]
+    assert len(fake.subscribers) == 2
+    lost = [record for record in caplog.records if "connection lost" in record.message]
+    assert len(lost) == 1
+    assert lost[0].exc_info is not None
+    assert isinstance(lost[0].exc_info[1], redis.exceptions.ConnectionError)

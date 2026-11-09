@@ -2,7 +2,7 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from src.reader.html_utils import remove_noise_tags
+from src.reader.html_utils import collapsed_text, remove_noise_tags
 
 LINK_MARKER_TEMPLATE = "[{index}]"
 VALID_SCHEMES = ("http", "https")
@@ -26,7 +26,7 @@ def annotate_links(
         if link_filter and link_filter not in absolute_url:
             continue
         marker = LINK_MARKER_TEMPLATE.format(index=link_index)
-        anchor.string = f"{anchor.get_text(strip=True)} {marker}"
+        anchor.string = f"{collapsed_text(anchor)} {marker}"
         link_map[link_index] = absolute_url
         link_index += 1
 

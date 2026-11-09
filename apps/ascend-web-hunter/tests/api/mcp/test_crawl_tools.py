@@ -14,6 +14,7 @@ from src.api.mcp.mcp_server import (
     crawl_list_jobs,
     crawl_submit,
 )
+from src.config.config import settings
 from src.crawl import job_service as job_service_module
 from src.crawl.job_service import job_service
 
@@ -144,6 +145,36 @@ async def test_submit_honours_depth_and_budget(fake_redis: FakeRedis, stub_guard
     assert status["state"] == "waiting"
 
 
+async def test_submit_ignores_robots_by_default(fake_redis: FakeRedis, stub_guard: AsyncMock) -> None:
+    # when
+    submitted = await crawl_submit(seeds=["https://example.com/"])
+
+    # then
+    record = await job_service.get_job("default", submitted["job_id"])
+    assert record is not None
+    assert record.request.respect_robots is False
+
+
+async def test_submit_keeps_robots_behaviour_when_the_caller_asks(
+    fake_redis: FakeRedis, stub_guard: AsyncMock
+) -> None:
+    # when
+    submitted = await crawl_submit(seeds=["https://example.com/"], respect_robots=True)
+
+    # then
+    record = await job_service.get_job("default", submitted["job_id"])
+    assert record is not None
+    assert record.request.respect_robots is True
+
+
+def test_submit_description_says_a_redirect_target_is_not_checked_against_robots() -> None:
+    assert "a redirect target is not checked" in (crawl_submit.__doc__ or "")
+
+
+def test_submit_description_says_robots_is_ignored_by_default() -> None:
+    assert "Defaults to False, which ignores robots.txt" in (crawl_submit.__doc__ or "")
+
+
 async def test_unknown_job_answers_tool_error_starting_with_code(
     fake_redis: FakeRedis,
 ) -> None:
@@ -162,6 +193,22 @@ async def test_invalid_request_answers_validation_tool_error(
     # when / then
     with pytest.raises(ToolError, match=r"^validation: "):
         await crawl_submit(seeds=[])
+
+
+async def test_oversized_extraction_schema_answers_validation_tool_error(
+    fake_redis: FakeRedis, stub_guard: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given a schema above the read path's size cap
+    monkeypatch.setattr(settings, "EXTRACTION_SCHEMA_MAX_BYTES", 10)
+
+    # when / then
+    with pytest.raises(ToolError, match=r"^validation: .*EXTRACTION_SCHEMA_MAX_BYTES"):
+        await crawl_submit(
+            seeds=["https://example.com/"],
+            output_format="schema",
+            extraction_schema={"type": "object", "title": "x" * 50},
+        )
+    assert await crawl_list_jobs() == {"jobs": []}
 
 
 async def test_unsafe_seed_answers_unsafe_uri_tool_error(fake_redis: FakeRedis) -> None:

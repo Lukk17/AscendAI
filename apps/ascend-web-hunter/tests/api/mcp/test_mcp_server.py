@@ -4,6 +4,7 @@ import pytest
 from ascend_python_common.uri_guard import UnsafeUriError
 
 from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.api.mcp import mcp_server
 from src.api.mcp.mcp_server import (
     session_clear,
     session_establish,
@@ -12,7 +13,8 @@ from src.api.mcp.mcp_server import (
     web_read,
     web_search,
 )
-from src.session.session_manager import SessionInfo, SessionManager
+from src.reader.strategies.base_strategy import FetchedHtml
+from src.session.session_manager import EstablishedFlow, SessionInfo, SessionManager
 
 
 @pytest.mark.asyncio
@@ -141,6 +143,36 @@ async def test_mcp_web_read_calls_read_with_links_when_include_links_true() -> N
     mock_read.assert_awaited_once_with(
         "http://mcp.com", "/job/", heavy_mode=False, profile=None, output_format="text", tier=None
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("include_links", [True, False])
+async def test_mcp_web_read_result_carries_no_cache_validators(include_links: bool) -> None:
+    # given a tier whose final answer carried ETag and Last-Modified
+    page = FetchedHtml(
+        "<html><body><article><p>"
+        + "public answer words " * 20
+        + '<a href="/next">next</a></p></article></body></html>',
+        {"etag": '"public"', "last-modified": "Mon"},
+    )
+
+    async def tier_html(name: object, strategy: object, url: str) -> str:
+        return page
+
+    # when
+    with (
+        patch.object(mcp_server.web_reader, "_novnc_or_tier_html", side_effect=tier_html),
+        patch.object(mcp_server.web_reader.validator, "validate", return_value=True),
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
+    ):
+        result = await web_read(
+            f"https://mcp-validators-{include_links}.example.com/", include_links=include_links
+        )
+
+    # then
+    assert result["status"] == "success"
+    assert "etag" not in result
+    assert "last_modified" not in result
 
 
 @pytest.mark.asyncio
@@ -324,7 +356,15 @@ async def test_mcp_session_establish_returns_human_intervention_payload() -> Non
         patch.object(
             SessionManager,
             "establish",
-            new=AsyncMock(return_value="http://vnc:7900"),
+            new=AsyncMock(
+                return_value=EstablishedFlow(
+                    vnc_url="http://vnc:7900",
+                    intervention_type="login",
+                    flow_id="9f2c41ab77de",
+                    joined=False,
+                    window={"slot": 0, "x": 0, "y": 0, "width": 1280, "height": 800},
+                )
+            ),
         ),
     ):
         result = await session_establish("http://example.com")
@@ -334,6 +374,38 @@ async def test_mcp_session_establish_returns_human_intervention_payload() -> Non
     assert result["intervention_type"] == "login"
     assert result["vnc_url"] == "http://vnc:7900"
     assert "http://vnc:7900" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_establish_answers_the_real_flow_values() -> None:
+    """A joined captcha flow answers its own type, flow_id, joined and window."""
+    # given
+    window = {"slot": 3, "x": 144, "y": 144, "width": 1280, "height": 800}
+    established = EstablishedFlow(
+        vnc_url="http://vnc:7900",
+        intervention_type="captcha",
+        flow_id="0123456789ab",
+        joined=True,
+        window=window,
+    )
+
+    # when
+    with (
+        patch("src.api.mcp.mcp_server.check_fetch_uri", return_value=True),
+        patch.object(SessionManager, "establish", new=AsyncMock(return_value=established)),
+    ):
+        result = await session_establish("http://example.com")
+
+    # then
+    assert result == {
+        "status": "human_intervention_required",
+        "intervention_type": "captcha",
+        "vnc_url": "http://vnc:7900",
+        "flow_id": "0123456789ab",
+        "joined": True,
+        "window": window,
+        "message": "Login required. Please visit: http://vnc:7900",
+    }
 
 
 @pytest.mark.asyncio
@@ -447,8 +519,8 @@ async def test_mcp_session_interventions_lists_flows(
         url="https://listed-site.com/1",
         profile="default",
         intervention_type="captcha",
+        resolve_vnc_url=AsyncMock(return_value="http://vnc/vnc.html"),
     )
-    await novnc_flow_registry.set_vnc_url(flow.flow_id, "http://vnc/vnc.html")
 
     # when
     result = await session_interventions()
@@ -485,6 +557,15 @@ def test_tool_docstrings_name_vnc_url_and_status() -> None:
     assert "vnc_url" in establish_doc
     assert "status" in establish_doc
     assert "slot" in establish_doc
+
+
+def test_session_establish_docstring_names_every_field_it_returns() -> None:
+    # given / when
+    establish_doc = session_establish.__doc__ or ""
+
+    # then
+    for field in ("flow_id", "joined", "window", "intervention_type", "novnc_busy"):
+        assert field in establish_doc
 
 
 # ---------------------------------------------------------------------------
@@ -667,3 +748,55 @@ async def test_mcp_session_clear_unexpected_failure_maps_to_internal() -> None:
 
     # then
     assert str(exc_info.value).startswith("internal: ")
+
+
+# ---------------------------------------------------------------------------
+# session_cancel_intervention MCP tool
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_cancel_intervention_closes_the_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    from src.api.mcp.mcp_server import session_cancel_intervention
+    from src.reader.novnc.flow_registry import flow_key_for, novnc_flow_registry
+    from tests.reader.novnc.test_flow_registry import FakeRedis
+
+    monkeypatch.setattr(novnc_flow_registry, "_redis", FakeRedis())
+    flow = await novnc_flow_registry.reserve(
+        key=flow_key_for("https://mcp-close.com/1", "default"),
+        url="https://mcp-close.com/1",
+        profile="default",
+        intervention_type="login",
+    )
+
+    # when
+    result = await session_cancel_intervention(flow.flow_id)
+
+    # then
+    assert result == {"status": "cancelled", "flow_id": flow.flow_id}
+    assert novnc_flow_registry.local() == []
+    last = await novnc_flow_registry.last_result(flow.key)
+    assert last is not None
+    assert last.outcome == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_mcp_session_cancel_intervention_of_an_unknown_flow_is_a_flow_not_found_tool_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    from fastmcp.exceptions import ToolError
+
+    from src.api.mcp.mcp_server import session_cancel_intervention
+    from src.reader.novnc.flow_registry import novnc_flow_registry
+    from tests.reader.novnc.test_flow_registry import FakeRedis
+
+    monkeypatch.setattr(novnc_flow_registry, "_redis", FakeRedis())
+
+    # when / then
+    expected = r"^flow_not_found: No open intervention window has flow_id 0123456789ab\.$"
+    with pytest.raises(ToolError, match=expected):
+        await session_cancel_intervention("0123456789ab")

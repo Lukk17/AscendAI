@@ -6,9 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import urlparse
 
 import anyio
+import fakeredis
+import fakeredis.aioredis
 import httpx
 import pytest
 import pytest_asyncio
+import redis
+import redis.asyncio
 from httpx import ASGITransport, AsyncClient
 
 
@@ -34,6 +38,22 @@ async def _blocked_handle_async_request(*_args: object, **_kwargs: object) -> No
 # actually dialing out and eating the network's real latency.
 httpx.HTTPTransport.handle_request = _blocked_handle_request  # type: ignore[method-assign, assignment]
 httpx.AsyncHTTPTransport.handle_async_request = _blocked_handle_async_request  # type: ignore[method-assign, assignment]
+
+fake_redis_server = fakeredis.FakeServer()
+
+
+def _fake_sync_redis_from_url(_cls: type[redis.Redis], _url: str, /, **kwargs: Any) -> fakeredis.FakeRedis:
+    return fakeredis.FakeRedis(server=fake_redis_server, **kwargs)
+
+
+def _fake_async_redis_from_url(
+    _cls: type[redis.asyncio.Redis], _url: str, /, **kwargs: Any
+) -> fakeredis.aioredis.FakeRedis:
+    return fakeredis.aioredis.FakeRedis(server=fake_redis_server, **kwargs)
+
+
+redis.Redis.from_url = classmethod(_fake_sync_redis_from_url)  # type: ignore[method-assign, assignment]
+redis.asyncio.Redis.from_url = classmethod(_fake_async_redis_from_url)  # type: ignore[method-assign, assignment]
 
 mock_fastmcp = MagicMock()
 mock_instance = MagicMock()
@@ -86,10 +106,8 @@ async def reset_cookie_manager_singleton() -> AsyncIterator[None]:
     before every test: every strategy holds a reference to that object, so
     replacing it would leave the old state reachable."""
     await _reset_global_cookie_manager()
-    _clear_rate_limit_budgets()
     yield
     await _reset_global_cookie_manager()
-    _clear_rate_limit_budgets()
 
 
 async def _reset_global_cookie_manager() -> None:
@@ -111,26 +129,13 @@ async def _reset_global_cookie_manager() -> None:
     )
     cookie_module.CookieManager._instance = manager
     novnc_flow_registry._local.clear()
-    _delete_redis_keys(("novnc_flow:*", "session:*", "tier_memory:*"))
+    _flush_fake_redis()
 
 
-def _clear_rate_limit_budgets() -> None:
-    _delete_redis_keys(("*LIMITER*", "LIMITER*"))
-
-
-def _delete_redis_keys(patterns: tuple[str, ...]) -> None:
-    import redis as sync_redis
-
-    from src.config.config import settings as service_settings
-
-    client = sync_redis.Redis.from_url(service_settings.REDIS_URL, socket_connect_timeout=2)
+def _flush_fake_redis() -> None:
+    client = fakeredis.FakeRedis(server=fake_redis_server)
     try:
-        keys: list[str] = []
-        for pattern in patterns:
-            found = client.keys(pattern)
-            keys.extend(key.decode() if isinstance(key, bytes) else key for key in found)
-        if keys:
-            client.delete(*keys)
+        client.flushall()
     finally:
         client.close()
 
@@ -148,6 +153,35 @@ def stub_browser_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_browser.is_connected = MagicMock(return_value=True)
     mock_browser.close = AsyncMock()
     monkeypatch.setattr(bp, "get_browser", AsyncMock(return_value=mock_browser))
+
+
+@pytest.fixture(autouse=True)
+def stub_page_measure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A page mock has no real document to measure."""
+    from src.reader.strategies import browser_read
+
+    monkeypatch.setattr(browser_read, "_page_html_length", AsyncMock(return_value=0))
+
+
+@pytest.fixture(autouse=True)
+def stub_browser_tunnel(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A tunnel the launch arguments can read; no listener opens in unit tests."""
+    from src.reader.browser_guard import browser_tunnel
+
+    monkeypatch.setattr(browser_tunnel, "_port", 9)
+    monkeypatch.setattr(
+        browser_tunnel, "chained_proxy", lambda proxy: {"server": f"chained:{proxy['server']}"}
+    )
+
+
+@pytest.fixture(autouse=True)
+def stub_crawl_result_expiry(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """Keep every lifespan away from the real object store and hand back the real startup step."""
+    from src.main import _ServiceLifespan
+
+    original = _ServiceLifespan._start_result_expiry
+    monkeypatch.setattr(_ServiceLifespan, "_start_result_expiry", AsyncMock())
+    return original
 
 
 @pytest.fixture(scope="session", autouse=True)

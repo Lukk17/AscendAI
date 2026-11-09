@@ -8,7 +8,7 @@ the helper methods return the proxy dict in the format each tier expects:
   - Playwright:      {"server": url} (may include username/password keys)
 
 The same abstraction offers the customer-supplied crawl proxy
-CRAWL_PROXY_URL (design D7). It is used only by crawl jobs, never by single
+CRAWL_PROXY_URL. It is used only by crawl jobs, never by single
 reads: the crawl worker runs every fetch inside ``crawl_proxy()``, and inside
 that context the helpers serve the crawl proxy whenever it is set, ahead of
 PROXY_URL. Single reads never enter the context and keep using PROXY_URL
@@ -27,7 +27,7 @@ _crawl_mode: ContextVar[bool] = ContextVar("crawl_proxy_mode", default=False)
 
 @contextmanager
 def crawl_proxy() -> Iterator[None]:
-    """Mark the current context as a crawl fetch (design D7)."""
+    """Mark the current context as a crawl fetch."""
     token = _crawl_mode.set(True)
     try:
         yield

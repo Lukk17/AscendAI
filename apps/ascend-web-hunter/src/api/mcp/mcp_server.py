@@ -4,7 +4,7 @@ from importlib.metadata import version as package_version
 from typing import Any, NoReturn
 
 from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, resolve_detail
-from ascend_python_common.uri_guard import FetchPolicy, check_fetch_uri
+from ascend_python_common.uri_guard import check_fetch_uri
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 
@@ -24,11 +24,13 @@ from src.crawl.models import (
     JobNotFoundError,
 )
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
+from src.reader.browser_guard import web_hunter_fetch_policy
 from src.reader.cache_purge import publish_purge
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.novnc.flow_registry import flow_shape, novnc_flow_registry
 from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
+from src.session.profile import Profile, ReadUrl, SessionUrl
 from src.session.session_manager import session_manager
 
 mcp = FastMCP("ascend-web-hunter", version=package_version("ascend-web-hunter"))
@@ -40,17 +42,9 @@ logger = logging.getLogger(__name__)
 MAX_QUERY_LENGTH = 500
 
 
-def _fetch_policy() -> FetchPolicy:
-    return FetchPolicy(
-        allowed_hosts=tuple(settings.ALLOWED_PRIVATE_HOSTS),
-        file_root=None,
-        max_redirect_hops=settings.FETCH_MAX_REDIRECT_HOPS,
-    )
-
-
 async def _check_url(operation: str, url: str) -> None:
     try:
-        await check_fetch_uri(url, _fetch_policy())
+        await check_fetch_uri(url, web_hunter_fetch_policy())
     except Exception as exc:
         _raise_mapped_error(operation, exc)
 
@@ -88,11 +82,11 @@ async def web_search(query: str, limit: int = 5) -> list[dict[str, Any]]:
 
 @mcp.tool()
 async def web_read(
-    url: str,
+    url: ReadUrl,
     include_links: bool = False,
     link_filter: str | None = None,
     heavy_mode: bool = False,
-    profile: str | None = None,
+    profile: Profile | None = None,
     output_format: OutputFormat = "text",
     tier: TierName | None = None,
     extraction_schema: dict[str, Any] | None = None,
@@ -182,13 +176,18 @@ async def web_read(
 
 
 @mcp.tool()
-async def session_establish(url: str, profile: str | None = None) -> dict[str, Any]:
+async def session_establish(url: SessionUrl, profile: Profile | None = None) -> dict[str, Any]:
     """
-    Proactively open the NoVNC login flow for a site.
+    Proactively open the NoVNC login flow for a site, or join the one already open for it.
     IMPORTANT: When this returns status='human_intervention_required', display the vnc_url to the user
     and ask them to complete the login in their browser. Several windows may be open at once: surface
     the window's `slot` alongside the `vnc_url` so the user opens the right one. The session will be
-    captured automatically.
+    captured automatically once the login succeeds.
+    The result carries `intervention_type` ('login', or 'captcha' when an open captcha flow for the
+    site was joined), `vnc_url`, `flow_id`, `joined` (true when an open flow for the same site and
+    profile was joined), `window` (slot, x, y, width, height) and `message`.
+    When every window is in use it returns status='novnc_busy' with `holder_url`, `holder_profile`,
+    `active_flows`, `max_concurrent_flows` and `flows`; try again shortly.
     Args:
         url: The site URL to establish a session for.
         profile: Optional profile label to use (e.g. 'work', 'personal').
@@ -196,7 +195,7 @@ async def session_establish(url: str, profile: str | None = None) -> dict[str, A
     await _check_url("session_establish", url)
 
     try:
-        vnc_url = await session_manager.establish(url, profile)
+        established = await session_manager.establish(url, profile)
     except NoVNCFlowBusyException as exc:
         NOVNC_FLOW_BUSY_TOTAL.inc()
 
@@ -212,12 +211,14 @@ async def session_establish(url: str, profile: str | None = None) -> dict[str, A
     except Exception as exc:
         _raise_mapped_error("session_establish", exc)
 
-    HUMAN_INTERVENTION_TOTAL.labels(intervention_type="login", joined="false").inc()
     return {
         "status": "human_intervention_required",
-        "intervention_type": "login",
-        "vnc_url": vnc_url,
-        "message": f"Login required. Please visit: {vnc_url}",
+        "intervention_type": established.intervention_type,
+        "vnc_url": established.vnc_url,
+        "message": f"Login required. Please visit: {established.vnc_url}",
+        "flow_id": established.flow_id,
+        "joined": established.joined,
+        "window": established.window,
     }
 
 
@@ -241,14 +242,35 @@ async def session_interventions() -> dict[str, Any]:
 
 
 @mcp.tool()
-async def session_status(url: str, profile: str | None = None) -> dict[str, Any]:
+async def session_cancel_intervention(flow_id: str) -> dict[str, Any]:
+    """
+    Close one open human-intervention window and free its slot at once.
+
+    Nothing the window holds is saved, and the flow ends with the outcome
+    'cancelled', which session_status shows as its `last_window`. Fails with
+    'flow_not_found' when no open window has this flow_id.
+    Args:
+        flow_id: The flow_id of the window, as session_interventions lists it.
+    """
+    try:
+        await novnc_flow_registry.cancel(flow_id)
+    except Exception as exc:
+        _raise_mapped_error("session_cancel_intervention", exc)
+
+    return {"status": "cancelled", "flow_id": flow_id}
+
+
+@mcp.tool()
+async def session_status(url: SessionUrl, profile: Profile | None = None) -> dict[str, Any]:
     """
     Query the authentication session status for a URL.
     Args:
         url: The site URL to check the session for.
         profile: Optional profile label (e.g. 'work', 'personal').
     Returns status ('active', 'expired', 'none'), remaining auth TTL in seconds,
-    and the timestamp of the last validated session.
+    the timestamp of the last validated session, and `last_window`: how the last
+    intervention window for the site and profile ended (flow_id, intervention_type,
+    outcome, finished_at), or null when none ended within the session lifetime.
     """
     await _check_url("session_status", url)
 
@@ -260,7 +282,7 @@ async def session_status(url: str, profile: str | None = None) -> dict[str, Any]
 
 
 @mcp.tool()
-async def session_clear(url: str, profile: str | None = None) -> dict[str, Any]:
+async def session_clear(url: SessionUrl, profile: Profile | None = None) -> dict[str, Any]:
     """
     Delete the stored session for a site, including any cached read results
     for that domain. Idempotent: always succeeds, whether or not a session
@@ -301,10 +323,10 @@ async def crawl_submit(
     max_depth: int | None = None,
     page_budget: int | None = None,
     same_domain_only: bool = True,
-    respect_robots: bool = True,
+    respect_robots: bool = False,
     output_format: OutputFormat = "text",
     extraction_schema: dict[str, Any] | None = None,
-    profile: str | None = None,
+    profile: Profile | None = None,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """
@@ -319,7 +341,9 @@ async def crawl_submit(
         max_depth: Link depth below the seeds. Defaults to the service setting.
         page_budget: Most pages the job reads. Defaults to the service setting.
         same_domain_only: When True, links outside the seeds' domains are dropped.
-        respect_robots: When True, robots.txt and crawl-delay are honoured.
+        respect_robots: Defaults to False, which ignores robots.txt rules and crawl-delay. When
+                        True, both apply to queued addresses, and a redirect target is not checked
+                        against the rules. Sitemaps named by robots.txt are used either way.
         output_format: 'text' for the flat content field, 'structured' to also get title, author,
                        date and sitename, 'schema' for JSON validated against extraction_schema,
                        'tables' for HTML tables as rows, 'screenshot' for a base64 PNG.

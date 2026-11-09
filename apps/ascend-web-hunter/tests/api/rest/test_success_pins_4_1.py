@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from src.session.session_manager import SessionInfo, SessionManager
+from src.session.session_manager import EstablishedFlow, SessionInfo, SessionManager
 
 
 @pytest.mark.asyncio
@@ -78,7 +78,19 @@ async def test_establish_session_success_pins_today_body(client: AsyncClient) ->
     # when
     with (
         patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
-        patch.object(SessionManager, "establish", new=AsyncMock(return_value=vnc_url)),
+        patch.object(
+            SessionManager,
+            "establish",
+            new=AsyncMock(
+                return_value=EstablishedFlow(
+                    vnc_url=vnc_url,
+                    intervention_type="login",
+                    flow_id="9f2c41ab77de",
+                    joined=False,
+                    window=None,
+                )
+            ),
+        ),
     ):
         response = await client.post(
             "/api/v2/web/session/establish",

@@ -208,3 +208,21 @@ async def test_get_browser_double_check_inside_lock() -> Any:
 
     # then
     assert result is connected_after_lock
+
+
+@pytest.mark.asyncio
+async def test_launch_carries_the_browser_guard_arguments() -> None:
+    # given
+    from src.reader.browser_guard import chromium_guard_args
+
+    browser = MagicMock()
+    browser.is_connected = MagicMock(return_value=True)
+    factory, pw = _make_playwright_factory(browser)
+
+    # when
+    with patch("src.runtime.browser_pool.async_playwright", return_value=factory):
+        await BrowserPool().start()
+
+    # then
+    args = pw.chromium.launch.await_args.kwargs["args"]
+    assert args == ["--no-sandbox", *chromium_guard_args()]

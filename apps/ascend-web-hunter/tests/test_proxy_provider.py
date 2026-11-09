@@ -7,6 +7,7 @@ import pytest
 
 from src.proxy.proxy_provider import ProxyProvider
 from tests.reader.crawlee_test_support import final_statistics
+from tests.reader.strategies.conftest import make_streaming
 
 
 def test_proxy_disabled_by_default() -> None:
@@ -41,7 +42,7 @@ async def test_curl_cffi_fetcher_injects_proxy_when_configured(pinned_public_hos
 
     mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.text = "<html><body>ok</body></html>"
+    make_streaming(mock_response, "<html><body>ok</body></html>")
     mock_response.url = "http://test.com"
     mock_response.headers = {}
     mock_response.raise_for_status = MagicMock()
@@ -89,11 +90,11 @@ async def test_curl_cffi_fetcher_injects_proxy_on_redirect_hop(pinned_public_hos
     redirect_response = MagicMock()
     redirect_response.status_code = 302
     redirect_response.headers = {"location": "http://test.com/final"}
-    redirect_response.text = ""
+    make_streaming(redirect_response, "")
 
     final_response = MagicMock()
     final_response.status_code = 200
-    final_response.text = "<html>final</html>"
+    make_streaming(final_response, "<html>final</html>")
     final_response.url = "http://test.com/final"
     final_response.headers = {}
     final_response.raise_for_status = MagicMock()
@@ -176,7 +177,7 @@ async def test_crawlee_strategy_injects_proxy_when_configured() -> None:
         await strategy.extract("http://test.com")
 
     # then
-    assert captured_ctx_options.get("proxy") == proxy_dict
+    assert captured_ctx_options.get("proxy") == {"server": "chained:http://proxy:8080"}
 
 
 @pytest.mark.asyncio
@@ -188,11 +189,11 @@ async def test_curl_cffi_fetcher_follows_redirect_without_proxy(pinned_public_ho
     redirect_response = MagicMock()
     redirect_response.status_code = 302
     redirect_response.headers = {"location": "http://test.com/final"}
-    redirect_response.text = ""
+    make_streaming(redirect_response, "")
 
     final_response = MagicMock()
     final_response.status_code = 200
-    final_response.text = "<html>noproxy</html>"
+    make_streaming(final_response, "<html>noproxy</html>")
     final_response.url = "http://test.com/final"
     final_response.headers = {}
     final_response.raise_for_status = MagicMock()
@@ -238,7 +239,7 @@ async def test_curl_cffi_fetcher_breaks_on_empty_redirect_location(pinned_public
     redirect_response = MagicMock()
     redirect_response.status_code = 302
     redirect_response.headers = {}  # no location header
-    redirect_response.text = "<html>original</html>"
+    make_streaming(redirect_response, "<html>original</html>")
     redirect_response.url = "http://test.com"
     redirect_response.raise_for_status = MagicMock()
 

@@ -1,13 +1,18 @@
 """Unit tests for the registry-backed NoVNC strategy: joins, reserves and URL rules."""
 
+import time
+from importlib.metadata import version as package_version
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
 from src.api.exceptions import HumanInterventionRequiredException
+from src.config.config import settings
 from src.reader.cloudflare.challenge_signals import ChallengeVerdict
-from src.reader.novnc.flow_registry import NoVNCFlowRegistry, flow_key_for, novnc_flow_registry
+from src.reader.novnc.flow_registry import NoVNCFlow, NoVNCFlowRegistry, flow_key_for, novnc_flow_registry
+from src.reader.novnc.window_layout import rect_for_slot
 from src.reader.strategies.novnc_strategy import NoVNCStrategy
 from tests.reader.novnc.test_flow_registry import FakeRedis
 
@@ -21,6 +26,36 @@ def _isolated_registry(monkeypatch: pytest.MonkeyPatch) -> Any:
     novnc_flow_registry._local.clear()
     yield fake
     novnc_flow_registry._local.clear()
+
+
+_PUBLISHED_VNC_URL = "http://vnc/vnc.html?autoconnect=true"
+_PAGE_QUERY = f"autoconnect=true&v={package_version('ascend-web-hunter')}"
+
+
+async def _published_vnc_url(_flow: NoVNCFlow) -> str:
+    return _PUBLISHED_VNC_URL
+
+
+def _unpublished_flow(url: str) -> NoVNCFlow:
+    window = rect_for_slot(
+        0,
+        settings.NOVNC_DISPLAY_SIZE,
+        (settings.NOVNC_WINDOW_WIDTH_PX, settings.NOVNC_WINDOW_HEIGHT_PX),
+        settings.NOVNC_WINDOW_CASCADE_OFFSET_PX,
+    )
+
+    return NoVNCFlow(
+        flow_id="d4e5f6a7b8c9",
+        key=flow_key_for(url, "default"),
+        url=url,
+        profile="default",
+        intervention_type="captcha",
+        window=window,
+        vnc_url="",
+        started_at=time.time(),
+        request_id="test-request",
+        lease_started=time.monotonic(),
+    )
 
 
 def _discard_coro(coro: Any) -> Any:
@@ -66,7 +101,7 @@ async def test_novnc_get_html_raises_login_intervention_on_login_redirect_url() 
 
     # then
     assert exc.value.intervention_type == "login"
-    assert exc.value.vnc_url == "http://vnc/vnc.html?autoconnect=true"
+    assert exc.value.vnc_url == f"http://vnc/vnc.html?{_PAGE_QUERY}"
     assert exc.value.joined is False
     assert exc.value.flow_id is not None
     assert exc.value.window is not None
@@ -196,9 +231,12 @@ async def test_lost_write_joins_existing_flow_and_launches_no_browser() -> None:
     other = NoVNCFlowRegistry(redis_client=novnc_flow_registry._redis)
     key = flow_key_for("https://race-site.com/1", "default")
     winner = await other.reserve(
-        key=key, url="https://race-site.com/1", profile="default", intervention_type="captcha"
+        key=key,
+        url="https://race-site.com/1",
+        profile="default",
+        intervention_type="captcha",
+        resolve_vnc_url=_published_vnc_url,
     )
-    await other.set_vnc_url(winner.flow_id, "http://vnc/vnc.html?autoconnect=true")
     factory = MagicMock()
     factory.chromium.launch = AsyncMock()
 
@@ -255,16 +293,33 @@ async def test_strategy_log_lines_carry_flow_id_and_slot(
 
 
 @pytest.mark.asyncio
+async def test_a_query_the_owner_appends_to_the_address_keeps_working() -> None:
+    # given
+    strategy = NoVNCStrategy()
+
+    # when
+    with patch("src.reader.strategies.novnc_strategy.settings.NOVNC_PUBLIC_URL", None):
+        address = await strategy._resolve_public_vnc_url(_unpublished_flow("https://direct.com/"))
+
+    # then
+    assert parse_qs(urlsplit(f"{address}&resize=scale").query) == {
+        "autoconnect": ["true"],
+        "v": [package_version("ascend-web-hunter")],
+        "resize": ["scale"],
+    }
+
+
+@pytest.mark.asyncio
 async def test_novnc_resolve_public_vnc_url_direct() -> None:
     # given
     strategy = NoVNCStrategy()
 
     # when
     with patch("src.reader.strategies.novnc_strategy.settings.NOVNC_PUBLIC_URL", None):
-        result = await strategy._resolve_public_vnc_url()
+        result = await strategy._resolve_public_vnc_url(_unpublished_flow("https://direct.com/"))
 
     # then
-    assert result.endswith("/vnc.html?autoconnect=true")
+    assert result.endswith(f"/vnc.html?{_PAGE_QUERY}")
 
 
 @pytest.mark.asyncio
@@ -286,7 +341,7 @@ async def test_public_url_builds_container_address_without_ngrok() -> None:
 
     # then
     assert exc.value.vnc_url == (
-        "https://edge.example.com/novnc/host-1/vnc.html?autoconnect=true&path=novnc/host-1/websockify"
+        f"https://edge.example.com/novnc/host-1/vnc.html?{_PAGE_QUERY}&path=novnc/host-1/websockify"
     )
     assert exc.value.joined is False
     mock_client_factory.assert_not_called()
@@ -320,7 +375,7 @@ async def test_join_on_second_container_carries_owner_hostname() -> None:
 
     # then
     assert first_exc.value.vnc_url == (
-        "https://edge.example.com/novnc/host-1/vnc.html?autoconnect=true&path=novnc/host-1/websockify"
+        f"https://edge.example.com/novnc/host-1/vnc.html?{_PAGE_QUERY}&path=novnc/host-1/websockify"
     )
     assert second_exc.value.joined is True
     assert second_exc.value.vnc_url == first_exc.value.vnc_url
@@ -347,10 +402,10 @@ async def test_novnc_fetch_ngrok_url_picks_first_tunnel() -> None:
         ),
         patch("src.reader.strategies.novnc_strategy.httpx.AsyncClient", return_value=mock_client),
     ):
-        url = await strategy._resolve_public_vnc_url()
+        url = await strategy._resolve_public_vnc_url(_unpublished_flow("https://tunnel.com/"))
 
     # then
-    assert url == "https://abc.ngrok.app/vnc.html?autoconnect=true"
+    assert url == f"https://abc.ngrok.app/vnc.html?{_PAGE_QUERY}"
 
 
 @pytest.mark.asyncio
@@ -373,10 +428,10 @@ async def test_novnc_fetch_ngrok_url_falls_back_on_error() -> None:
         ),
         patch("src.reader.strategies.novnc_strategy.httpx.AsyncClient", return_value=mock_client),
     ):
-        url = await strategy._resolve_public_vnc_url()
+        url = await strategy._resolve_public_vnc_url(_unpublished_flow("https://tunnel.com/"))
 
     # then
-    assert url == "http://fallback/vnc.html?autoconnect=true"
+    assert url == f"http://fallback/vnc.html?{_PAGE_QUERY}"
 
 
 def test_novnc_extract_url_from_ngrok_empty_tunnels_uses_fallback() -> None:
@@ -387,7 +442,7 @@ def test_novnc_extract_url_from_ngrok_empty_tunnels_uses_fallback() -> None:
     result = strategy._extract_url_from_ngrok_response({"tunnels": []}, "http://fallback")
 
     # then
-    assert result == "http://fallback/vnc.html?autoconnect=true"
+    assert result == f"http://fallback/vnc.html?{_PAGE_QUERY}"
 
 
 @pytest.mark.asyncio
@@ -398,9 +453,12 @@ async def test_blind_find_then_lost_write_joins_without_launch() -> None:
     other = NoVNCFlowRegistry(redis_client=novnc_flow_registry._redis)
     key = flow_key_for("https://blind-site.com/1", "default")
     winner = await other.reserve(
-        key=key, url="https://blind-site.com/1", profile="default", intervention_type="captcha"
+        key=key,
+        url="https://blind-site.com/1",
+        profile="default",
+        intervention_type="captcha",
+        resolve_vnc_url=_published_vnc_url,
     )
-    await other.set_vnc_url(winner.flow_id, "http://vnc/vnc.html?autoconnect=true")
     factory = MagicMock()
     factory.chromium.launch = AsyncMock()
 
@@ -423,3 +481,96 @@ async def test_blind_find_then_lost_write_joins_without_launch() -> None:
     assert exc.value.vnc_url == "http://vnc/vnc.html?autoconnect=true"
     mock_create_task.assert_not_called()
     factory.chromium.launch.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# A joiner always gets the address, and the Ngrok line names the flow
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_joiner_during_the_address_lookup_gets_a_non_empty_vnc_url() -> None:
+    """While the owner still waits on the Ngrok API, a second read for the
+    same site and profile joins with the owner's address, never an empty one."""
+    # given
+    import asyncio
+
+    gate = asyncio.Event()
+
+    async def slow_lookup(_self: NoVNCStrategy, *_args: Any) -> str:
+        await gate.wait()
+
+        return "https://abc.ngrok.app/vnc.html?autoconnect=true"
+
+    owner = NoVNCStrategy("default")
+    follower = NoVNCStrategy("default")
+
+    async def read(strategy: NoVNCStrategy, url: str) -> HumanInterventionRequiredException:
+        with pytest.raises(HumanInterventionRequiredException) as exc:
+            await strategy.get_html(url)
+
+        return exc.value
+
+    # when
+    with (
+        patch.object(NoVNCStrategy, "_resolve_public_vnc_url", new=slow_lookup),
+        patch("src.reader.strategies.novnc_strategy.asyncio.create_task", side_effect=_discard_coro),
+    ):
+        loop = asyncio.get_running_loop()
+        owner_read = loop.create_task(read(owner, "https://lookup-site.com/a"))
+        await asyncio.sleep(0.01)
+        follower_read = loop.create_task(read(follower, "https://lookup-site.com/b"))
+        await asyncio.sleep(0.01)
+        gate.set()
+        owner_exc, follower_exc = await asyncio.gather(owner_read, follower_read)
+
+    # then
+    assert owner_exc.joined is False
+    assert follower_exc.joined is True
+    assert follower_exc.flow_id == owner_exc.flow_id
+    assert follower_exc.vnc_url == "https://abc.ngrok.app/vnc.html?autoconnect=true"
+
+
+@pytest.mark.asyncio
+async def test_ngrok_lookup_warning_carries_flow_id_and_slot(caplog: pytest.LogCaptureFixture) -> None:
+    # given
+    strategy = NoVNCStrategy()
+    mock_client = AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.get = AsyncMock(side_effect=RuntimeError("nope"))
+
+    # when
+    with (
+        caplog.at_level("WARNING", logger="src.reader.strategies.novnc_strategy"),
+        patch("src.reader.strategies.novnc_strategy.settings.NOVNC_PUBLIC_URL", None),
+        patch("src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL", "http://ngrok/api/tunnels"),
+        patch("src.reader.strategies.novnc_strategy.httpx.AsyncClient", return_value=mock_client),
+        patch("src.reader.strategies.novnc_strategy.asyncio.create_task", side_effect=_discard_coro),
+    ):
+        with pytest.raises(HumanInterventionRequiredException) as exc:
+            await strategy.get_html("https://ngrok-log.com/")
+
+    # then
+    lines = [record.getMessage() for record in caplog.records if "PUBLIC_VNC_URL" in record.getMessage()]
+    assert lines
+    assert f"flow_id={exc.value.flow_id}" in lines[0]
+    assert "slot=0" in lines[0]
+
+
+@pytest.mark.asyncio
+async def test_explicit_intervention_type_overrides_the_url_rule() -> None:
+    # given
+    strategy = NoVNCStrategy()
+
+    # when
+    with (
+        patch("src.reader.strategies.novnc_strategy.settings.PUBLIC_VNC_URL", "http://vnc"),
+        patch("src.reader.strategies.novnc_strategy.settings.NOVNC_PUBLIC_URL", None),
+        patch("src.reader.strategies.novnc_strategy.asyncio.create_task", side_effect=_discard_coro),
+    ):
+        with pytest.raises(HumanInterventionRequiredException) as exc:
+            await strategy.get_html("https://plain-site.com/", intervention_type="login")
+
+    # then
+    assert exc.value.intervention_type == "login"
+    assert [flow.intervention_type for flow in novnc_flow_registry.local()] == ["login"]

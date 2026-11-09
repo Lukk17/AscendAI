@@ -20,6 +20,7 @@ from src.crawl.keys import (
     seen_key,
 )
 from src.crawl.models import CrawlRequest, InvalidTenantError, JobRecord
+from src.reader.schema_extraction import canonical_schema
 
 
 @pytest.fixture
@@ -107,6 +108,20 @@ async def test_submit_checks_every_seed(service: CrawlJobService, stub_guard: As
     ]
 
 
+async def test_submit_checks_seeds_with_the_shared_fetch_policy(
+    service: CrawlJobService, stub_guard: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given a shared policy
+    sentinel = object()
+    monkeypatch.setattr("src.crawl.job_service.web_hunter_fetch_policy", lambda: sentinel)
+
+    # when
+    await service.submit_job("acme", _request())
+
+    # then the seed guard ran with it
+    assert [call.args[1] for call in stub_guard.await_args_list] == [sentinel]
+
+
 async def test_submit_refuses_unsafe_seed_and_creates_no_job(
     service: CrawlJobService, stub_guard: AsyncMock
 ) -> None:
@@ -119,11 +134,45 @@ async def test_submit_refuses_unsafe_seed_and_creates_no_job(
     assert await service.list_jobs("acme") == []
 
 
-async def test_submit_refuses_opt_out_seed(service: CrawlJobService, public_guard: None) -> None:
+async def test_submit_accepts_ignoring_robots_for_every_site(
+    service: CrawlJobService, public_guard: None
+) -> None:
+    # when
+    record = await service.submit_job("acme", _request(respect_robots=False))
+
+    # then
+    assert record.request.respect_robots is False
+    assert [job.job_id for job in await service.list_jobs("acme")] == [record.job_id]
+
+
+async def test_submit_refuses_oversized_extraction_schema_and_creates_no_job(
+    service: CrawlJobService, stub_guard: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given a schema above the read path's size cap
+    monkeypatch.setattr(settings, "EXTRACTION_SCHEMA_MAX_BYTES", 10)
+    request = _request(output_format="schema", extraction_schema={"type": "object", "title": "x" * 50})
+
     # when / then
-    with pytest.raises(ValueError, match="respect_robots=false is refused"):
-        await service.submit_job("acme", _request(respect_robots=False))
+    with pytest.raises(ValueError, match="EXTRACTION_SCHEMA_MAX_BYTES"):
+        await service.submit_job("acme", request)
     assert await service.list_jobs("acme") == []
+    assert stub_guard.await_count == 0
+
+
+async def test_submit_accepts_extraction_schema_at_the_cap(
+    service: CrawlJobService, stub_guard: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given a schema exactly at the size cap
+    schema = {"type": "object"}
+    monkeypatch.setattr(
+        settings, "EXTRACTION_SCHEMA_MAX_BYTES", len(canonical_schema(schema).encode("utf-8"))
+    )
+
+    # when
+    record = await service.submit_job("acme", _request(output_format="schema", extraction_schema=schema))
+
+    # then
+    assert record.state == "waiting"
 
 
 async def test_get_missing_returns_none(service: CrawlJobService) -> None:
@@ -319,3 +368,59 @@ def test_resolve_tenant_refuses_outside_format(header: str) -> None:
     # when / then
     with pytest.raises(InvalidTenantError):
         resolve_tenant(header)
+
+
+def _record_with_old_bad_profile(fresh: JobRecord) -> str:
+    stored = json.loads(fresh.model_dump_json())
+    stored["request"]["profile"] = "a\nb"
+
+    return json.dumps(stored)
+
+
+async def test_a_stored_job_with_an_old_bad_profile_reads_as_not_found(
+    service: CrawlJobService, fake_redis: FakeRedis, stub_guard: AsyncMock
+) -> None:
+    # given
+    record = await service.submit_job("acme", _request())
+    await fake_redis.set(job_key("acme", record.job_id), _record_with_old_bad_profile(record))
+
+    # when
+    found = await service.get_job("acme", record.job_id)
+    cancelled = await service.cancel_job("acme", record.job_id)
+
+    # then
+    assert found is None
+    assert cancelled is None
+
+
+async def test_the_tenant_list_skips_a_stored_job_with_an_old_bad_profile(
+    service: CrawlJobService, fake_redis: FakeRedis, stub_guard: AsyncMock
+) -> None:
+    # given
+    bad = await service.submit_job("acme", _request())
+    good = await service.submit_job("acme", _request())
+    await fake_redis.set(job_key("acme", bad.job_id), _record_with_old_bad_profile(bad))
+
+    # when
+    listed = await service.list_jobs("acme")
+
+    # then
+    assert [record.job_id for record in listed] == [good.job_id]
+
+
+async def test_a_seed_given_twice_is_queued_and_counted_once(
+    service: CrawlJobService, fake_redis: FakeRedis, stub_guard: AsyncMock
+) -> None:
+    # given
+    request = _request(seeds=["https://example.com/a", "https://example.com/a", "https://example.com/b"])
+
+    # when
+    record = await service.submit_job("acme", request)
+
+    # then
+    assert record.pending == 2
+    assert record.counts.queued == 2
+    assert await fake_redis.lrange(queue_key("acme", record.job_id, "example.com"), 0, -1) == [
+        "0\thttps://example.com/a",
+        "0\thttps://example.com/b",
+    ]

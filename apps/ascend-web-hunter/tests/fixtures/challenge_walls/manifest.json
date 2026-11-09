@@ -936,10 +936,10 @@
     "notes": "Real 404 with a large real body."
   },
   {
-    "path": "rich-403.html",
+    "path": "reddit-network-block-403.html",
     "vendor": null,
     "language": "en",
-    "kind": "counterexample",
+    "kind": "wall",
     "status": 403,
     "headers": {
       "server": "snooserv"
@@ -953,13 +953,18 @@
     "captured_with": "curl_cffi",
     "synthetic": false,
     "expected": {
-      "wall": false,
+      "wall": true,
       "intervention_type": "captcha",
       "vendor": null,
-      "signals_must_fire": [],
-      "signals_must_not_fire": []
+      "signals_must_fire": [
+        "status_large_body",
+        "phrase_body"
+      ],
+      "signals_must_not_fire": [
+        "rich_content"
+      ]
     },
-    "notes": "403 with a large real body: status_large plus guards, still content."
+    "notes": "Reddit's block page, a 403 with a large body whose visible text is \"You've been blocked by network security\". Filed as content until 2026-11-07, when it was found to be a block page, not a real article: its phrase now fires and makes it a wall."
   },
   {
     "path": "script-shell.html",
@@ -1092,5 +1097,90 @@
       ]
     },
     "notes": "Built from the SDK markers in challenge_dictionary.json alone; no public Friendly Captcha page scored as a wall (best 80 of 100 on app.friendlycaptcha.eu)."
+  },
+  {
+    "path": "reddit-login-redirect-rendered.html",
+    "vendor": null,
+    "language": "en",
+    "kind": "login_wall",
+    "status": 200,
+    "headers": {
+      "server": "snooserv"
+    },
+    "cookie_names": [
+      "_GRECAPTCHA",
+      "csrf_token",
+      "csv",
+      "edgebucket",
+      "g_state",
+      "loid",
+      "session_tracker",
+      "token_v2"
+    ],
+    "source_url": "https://old.reddit.com/r/programming/",
+    "final_url": "https://old.reddit.com/login/?reason=lor2&dest=https%3A%2F%2Fold.reddit.com%2Fr%2Fprogramming%2F",
+    "captured_on": "2026-11-07",
+    "captured_with": "playwright through the 4-playwright_stealth tier",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [
+        "thin_text",
+        "few_links",
+        "no_article"
+      ],
+      "signals_must_not_fire": [
+        "rich_content",
+        "status_large_body"
+      ],
+      "login_wall": true
+    },
+    "notes": "Anonymous read of a subreddit, redirected with 302 to the login page, which answered 200 titled Welcome to Reddit with no password input outside shadow roots. The score alone keeps it content, so only the login path of the final address makes it a login wall. Inline script and style bodies trimmed to 200 characters. The loid, clienthash, country, cluster, nonce, renderId, cas and cb values and every UUID replaced with REDACTED."
+  },
+  {
+    "path": "scrapingcourse-cloudflare-cleared.html",
+    "vendor": "cloudflare",
+    "language": "en",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {
+      "server": "cloudflare",
+      "cf-ray": "a57d1b77acd63eae-WAW",
+      "cf-cache-status": "DYNAMIC",
+      "content-type": "text/html; charset=utf-8"
+    },
+    "cookie_names": [
+      "cf_clearance",
+      "XSRF-TOKEN",
+      "scrapingcoursecom_session",
+      "AWSALB",
+      "AWSALBCORS"
+    ],
+    "source_url": "https://www.scrapingcourse.com/cloudflare-challenge",
+    "captured_on": "2026-11-09",
+    "captured_with": "patchright through the browser guard and the pinned tunnel, visible window, nobody clicking",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "vendor_script",
+        "vendor_presence",
+        "few_links",
+        "served_page"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header",
+        "interstitial_structure",
+        "captcha_element",
+        "captcha_input",
+        "thin_text",
+        "no_article"
+      ]
+    },
+    "notes": "The page a cleared Cloudflare challenge lands on: answered 200 with no cf-mitigated header, the Turnstile script stays in its head and the Cloudflare headers and cookies stay on the response. No challenge structure, so the script and vendor presence alone must not make it a wall."
   }
 ]

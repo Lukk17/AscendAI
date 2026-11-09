@@ -1,4 +1,4 @@
-"""Tests for the record-presence questions the read and session layers ask: has_auth_cookies,
+"""Tests for the record-presence questions the read and session layers ask: has_auth_state,
 has_session_record and get_auth_saved_at.
 
 Change close-web-search-scraping-follow-ups, task 2.1.
@@ -30,10 +30,10 @@ async def test_no_record_means_no_auth_cookies() -> None:
     manager = _fresh()
 
     # when / then
-    assert await manager.has_auth_cookies(_URL) is False
+    assert await manager.has_auth_state(_URL) is False
 
 
-async def test_a_captured_login_has_auth_cookies() -> None:
+async def test_a_captured_login_has_auth_state() -> None:
     # given
     manager = _fresh()
     await manager.save_storage_state(
@@ -41,10 +41,10 @@ async def test_a_captured_login_has_auth_cookies() -> None:
     )
 
     # when / then
-    assert await manager.has_auth_cookies(_URL) is True
+    assert await manager.has_auth_state(_URL) is True
 
 
-async def test_a_lapsed_login_still_has_auth_cookies() -> None:
+async def test_a_lapsed_login_still_has_auth_state() -> None:
     """The gate asks whether a login was ever captured, not whether it is still valid."""
     # given
     manager = _fresh()
@@ -53,7 +53,7 @@ async def test_a_lapsed_login_still_has_auth_cookies() -> None:
     stored["auth"]["saved_at"] = time.time() - 10_000_000
 
     # when / then
-    assert await manager.has_auth_cookies(_URL) is True
+    assert await manager.has_auth_state(_URL) is True
 
 
 async def test_a_waf_only_record_has_no_auth_cookies() -> None:
@@ -62,7 +62,7 @@ async def test_a_waf_only_record_has_no_auth_cookies() -> None:
     await manager.save_flat_cookies(_URL, {"cf_clearance": "x"}, "ua", None, PRODUCED_BY_NOVNC)
 
     # when / then
-    assert await manager.has_auth_cookies(_URL) is False
+    assert await manager.has_auth_state(_URL) is False
 
 
 async def test_a_profile_without_a_login_is_independent_of_one_with() -> None:
@@ -71,8 +71,8 @@ async def test_a_profile_without_a_login_is_independent_of_one_with() -> None:
     await manager.save_storage_state(_URL, {"cookies": [_cookie("li_at")], "origins": []}, "ua", "work")
 
     # when / then
-    assert await manager.has_auth_cookies(_URL, "work") is True
-    assert await manager.has_auth_cookies(_URL, "personal") is False
+    assert await manager.has_auth_state(_URL, "work") is True
+    assert await manager.has_auth_state(_URL, "personal") is False
 
 
 async def test_nothing_stored_means_no_session_record() -> None:
@@ -84,7 +84,7 @@ async def test_nothing_stored_means_no_session_record() -> None:
 
 
 async def test_a_waf_only_record_is_still_a_session_record() -> None:
-    """Wider than has_auth_cookies on purpose: this is what tells an expired
+    """Wider than has_auth_state on purpose: this is what tells an expired
     session apart from one that was never established."""
     # given
     manager = _fresh()

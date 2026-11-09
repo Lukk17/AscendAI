@@ -1,10 +1,11 @@
-"""Per-domain tier memory in Redis (design D3).
+"""Per-domain tier memory in Redis.
 
 Key ``tier_memory:{registrable_domain}``, value the tier name that last
-returned accepted content, TTL ``TIER_MEMORY_TTL_SECONDS``. A success at a
-cheaper tier than the remembered one overwrites it; a dearer tier never does.
-A Redis failure is logged and answered with ``None`` (get) or dropped
-(record): the read climbs the full ladder instead of failing.
+returned accepted content, TTL ``TIER_MEMORY_TTL_SECONDS``. Every recorded
+success overwrites the remembered tier, whichever end of the ladder it is on.
+A name outside the ladder is never stored. A Redis failure is logged and
+answered with ``None`` (get) or dropped (record): the read climbs the full
+ladder instead of failing.
 """
 
 import logging
@@ -25,19 +26,15 @@ def _key(url: str) -> str:
     return f"{_KEY_PREFIX}{cookie_manager.registrable_domain(url)}"
 
 
-def _is_cheaper(candidate: str, stored: str) -> bool:
-    """True when *candidate* climbs earlier in the ladder than *stored*.
+def _is_ladder_tier(tier: str) -> bool:
+    """True when *tier* names a rung of the ladder.
 
     Deferred import: `web_reader` imports this module, so a top-level import
     would cycle back into it.
     """
     from src.reader.web_reader import TIER_ORDER
 
-    order: list[str] = list(TIER_ORDER)
-    try:
-        return order.index(candidate) < order.index(stored)
-    except ValueError:
-        return False
+    return tier in TIER_ORDER
 
 
 def _memory_get(key: str) -> str | None:
@@ -84,12 +81,11 @@ async def get(url: str) -> str | None:
 
 
 async def record(url: str, tier: str) -> None:
-    """Remember *tier* for the registrable domain of *url*, unless the stored
-    tier climbs earlier in the ladder already."""
-    key = _key(url)
-    stored = await get(url)
-    if stored is not None and not _is_cheaper(tier, stored):
+    """Remember *tier* for the registrable domain of *url*, replacing any remembered tier."""
+    if not _is_ladder_tier(tier):
         return
+
+    key = _key(url)
 
     client = cookie_manager.redis_client
     if client is not None:

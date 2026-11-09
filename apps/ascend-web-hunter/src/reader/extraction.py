@@ -7,10 +7,12 @@ Provides two extraction paths:
 
 import json
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 import trafilatura
 from bs4 import BeautifulSoup
+from bs4.element import PageElement, PreformattedString, Tag
 from extruct import extract as extruct_extract
 from readability import Document
 
@@ -31,9 +33,56 @@ _BOILERPLATE_MARKERS = (
     "widget",
 )
 
+_BLOCK_TAGS = frozenset(
+    {
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "body",
+        "br",
+        "dd",
+        "details",
+        "div",
+        "dl",
+        "dt",
+        "figcaption",
+        "figure",
+        "footer",
+        "form",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "header",
+        "hr",
+        "html",
+        "li",
+        "main",
+        "nav",
+        "ol",
+        "p",
+        "pre",
+        "section",
+        "summary",
+        "table",
+        "tbody",
+        "td",
+        "tfoot",
+        "th",
+        "thead",
+        "tr",
+        "ul",
+    }
+)
+
+_NON_TEXT_TAGS = frozenset({"noscript", "script", "style", "template"})
+
 
 def extract_embedded_metadata(html: str) -> dict[str, Any]:
-    """Parse JSON-LD, OpenGraph and microdata with extruct (design D1).
+    """Parse JSON-LD, OpenGraph and microdata with extruct.
 
     A parse error leaves the metadata empty and logs a WARNING. It never fails the read.
     """
@@ -52,7 +101,7 @@ def extract_embedded_metadata(html: str) -> dict[str, Any]:
 
 
 def extract_tables(html: str) -> list[list[list[str]]]:
-    """Parse every HTML table into rows of cell texts (design D7).
+    """Parse every HTML table into rows of cell texts.
 
     One entry per table, one list of cell texts per row, header and body rows
     alike. A page with no tables yields an empty list, never an error.
@@ -95,7 +144,7 @@ def _readability_extract(html: str) -> dict[str, Any]:
 
 
 def _ensemble_score(content: str) -> float:
-    """Score one extraction by text length discounted for links and boilerplate (design D2)."""
+    """Score one extraction by text length discounted for links and boilerplate."""
     soup = BeautifulSoup(content, "html.parser")
     plain = soup.get_text(" ", strip=True)
     length = len(plain)
@@ -170,7 +219,7 @@ def extract_structured(html: str) -> dict[str, Any]:
     read_content: str = read_result.get("content", "")
 
     if _ensemble_score(read_content) > _ensemble_score(traf_content):
-        return {**read_result, "metadata": metadata}
+        return {**read_result, "content": _html_to_plain_text(read_content), "metadata": metadata}
 
     if traf is not None:
         return {**traf, "metadata": metadata}
@@ -186,6 +235,34 @@ def extract_structured(html: str) -> dict[str, Any]:
     }
 
 
+def _inline_text(node: PageElement) -> str:
+    if isinstance(node, Tag):
+        return "" if node.name in _NON_TEXT_TAGS else node.get_text()
+    if isinstance(node, PreformattedString):
+        return ""
+
+    return str(node)
+
+
+def _block_lines(node: Tag) -> Iterator[str]:
+    inline: list[str] = []
+    for child in node.children:
+        if isinstance(child, Tag) and child.name in _BLOCK_TAGS:
+            yield " ".join("".join(inline).split())
+            inline = []
+            yield from _block_lines(child)
+        else:
+            inline.append(_inline_text(child))
+    yield " ".join("".join(inline).split())
+
+
+def _html_to_plain_text(html: str) -> str:
+    """Flatten HTML to plain text, one line per block, entities decoded and whitespace collapsed."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    return "\n".join(line for line in _block_lines(soup) if line)
+
+
 def extract_text_with_fallback(html: str) -> str:
     """Extract text from HTML: both extractors run and the higher scoring result wins.
 
@@ -196,6 +273,6 @@ def extract_text_with_fallback(html: str) -> str:
     read_content: str = _readability_extract(html).get("content", "")
 
     if _ensemble_score(read_content) > _ensemble_score(traf_text):
-        return read_content
+        return _html_to_plain_text(read_content)
 
     return traf_text

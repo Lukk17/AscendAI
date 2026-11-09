@@ -6,7 +6,9 @@ from ascend_python_common.uri_guard import UnsafeUriError
 from httpx import AsyncClient
 
 from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
-from src.session.session_manager import SessionInfo, SessionManager
+from src.api.rest import rest_endpoints
+from src.reader.strategies.base_strategy import FetchedHtml
+from src.session.session_manager import EstablishedFlow, SessionInfo, SessionManager
 
 
 @pytest.mark.asyncio
@@ -137,6 +139,39 @@ async def test_read_post_with_include_links(client: AsyncClient) -> None:
     )
 
 
+_PAGE_WITH_VALIDATORS = FetchedHtml(
+    "<html><body><article><p>"
+    + "public answer words " * 20
+    + '<a href="/next">next</a></p></article></body></html>',
+    {"etag": '"public"', "last-modified": "Mon"},
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("include_links", [True, False])
+async def test_read_post_answer_carries_no_cache_validators(client: AsyncClient, include_links: bool) -> None:
+    # given a tier whose final answer carried ETag and Last-Modified
+    async def tier_html(name: Any, strategy: Any, url: str) -> str:
+        return _PAGE_WITH_VALIDATORS
+
+    url = f"https://rest-validators-{include_links}.example.com/"
+
+    # when
+    with (
+        patch.object(rest_endpoints.web_reader, "_novnc_or_tier_html", side_effect=tier_html),
+        patch.object(rest_endpoints.web_reader.validator, "validate", return_value=True),
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
+    ):
+        resp = await client.post("/api/v2/web/read", json={"url": url, "include_links": include_links})
+
+    # then
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "success"
+    assert "etag" not in body
+    assert "last_modified" not in body
+
+
 @pytest.mark.asyncio
 async def test_read_post_heavy_mode_forwarded(client: AsyncClient) -> None:
     # given
@@ -181,7 +216,7 @@ async def test_establish_session_returns_vnc_url(client: AsyncClient) -> None:
         patch.object(
             SessionManager,
             "establish",
-            new=AsyncMock(return_value="http://vnc:7900"),
+            new=AsyncMock(return_value=_established()),
         ),
     ):
         resp = await client.post(
@@ -195,6 +230,38 @@ async def test_establish_session_returns_vnc_url(client: AsyncClient) -> None:
     assert body["status"] == "login_required"
     assert body["vnc_url"] == "http://vnc:7900"
     assert "example.com" in body["target"]
+
+
+def _established(joined: bool = False) -> EstablishedFlow:
+    return EstablishedFlow(
+        vnc_url="http://vnc:7900",
+        intervention_type="login",
+        flow_id="9f2c41ab77de",
+        joined=joined,
+        window={"slot": 2, "x": 96, "y": 96, "width": 1280, "height": 800},
+    )
+
+
+@pytest.mark.asyncio
+async def test_establish_session_returns_flow_id_joined_and_window(client: AsyncClient) -> None:
+    # when
+    with (
+        patch("src.api.rest.rest_endpoints.check_fetch_uri", return_value=True),
+        patch.object(SessionManager, "establish", new=AsyncMock(return_value=_established(joined=True))),
+    ):
+        resp = await client.post("/api/v2/web/session/establish", json={"url": "http://example.com/"})
+
+    # then
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "status": "login_required",
+        "target": "http://example.com/",
+        "intervention_type": "login",
+        "vnc_url": "http://vnc:7900",
+        "flow_id": "9f2c41ab77de",
+        "joined": True,
+        "window": {"slot": 2, "x": 96, "y": 96, "width": 1280, "height": 800},
+    }
 
 
 @pytest.mark.asyncio
@@ -506,8 +573,8 @@ async def test_interventions_rest_and_mcp_return_same_payload(
         url="https://parity-site.com/1",
         profile="default",
         intervention_type="captcha",
+        resolve_vnc_url=AsyncMock(return_value="http://vnc/vnc.html"),
     )
-    await novnc_flow_registry.set_vnc_url(flow.flow_id, "http://vnc/vnc.html")
 
     # when
     resp = await client.get("/api/v2/session/interventions")
@@ -542,10 +609,9 @@ async def test_busy_flows_and_listing_name_owner_hostname(
             url=f"https://{domain}/1",
             profile="default",
             intervention_type="captcha",
-        )
-        await novnc_flow_registry.set_vnc_url(
-            flow.flow_id,
-            "https://edge.example.com/novnc/host-1/vnc.html?autoconnect=true&path=novnc/host-1/websockify",
+            resolve_vnc_url=AsyncMock(
+                return_value="https://edge.example.com/novnc/host-1/vnc.html?autoconnect=true&path=novnc/host-1/websockify"
+            ),
         )
         owned.append(flow.flow_id)
 
@@ -617,6 +683,154 @@ async def test_session_status_returns_info(client: AsyncClient) -> None:
     body = resp.json()
     assert body["status"] == "active"
     assert body["auth_ttl_remaining_seconds"] == 3600.0
+
+
+@pytest.mark.asyncio
+async def test_session_status_names_the_last_window_result(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    from src.reader.novnc.flow_registry import flow_key_for, novnc_flow_registry
+    from tests.reader.novnc.test_flow_registry import FakeRedis
+
+    monkeypatch.setattr(novnc_flow_registry, "_redis", FakeRedis())
+    flow = await novnc_flow_registry.reserve(
+        key=flow_key_for("https://status-window.com/", "work"),
+        url="https://status-window.com/",
+        profile="work",
+        intervention_type="login",
+    )
+    await novnc_flow_registry.finish(flow, "already_authenticated")
+
+    # when
+    resp = await client.post(
+        "/api/v2/web/session/status",
+        json={"url": "https://status-window.com/", "profile": "work"},
+    )
+
+    # then
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body) == {
+        "url",
+        "status",
+        "auth_ttl_remaining_seconds",
+        "last_validated",
+        "profile",
+        "last_window",
+    }
+    assert body["last_window"]["flow_id"] == flow.flow_id
+    assert body["last_window"]["intervention_type"] == "login"
+    assert body["last_window"]["outcome"] == "already_authenticated"
+    assert isinstance(body["last_window"]["finished_at"], float)
+
+
+@pytest.mark.asyncio
+async def test_session_status_last_window_is_null_once_its_redis_record_is_deleted(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    from src.reader.novnc.flow_registry import flow_key_for, novnc_flow_registry
+    from tests.reader.novnc.test_flow_registry import FakeRedis
+
+    fake = FakeRedis()
+    monkeypatch.setattr(novnc_flow_registry, "_redis", fake)
+    key = flow_key_for("https://deleted-window.com/", "default")
+    flow = await novnc_flow_registry.reserve(
+        key=key,
+        url="https://deleted-window.com/",
+        profile="default",
+        intervention_type="login",
+    )
+    await novnc_flow_registry.finish(flow, "resolved")
+    del fake._data[f"novnc_window_result:{key}"]
+
+    # when
+    resp = await client.post("/api/v2/web/session/status", json={"url": "https://deleted-window.com/"})
+
+    # then
+    assert resp.status_code == 200
+    assert resp.json()["last_window"] is None
+
+
+@pytest.mark.asyncio
+async def test_session_status_last_window_is_null_before_any_window(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    from src.reader.novnc.flow_registry import novnc_flow_registry
+    from tests.reader.novnc.test_flow_registry import FakeRedis
+
+    monkeypatch.setattr(novnc_flow_registry, "_redis", FakeRedis())
+
+    # when
+    resp = await client.post("/api/v2/web/session/status", json={"url": "https://no-window-yet.com/"})
+
+    # then
+    assert resp.status_code == 200
+    assert resp.json()["last_window"] is None
+
+
+# ---------------------------------------------------------------------------
+# Closing one window: DELETE on /api/v2/session/interventions/{flow_id}
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_delete_intervention_closes_the_window_and_answers_204(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    from src.reader.novnc.flow_registry import flow_key_for, novnc_flow_registry
+    from tests.reader.novnc.test_flow_registry import FakeRedis
+
+    monkeypatch.setattr(novnc_flow_registry, "_redis", FakeRedis())
+    flow = await novnc_flow_registry.reserve(
+        key=flow_key_for("https://close-me.com/", "default"),
+        url="https://close-me.com/",
+        profile="default",
+        intervention_type="captcha",
+    )
+
+    # when
+    resp = await client.delete(f"/api/v2/session/interventions/{flow.flow_id}")
+    listing = await client.get("/api/v2/session/interventions")
+    status = await client.post("/api/v2/web/session/status", json={"url": "https://close-me.com/"})
+
+    # then
+    assert resp.status_code == 204
+    assert resp.content == b""
+    assert listing.json()["flows"] == []
+    assert novnc_flow_registry.local() == []
+    assert status.json()["last_window"]["outcome"] == "cancelled"
+    assert status.json()["last_window"]["flow_id"] == flow.flow_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("flow_id", ["0123456789ab", "not-a-flow"])
+async def test_delete_intervention_of_an_unknown_or_finished_flow_answers_404_problem(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, flow_id: str
+) -> None:
+    # given
+    from src.reader.novnc.flow_registry import novnc_flow_registry
+    from tests.reader.novnc.test_flow_registry import FakeRedis
+
+    monkeypatch.setattr(novnc_flow_registry, "_redis", FakeRedis())
+
+    # when
+    resp = await client.delete(f"/api/v2/session/interventions/{flow_id}")
+
+    # then
+    assert resp.status_code == 404
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    body = resp.json()
+    assert body["type"] == "https://ascend.ai/errors/flow-not-found"
+    assert body["title"] == "Not Found"
+    assert body["code"] == "flow_not_found"
+    assert body["status"] == 404
+    assert body["detail"] == f"No open intervention window has flow_id {flow_id}."
+    assert body["instance"] == f"/api/v2/session/interventions/{flow_id}"
+    assert "traceId" in body
 
 
 # ---------------------------------------------------------------------------

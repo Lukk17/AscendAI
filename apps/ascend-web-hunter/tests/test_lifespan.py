@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -82,6 +83,23 @@ async def test_lifespan_logs_warning_when_browser_pool_stop_fails() -> None:
             "stop",
             new=AsyncMock(side_effect=RuntimeError("stop failed")),
         ),
+        _no_banner_network()[0],
+        _no_banner_network()[1],
+    ):
+        app: FastAPI = main_module.create_app()
+        async with LifespanManager(app):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_lifespan_logs_warning_when_browser_tunnel_stop_fails() -> None:
+    # given
+    from src import main as main_module
+    from src.reader.browser_guard import browser_tunnel
+
+    # when / then
+    with (
+        patch.object(browser_tunnel, "stop", new=AsyncMock(side_effect=RuntimeError("stop failed"))),
         _no_banner_network()[0],
         _no_banner_network()[1],
     ):
@@ -229,7 +247,7 @@ async def test_lifespan_exit_cancels_live_flow_monitor(
         ),
         patch(
             "src.reader.strategies.novnc_strategy._poll_once",
-            new=AsyncMock(return_value=(False, True)),
+            new=AsyncMock(return_value=(None, True)),
         ),
     ):
         task = asyncio.create_task(_monitor_for_cookies(flow))
@@ -376,3 +394,57 @@ async def test_lifespan_exit_without_enter_skips_sweeper_cancel(
     # then
     assert lifespan._novnc_sweeper is None
     assert calls == ["shutdown", "stop"]
+
+
+@pytest.mark.asyncio
+async def test_lifespan_exit_closes_the_document_router_after_the_search_clients(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # given
+    from src import main as main_module
+    from src.reader.novnc.flow_registry import novnc_flow_registry
+    from src.runtime.browser_pool import browser_pool
+
+    calls: list[str] = []
+
+    async def record(name: str) -> None:
+        calls.append(name)
+
+    monkeypatch.setattr(novnc_flow_registry, "shutdown", AsyncMock())
+    monkeypatch.setattr(browser_pool, "stop", AsyncMock())
+    monkeypatch.setattr(main_module.rest_search_client, "aclose", lambda: record("rest"))  # type: ignore[attr-defined]
+    monkeypatch.setattr(main_module.mcp_search_client, "aclose", lambda: record("mcp"))  # type: ignore[attr-defined]
+    monkeypatch.setattr(main_module, "close_document_router", lambda: record("document_router"))
+    lifespan = main_module.service_lifespan()
+
+    # when
+    await lifespan.__aexit__(None, None, None)
+
+    # then
+    assert calls == ["rest", "mcp", "document_router"]
+
+
+@pytest.mark.asyncio
+async def test_lifespan_exit_logs_a_failed_document_router_close(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # given
+    from src import main as main_module
+    from src.reader.novnc.flow_registry import novnc_flow_registry
+    from src.runtime.browser_pool import browser_pool
+
+    monkeypatch.setattr(novnc_flow_registry, "shutdown", AsyncMock())
+    monkeypatch.setattr(browser_pool, "stop", AsyncMock())
+    monkeypatch.setattr(main_module.rest_search_client, "aclose", AsyncMock())  # type: ignore[attr-defined]
+    monkeypatch.setattr(main_module.mcp_search_client, "aclose", AsyncMock())  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        main_module, "close_document_router", AsyncMock(side_effect=RuntimeError("router close failed"))
+    )
+    lifespan = main_module.service_lifespan()
+
+    # when
+    with caplog.at_level(logging.WARNING, logger="uvicorn"):
+        await lifespan.__aexit__(None, None, None)
+
+    # then
+    assert "shutdown: failed to close the document router: router close failed" in caplog.messages

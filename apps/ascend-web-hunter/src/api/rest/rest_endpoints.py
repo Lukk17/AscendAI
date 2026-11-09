@@ -1,25 +1,30 @@
 import random
-import re
 import time
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import tldextract
-from ascend_python_common.uri_guard import FetchPolicy, UnsafeUriError, check_fetch_uri
-from fastapi import APIRouter, HTTPException
+from ascend_python_common.uri_guard import UnsafeUriError, check_fetch_uri
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 from src.api.exceptions import (
     FormatCombinationError,
-    InvalidProfileError,
     NoCookiesForDomainError,
 )
 from src.config.config import settings
+from src.reader.browser_guard import web_hunter_fetch_policy
 from src.reader.cache_purge import publish_purge
-from src.reader.cloudflare.cookie_manager import PRODUCED_BY_IMPORT, cookie_manager
+from src.reader.cloudflare.cookie_manager import (
+    PRODUCED_BY_IMPORT,
+    cookie_manager,
+    holds_login_state,
+    is_waf_cookie,
+)
 from src.reader.novnc.flow_registry import flow_shape, novnc_flow_registry
 from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
+from src.session.profile import Profile, SessionHttpUrl, check_profile
 from src.session.session_manager import session_manager
 
 rest_router = APIRouter(prefix="/api/v1/web", tags=["web_v1"])
@@ -32,20 +37,12 @@ search_client = SearxngClient()
 web_reader = WebReader()
 
 
-def _fetch_policy() -> FetchPolicy:
-    return FetchPolicy(
-        allowed_hosts=tuple(settings.ALLOWED_PRIVATE_HOSTS),
-        file_root=None,
-        max_redirect_hops=settings.FETCH_MAX_REDIRECT_HOPS,
-    )
-
-
 class ReadRequest(BaseModel):
     url: HttpUrl
     include_links: bool = False
     link_filter: str | None = None
     heavy_mode: bool = False
-    profile: str | None = None
+    profile: Profile | None = None
     output_format: OutputFormat = Field(
         default="text",
         description=(
@@ -72,23 +69,19 @@ class ReadRequest(BaseModel):
 
 
 class SessionEstablishRequest(BaseModel):
-    url: HttpUrl
-    profile: str | None = None
+    url: SessionHttpUrl
+    profile: Profile | None = None
 
 
 class SessionStatusRequest(BaseModel):
-    url: HttpUrl
-    profile: str | None = None
+    url: SessionHttpUrl
+    profile: Profile | None = None
 
 
 class SessionClearRequest(BaseModel):
-    url: HttpUrl
-    profile: str | None = None
+    url: SessionHttpUrl
+    profile: Profile | None = None
 
-
-PROFILE_PATTERN = r"[A-Za-z0-9_-]{1,64}"
-
-_WAF_COOKIE_NAMES = frozenset({"cf_clearance", "__cf_bm", "_cfuvid"})
 
 _IMPORT_TLD_EXTRACT = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
 
@@ -103,7 +96,7 @@ class PlaywrightCookie(BaseModel):
     expires: float = -1
     http_only: bool = Field(default=False, alias="httpOnly")
     secure: bool = False
-    same_site: str = Field(default="Lax", alias="sameSite")
+    same_site: Literal["Strict", "Lax", "None"] = Field(default="Lax", alias="sameSite")
 
 
 class PlaywrightLocalStorageItem(BaseModel):
@@ -128,10 +121,17 @@ class PlaywrightStorageState(BaseModel):
 class SessionImportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    url: HttpUrl
-    profile: str | None = None
+    url: SessionHttpUrl
+    profile: Profile | None = None
     storage_state: PlaywrightStorageState
     user_agent: str | None = None
+
+
+def _belongs_to_domain(host: str, domain: str) -> bool:
+    """True when *host* is *domain* or one of its subdomains."""
+    normalised = host.lstrip(".").lower()
+
+    return normalised == domain or normalised.endswith(f".{domain}")
 
 
 @rest_router.get("/search")
@@ -252,7 +252,7 @@ async def read_url_v2(request: ReadRequest) -> dict[str, Any]:
     being hijacked by the HTTP router.
     """
     url_str = str(request.url)
-    await check_fetch_uri(url_str, _fetch_policy())
+    await check_fetch_uri(url_str, web_hunter_fetch_policy())
     if request.include_links and request.output_format != "text":
         raise FormatCombinationError(request.output_format)
     if request.output_format == "schema" and request.extraction_schema is None:
@@ -284,16 +284,26 @@ async def establish_session(request: SessionEstablishRequest) -> dict[str, Any]:
     """
     Proactively open the NoVNC login flow for a URL.
 
-    Returns a 200 with the VNC URL so the caller can direct the user to
-    complete the login in their browser. Returns 409 with `status: novnc_busy`
-    when another NoVNC intervention already holds the shared browser/display;
-    only one can run at a time.
+    Returns a 200 with the VNC URL, the flow's `flow_id`, `window` and
+    `intervention_type`, and `joined` true when an open flow for the same site
+    and profile was joined, so the caller can direct the user to the window.
+    Returns 409 with code `novnc_busy` when every window slot of this
+    container is in use.
     """
     url_str = str(request.url)
-    await check_fetch_uri(url_str, _fetch_policy())
+    await check_fetch_uri(url_str, web_hunter_fetch_policy())
 
-    vnc_url = await session_manager.establish(url_str, request.profile)
-    return {"status": "login_required", "target": url_str, "vnc_url": vnc_url}
+    established = await session_manager.establish(url_str, request.profile)
+
+    return {
+        "status": "login_required",
+        "target": url_str,
+        "intervention_type": established.intervention_type,
+        "vnc_url": established.vnc_url,
+        "flow_id": established.flow_id,
+        "joined": established.joined,
+        "window": established.window,
+    }
 
 
 @rest_router_v2.post("/session/status")
@@ -315,7 +325,7 @@ async def clear_session(request: SessionClearRequest) -> dict[str, Any]:
     Idempotent: always returns 200, whether or not a session existed.
     """
     url_str = str(request.url)
-    await check_fetch_uri(url_str, _fetch_policy())
+    await check_fetch_uri(url_str, web_hunter_fetch_policy())
 
     existed = await session_manager.clear(url_str, request.profile)
     domain = cookie_manager.registrable_domain(url_str)
@@ -337,7 +347,8 @@ async def import_session(request: SessionImportRequest) -> dict[str, Any]:
 
     Validates with no address lookup: the URL host must have a registrable
     domain, the profile must match the identifier pattern, and at least one
-    cookie must belong to the domain. Drops other-domain cookies, saves with
+    cookie, or one localStorage entry the site set on its own origin, must
+    belong to the domain. Drops other-domain cookies and origins, saves with
     the import provenance, and purges the domain read cache like a clear.
     """
     url_str = str(request.url)
@@ -347,37 +358,35 @@ async def import_session(request: SessionImportRequest) -> dict[str, Any]:
         raise UnsafeUriError(f"URL host has no registrable domain: {parsed_host}")
     domain = f"{extracted.domain}.{extracted.suffix}"
 
-    effective_profile = request.profile if request.profile is not None else settings.SESSION_DEFAULT_PROFILE
-    if re.fullmatch(PROFILE_PATTERN, effective_profile) is None:
-        raise InvalidProfileError(f"profile must match {PROFILE_PATTERN}")
+    effective_profile = check_profile(request.profile or settings.SESSION_DEFAULT_PROFILE)
 
-    kept = [
-        cookie
-        for cookie in request.storage_state.cookies
-        if (cookie.domain.lstrip(".").lower() == domain)
-        or (cookie.domain.lstrip(".").lower().endswith(f".{domain}"))
-    ]
+    kept = [cookie for cookie in request.storage_state.cookies if _belongs_to_domain(cookie.domain, domain)]
     dropped_cookies = len(request.storage_state.cookies) - len(kept)
-    if not kept:
-        raise NoCookiesForDomainError(f"no cookie belongs to {domain}")
-
-    user_agent = request.user_agent or random.choice(web_reader.user_agents)
     filtered_state = {
         "cookies": [cookie.model_dump(by_alias=True) for cookie in kept],
-        "origins": [origin.model_dump(by_alias=True) for origin in request.storage_state.origins],
+        "origins": [
+            origin.model_dump(by_alias=True)
+            for origin in request.storage_state.origins
+            if _belongs_to_domain(urlparse(origin.origin).hostname or "", domain)
+        ],
     }
+    if not holds_login_state(filtered_state, domain):
+        raise NoCookiesForDomainError(f"no cookie and no localStorage entry of the site belongs to {domain}")
+
+    user_agent = request.user_agent or random.choice(web_reader.user_agents)
     await cookie_manager.save_storage_state(
         url_str,
         filtered_state,
         user_agent,
         effective_profile,
         produced_by=PRODUCED_BY_IMPORT,
+        replaces_login=True,
     )
     web_reader.clear_cache_for_domain(domain)
     await publish_purge(domain)
 
-    auth_cookies = sum(1 for cookie in kept if cookie.name not in _WAF_COOKIE_NAMES)
-    waf_cookies = sum(1 for cookie in kept if cookie.name in _WAF_COOKIE_NAMES)
+    auth_cookies = sum(1 for cookie in kept if not is_waf_cookie(cookie.name))
+    waf_cookies = sum(1 for cookie in kept if is_waf_cookie(cookie.name))
 
     return {
         "status": "imported",
@@ -406,3 +415,18 @@ async def list_interventions() -> dict[str, Any]:
         "max_concurrent_flows": settings.NOVNC_MAX_CONCURRENT_FLOWS,
         "flows": [flow_shape(flow, now) for flow in flows],
     }
+
+
+@rest_session_router.delete("/interventions/{flow_id}", status_code=204)
+async def cancel_intervention(flow_id: str) -> Response:
+    """
+    Close one open human-intervention window and free its slot.
+
+    Nothing the window holds is saved. The flow ends with the outcome
+    `cancelled`, which the session status shows as its `last_window`.
+    Answers 204, or 404 with code `flow_not_found` when no open window has
+    this `flow_id`.
+    """
+    await novnc_flow_registry.cancel(flow_id)
+
+    return Response(status_code=204)

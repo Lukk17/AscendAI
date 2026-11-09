@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import trafilatura
 from ascend_python_common.uri_guard import UnsafeUriError, check_fetch_uri
+from crawlee import ConcurrencySettings
 from crawlee.crawlers import (
     AdaptivePlaywrightCrawler,
     AdaptivePlaywrightCrawlingContext,
@@ -22,31 +23,42 @@ from crawlee.storages import RequestQueue
 
 from src.api.exceptions import ChallengeDetectedException, ExtractionFailedError
 from src.config.config import settings
+from src.observability.safe_address import address_without_query
 from src.proxy.proxy_provider import proxy_provider
-from src.reader.browser_guard import install_browser_guard, web_hunter_fetch_policy
+from src.reader.browser_guard import (
+    BrowserFamily,
+    browser_tunnel,
+    chromium_guard_args,
+    guard_page_goto,
+    install_browser_guard,
+    web_hunter_fetch_policy,
+)
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.challenge_signals import (
-    as_login_verdict,
+    BLOCK_STATUSES,
     assess,
     log_verdict,
     record_verdict,
 )
 from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
-from src.reader.strategies.base_strategy import BaseStrategy
+from src.reader.strategies.base_strategy import BaseStrategy, FetchedHtml
+from src.reader.strategies.browser_read import PageContentError, bounded_page_content
+from src.reader.strategies.main_frame_response import DEFAULT_STATUS, MainFrameResponses
 
 if TYPE_CHECKING:
     from bs4 import BeautifulSoup, Tag
     from crawlee import Request
-    from crawlee.crawlers import ParsedHttpCrawlingContext, RenderingType
+    from crawlee.crawlers import BasicCrawlingContext, ParsedHttpCrawlingContext, RenderingType
     from crawlee.statistics import FinalStatistics
-    from playwright.async_api import Response as PlaywrightResponse
 
     from src.validator.url_validator import URLValidator
 
 logger = logging.getLogger(__name__)
 
 _CRAWLEE_TIER = "crawlee"
+
+_ONE_TASK_AT_A_TIME = ConcurrencySettings(max_concurrency=1, desired_concurrency=1)
 
 
 class _ClientOnlyRenderingTypePredictor(RenderingTypePredictor):
@@ -57,20 +69,6 @@ class _ClientOnlyRenderingTypePredictor(RenderingTypePredictor):
 
     def store_result(self, request: Request, rendering_type: RenderingType) -> None:  # noqa: ARG002
         return None
-
-
-def _response_summary(response: PlaywrightResponse) -> dict[str, Any]:
-    """Final status and headers of one Playwright response for the container."""
-    try:
-        headers = dict(response.headers)
-    except Exception:
-        headers = {}
-    try:
-        status = response.status
-    except Exception:
-        status = 200
-
-    return {"status": status, "headers": headers}
 
 
 class CrawleeStrategy(BaseStrategy):
@@ -91,9 +89,9 @@ class CrawleeStrategy(BaseStrategy):
         return extracted or ""
 
     async def get_html(self, url: str) -> str:
+        safe_url = address_without_query(url)
         await check_fetch_uri(url, web_hunter_fetch_policy())
-        result_container: dict[str, Any] = {"html": "", "status": 200, "headers": {}}
-        last_response: dict[str, Any] = {}
+        result_container: dict[str, Any] = {"html": "", "status": DEFAULT_STATUS, "headers": {}}
 
         storage_state = await cookie_manager.get_storage_state(url, self.profile)
         fp = self.fingerprint
@@ -110,19 +108,15 @@ class CrawleeStrategy(BaseStrategy):
 
         proxy = proxy_provider.for_playwright()
         if proxy is not None:
-            browser_new_context_options["proxy"] = proxy
+            browser_new_context_options["proxy"] = browser_tunnel.chained_proxy(proxy)
 
         playwright_kwargs: Any = {
             "headless": settings.PLAYWRIGHT_HEADLESS,
-            "browser_launch_options": {"chromium_sandbox": False},
+            "browser_launch_options": {"chromium_sandbox": False, "args": list(chromium_guard_args())},
             "browser_new_context_options": browser_new_context_options,
             "use_incognito_pages": True,
         }
 
-        # Crawlee's service locator lazily builds and caches its Configuration singleton
-        # the first time any crawler is constructed in this process, and never re-reads
-        # the environment afterwards, so both the memory budget and the storage dir must
-        # be set before that first construction to have any effect.
         if settings.CRAWLEE_MEMORY_MBYTES is not None:
             os.environ["CRAWLEE_MEMORY_MBYTES"] = str(settings.CRAWLEE_MEMORY_MBYTES)
 
@@ -136,6 +130,10 @@ class CrawleeStrategy(BaseStrategy):
         try:
             crawler = AdaptivePlaywrightCrawler.with_beautifulsoup_static_parser(
                 max_requests_per_crawl=settings.MAX_REQUESTS_PER_CRAWL,
+                configure_logging=False,
+                concurrency_settings=_ONE_TASK_AT_A_TIME,
+                retry_on_blocked=False,
+                ignore_http_error_status_codes=BLOCK_STATUSES,
                 rendering_type_predictor=_ClientOnlyRenderingTypePredictor(),
                 request_manager=request_manager,
                 playwright_crawler_specific_kwargs=playwright_kwargs,
@@ -145,58 +143,55 @@ class CrawleeStrategy(BaseStrategy):
             async def request_handler(
                 context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag],
             ) -> None:
-                await self._handle_crawlee_request(context, result_container, last_response)
+                await self._handle_crawlee_request(context, result_container)
 
-            @crawler.pre_navigation_hook
-            async def install_guard(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
-                result_container["refused_navigations"] = await install_browser_guard(
-                    context.page.context, self.url_validator
-                )
-                context.page.on(
-                    "response", lambda response: last_response.update(_response_summary(response))
-                )
+            self._guard_each_navigation(crawler, result_container)
+            self._stop_after_refused_navigation(crawler, result_container)
 
-            final_statistics = await self._run_crawler_bounded(crawler, url)
+            final_statistics = await self._run_crawler_bounded(crawler, url, safe_url)
         finally:
             await request_manager.drop()
         refused_navigations: list[str] = result_container.get("refused_navigations", [])
         if refused_navigations:
-            logger.warning("CrawleeStrategy: Blocked navigation detected post-render on %s", url)
+            logger.warning("CrawleeStrategy: Blocked navigation detected post-render on %s", safe_url)
 
             raise UnsafeUriError(f"browser request refused: {refused_navigations[0]}")
         if final_statistics.requests_finished < 1:
             logger.warning(
                 "CrawleeStrategy: the crawl handled no request for %s (failed %d of %d)",
-                url,
+                safe_url,
                 final_statistics.requests_failed,
                 final_statistics.requests_total,
             )
 
             raise ExtractionFailedError(
-                f"CrawleeStrategy: the crawl handled no request for {url} "
+                f"CrawleeStrategy: the crawl handled no request for {safe_url} "
                 f"(failed {final_statistics.requests_failed} of {final_statistics.requests_total})"
             )
         html: str = result_container.get("html", "")
-        status: int = result_container.get("status", 200)
+        status: int = result_container.get("status", DEFAULT_STATUS)
         headers: dict[str, str] = result_container.get("headers", {})
         stored_cookies = (storage_state or {}).get("cookies", [])
         cookie_names = [str(cookie.get("name", "")) for cookie in stored_cookies]
 
-        verdict = assess(status, html, headers, cookie_names)
+        verdict = await asyncio.to_thread(assess, status, html, headers, cookie_names)
         record_verdict(verdict, _CRAWLEE_TIER)
-        log_verdict(verdict, _CRAWLEE_TIER, url)
+        log_verdict(verdict, _CRAWLEE_TIER, safe_url)
 
-        if ChallengeDetector.is_login_required(html):
-            logger.warning("CrawleeStrategy: Login wall detected on %s", url)
+        login = ChallengeDetector.login_wall_verdict(
+            verdict, html, requested_url=url, final_url=result_container.get("final_url", url)
+        )
+        if login is not None:
+            logger.warning("CrawleeStrategy: Login wall detected on %s", safe_url)
 
-            raise ChallengeDetectedException(as_login_verdict(verdict))
+            raise ChallengeDetectedException(login)
 
         if verdict.wall:
-            logger.warning("CrawleeStrategy: WAF/Cloudflare block detected on %s", url)
+            logger.warning("CrawleeStrategy: WAF/Cloudflare block detected on %s", safe_url)
 
             raise ChallengeDetectedException(verdict)
 
-        return html
+        return FetchedHtml(html, headers)
 
     @staticmethod
     def _prepare_storage_dir(storage_dir_setting: str) -> str:
@@ -206,21 +201,40 @@ class CrawleeStrategy(BaseStrategy):
 
         return str(p)
 
+    def _guard_each_navigation(
+        self,
+        crawler: AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag],
+        result_container: dict[str, Any],
+    ) -> None:
+        """Install the browser guard before each navigation, with the guarded ``page.goto``."""
+
+        @crawler.pre_navigation_hook
+        async def install_guard(context: AdaptivePlaywrightPreNavCrawlingContext) -> None:
+            result_container["refused_navigations"] = await install_browser_guard(
+                context.page.context, self.url_validator, family=BrowserFamily.CHROMIUM
+            )
+            guard_page_goto(context.page)
+            result_container["responses"] = MainFrameResponses(context.page)
+
+    @staticmethod
+    def _stop_after_refused_navigation(
+        crawler: AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag],
+        result_container: dict[str, Any],
+    ) -> None:
+        """Stop the crawl before Crawlee retries a navigation the URI guard refused."""
+
+        @crawler.error_handler
+        async def stop_crawl(_context: BasicCrawlingContext, _error: Exception) -> None:
+            if result_container.get("refused_navigations"):
+                crawler.stop("the URI guard refused the navigation")
+
     @staticmethod
     async def _run_crawler_bounded(
         crawler: AdaptivePlaywrightCrawler[ParsedHttpCrawlingContext[BeautifulSoup], BeautifulSoup, Tag],
         url: str,
+        safe_url: str,
     ) -> FinalStatistics:
-        """Run the crawler with a hard wall-clock bound so this tier can never hang forever.
-
-        Crawlee's autoscaler blocks all work indefinitely whenever it considers the
-        system memory-overloaded (no request is ever dequeued), and BasicCrawler.run()
-        catches CancelledError internally for graceful shutdown, which also swallows the
-        cancellation asyncio.wait_for issues on timeout: per the asyncio docs, "if the
-        task suppresses the cancellation and returns a value instead, that value is
-        returned". Elapsed time is therefore checked explicitly after the call returns,
-        so a permanently-overloaded autoscaler still fails this tier instead of silently
-        returning empty content after burning the whole read budget.
+        """Run the crawler under a wall-clock bound and check the elapsed time after it returns.
 
         Returns:
             The final statistics of the crawl.
@@ -234,13 +248,13 @@ class CrawleeStrategy(BaseStrategy):
             final_statistics = await asyncio.wait_for(crawler.run([url]), timeout=crawl_timeout)
         except TimeoutError as exc:
             raise TimeoutError(
-                f"CrawleeStrategy: tier exceeded its {crawl_timeout:.0f}s budget for {url}"
+                f"CrawleeStrategy: tier exceeded its {crawl_timeout:.0f}s budget for {safe_url}"
             ) from exc
 
         elapsed = time.perf_counter() - started
         if elapsed > crawl_timeout:
             raise TimeoutError(
-                f"CrawleeStrategy: tier exceeded its {crawl_timeout:.0f}s budget for {url} "
+                f"CrawleeStrategy: tier exceeded its {crawl_timeout:.0f}s budget for {safe_url} "
                 f"(ran {elapsed:.1f}s; Crawlee's autoscaler likely reports the system as "
                 "permanently memory-overloaded)"
             )
@@ -251,13 +265,16 @@ class CrawleeStrategy(BaseStrategy):
     async def _handle_crawlee_request(
         context: AdaptivePlaywrightCrawlingContext[BeautifulSoup, Tag],
         result_container: dict[str, Any],
-        last_response: dict[str, Any],
     ) -> None:
         try:
-            result_container["html"] = await context.page.content()
+            result_container["html"] = await bounded_page_content(context.page)
+            result_container["final_url"] = context.page.url
+        except PageContentError:
+            raise
         except Exception:
             snapshot = await context.get_snapshot()
             result_container["html"] = snapshot.html or ""
-        if last_response:
-            result_container["status"] = last_response.get("status", 200)
-            result_container["headers"] = last_response.get("headers", {})
+            result_container["final_url"] = context.request.loaded_url or context.request.url
+        responses: MainFrameResponses | None = result_container.get("responses")
+        if responses is not None:
+            result_container["status"], result_container["headers"] = await responses.status_and_headers()

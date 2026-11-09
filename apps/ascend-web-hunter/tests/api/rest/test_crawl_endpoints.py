@@ -11,6 +11,7 @@ from httpx import AsyncClient
 from src.config.config import settings
 from src.crawl import job_service as job_service_module
 from src.crawl.job_service import job_service
+from src.crawl.models import DEFAULT_TENANT
 
 _TRACE_RE = re.compile(r"[0-9a-f]{32}")
 
@@ -61,6 +62,20 @@ async def test_submit_answers_202_with_poll_hint(
 
 
 @pytest.mark.asyncio
+async def test_submit_with_an_empty_profile_uses_the_default_profile(
+    client: AsyncClient, fake_redis: FakeRedis, stub_guard: AsyncMock
+) -> None:
+    # when
+    resp = await _submit(client, payload={"profile": ""})
+
+    # then
+    assert resp.status_code == 202
+    record = await job_service.get_job(DEFAULT_TENANT, resp.json()["job_id"])
+    assert record is not None
+    assert record.request.profile is None
+
+
+@pytest.mark.asyncio
 async def test_status_returns_state_counts_and_keys(
     client: AsyncClient, fake_redis: FakeRedis, stub_guard: AsyncMock
 ) -> None:
@@ -82,6 +97,7 @@ async def test_status_returns_state_counts_and_keys(
         "unchanged": 0,
         "failed": 0,
         "skipped_unsafe": 0,
+        "robots_skipped": 0,
     }
     assert body["pages_ndjson_key"] is None
     assert body["error"] is None
@@ -151,6 +167,25 @@ async def test_request_outside_bounds_answers_validation(client: AsyncClient, fa
     # then
     assert resp.status_code == 400
     assert resp.json()["code"] == "validation"
+
+
+@pytest.mark.asyncio
+async def test_oversized_extraction_schema_answers_validation_and_creates_no_job(
+    client: AsyncClient, fake_redis: FakeRedis, stub_guard: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given a schema above the read path's size cap
+    monkeypatch.setattr(settings, "EXTRACTION_SCHEMA_MAX_BYTES", 10)
+    payload = {"output_format": "schema", "extraction_schema": {"type": "object", "title": "x" * 50}}
+
+    # when
+    resp = await _submit(client, payload=payload)
+
+    # then
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["code"] == "validation"
+    assert "EXTRACTION_SCHEMA_MAX_BYTES" in body["detail"]
+    assert (await client.get("/api/v1/crawl/jobs")).json() == {"jobs": []}
 
 
 @pytest.mark.asyncio

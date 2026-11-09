@@ -3,7 +3,7 @@
 This suite mocks the top-level `fastmcp` module in `tests/conftest.py`, so the
 in-memory `fastmcp.Client` and the raw `/mcp` session used by the memory and
 audio-scribe pin tests cannot run here. The pins below call the same tool
-functions the MCP server registers and assert the same contract: the ten tool
+functions the MCP server registers and assert the same contract: the eleven tool
 names with no explicit rename, every input schema, and the content of each
 tool result, including the `human_intervention_required`, `novnc_busy` and
 `session_expired` result objects of `web_read`.
@@ -20,6 +20,7 @@ from src.api.mcp.mcp_server import (
     crawl_job_status,
     crawl_list_jobs,
     crawl_submit,
+    session_cancel_intervention,
     session_clear,
     session_establish,
     session_interventions,
@@ -29,13 +30,14 @@ from src.api.mcp.mcp_server import (
 )
 from src.config.config import settings
 from src.reader.novnc.flow_registry import novnc_flow_registry
-from src.session.session_manager import SessionInfo, session_manager
+from src.session.session_manager import EstablishedFlow, SessionInfo, session_manager
 
 EXPECTED_TOOL_NAMES = {
     "web_search",
     "web_read",
     "session_establish",
     "session_interventions",
+    "session_cancel_intervention",
     "session_status",
     "session_clear",
     "crawl_submit",
@@ -51,6 +53,7 @@ def test_tool_functions_keep_their_mcp_names() -> None:
         "web_read": web_read,
         "session_establish": session_establish,
         "session_interventions": session_interventions,
+        "session_cancel_intervention": session_cancel_intervention,
         "session_status": session_status,
         "session_clear": session_clear,
         "crawl_submit": crawl_submit,
@@ -94,6 +97,7 @@ def test_tool_input_schemas_pin_required_fields() -> None:
     )
     assert _required_and_optional(session_establish) == ({"url"}, {"profile"})
     assert _required_and_optional(session_interventions) == (set(), set())
+    assert _required_and_optional(session_cancel_intervention) == ({"flow_id"}, set())
     assert _required_and_optional(session_status) == ({"url"}, {"profile"})
     assert _required_and_optional(session_clear) == ({"url"}, {"profile"})
 
@@ -182,7 +186,15 @@ async def test_call_session_establish_pins_today_status_object() -> None:
         patch.object(
             session_manager,
             "establish",
-            new=AsyncMock(return_value="http://vnc:7900"),
+            new=AsyncMock(
+                return_value=EstablishedFlow(
+                    vnc_url="http://vnc:7900",
+                    intervention_type="login",
+                    flow_id="9f2c41ab77de",
+                    joined=False,
+                    window={"slot": 0, "x": 0, "y": 0, "width": 1280, "height": 800},
+                )
+            ),
         ),
     ):
         result = await session_establish("http://example.com/")
@@ -192,6 +204,9 @@ async def test_call_session_establish_pins_today_status_object() -> None:
         "intervention_type": "login",
         "vnc_url": "http://vnc:7900",
         "message": "Login required. Please visit: http://vnc:7900",
+        "flow_id": "9f2c41ab77de",
+        "joined": False,
+        "window": {"slot": 0, "x": 0, "y": 0, "width": 1280, "height": 800},
     }
 
 
@@ -220,6 +235,7 @@ async def test_call_session_status_pins_today_body() -> None:
         "auth_ttl_remaining_seconds": 60.0,
         "last_validated": None,
         "profile": "default",
+        "last_window": None,
     }
 
 

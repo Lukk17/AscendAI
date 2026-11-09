@@ -338,3 +338,47 @@ async def test_crawlee_refused_navigation_raises_unsafe_uri() -> None:
     ):
         with pytest.raises(UnsafeUriError):
             await CrawleeStrategy(_mock_url_validator()).get_html("https://example.com/article")
+
+
+@pytest.mark.asyncio
+async def test_crawlee_launches_chromium_with_the_guard_arguments_and_installs_the_chromium_guard() -> None:
+    # given
+    from src.reader.browser_guard import BrowserFamily, chromium_guard_args
+
+    captured: dict[str, Any] = {}
+    fake_context = MagicMock()
+    fake_context.page.on = MagicMock()
+    install = AsyncMock(return_value=[])
+
+    async def fake_run(urls: list[str]) -> FinalStatistics:
+        await captured["pre_nav"](fake_context)
+        return final_statistics(1)
+
+    def fake_crawler_factory(**kwargs: Any) -> MagicMock:
+        captured.update(kwargs)
+        crawler = MagicMock()
+        crawler.router.default_handler = lambda f: f
+        crawler.pre_navigation_hook = lambda f: captured.setdefault("pre_nav", f)
+        crawler.run = AsyncMock(side_effect=fake_run)
+        return crawler
+
+    # when
+    with (
+        patch(_CRAWLER_FACTORY_PATH, side_effect=fake_crawler_factory),
+        patch(
+            "src.reader.strategies.crawlee_strategy.cookie_manager.get_storage_state",
+            new=AsyncMock(return_value=None),
+        ),
+        patch("src.reader.strategies.crawlee_strategy.install_browser_guard", new=install),
+        patch(
+            "src.reader.strategies.crawlee_strategy.ChallengeDetector.is_login_required", return_value=False
+        ),
+        patch("src.reader.strategies.crawlee_strategy.ChallengeDetector.is_blocked", return_value=False),
+    ):
+        await CrawleeStrategy(_mock_url_validator()).get_html("https://example.com/article")
+
+    # then
+    launch_options = captured["playwright_crawler_specific_kwargs"]["browser_launch_options"]
+    assert launch_options["args"] == list(chromium_guard_args())
+    assert install.await_args is not None
+    assert install.await_args.kwargs["family"] is BrowserFamily.CHROMIUM

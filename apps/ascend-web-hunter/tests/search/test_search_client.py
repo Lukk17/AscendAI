@@ -215,3 +215,42 @@ async def test_search_observes_results_returned_histogram() -> None:
     assert after_count - before_count == 1.0
     assert after_sum - before_sum == 3.0
     await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_search_keeps_spaces_around_highlight_markup_in_title_and_content() -> None:
+    # given
+    html = """
+    <html><body>
+    <article class="result result-default category-general">
+        <a href="https://www.openstreetmap.org/" class="url_header" rel="noreferrer">
+            <div class="url_wrapper"><span class="url_o1"><span class="url_i1">https://www.openstreetmap.org</span></span></div>
+        </a>
+        <h3><a href="https://www.openstreetmap.org/" rel="noreferrer">
+            <span class="highlight">OpenStreetMap</span> Wiki
+            - the <span class="highlight">Open</span>StreetMap Foundation</a></h3>
+        <p class="content">
+            <span class="highlight">OpenStreetMap</span> is a map of the world, created by people like
+            <em>you</em>  and free to use under an <span class="highlight">open</span> license.
+        </p>
+    </article>
+    </body></html>
+    """
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = html
+    mock_response.raise_for_status = MagicMock()
+
+    client = SearxngClient()
+
+    # when
+    with patch.object(client.client, "get", new=AsyncMock(return_value=mock_response)):
+        results = await client.search("openstreetmap")
+
+    # then
+    assert results[0]["title"] == "OpenStreetMap Wiki - the OpenStreetMap Foundation"
+    assert results[0]["content"] == (
+        "OpenStreetMap is a map of the world, created by people like you"
+        " and free to use under an open license."
+    )
+    await client.aclose()

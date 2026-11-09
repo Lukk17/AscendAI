@@ -9,11 +9,13 @@ design.md under Open Question 1.
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.challenge_signals import ChallengeVerdict, assess
 
 _FIXTURES = Path("tests/fixtures/challenge_walls")
@@ -36,6 +38,8 @@ _REQUIRED_FIELDS = (
 )
 
 _REQUIRED_EXPECTED = ("wall", "intervention_type", "vendor", "signals_must_fire", "signals_must_not_fire")
+
+_KINDS = ("wall", "counterexample", "login_wall")
 
 
 def _manifest() -> list[dict[str, Any]]:
@@ -60,7 +64,7 @@ def test_manifest_entries_have_required_fields_and_paths() -> None:
         for field in _REQUIRED_EXPECTED:
             assert field in entry["expected"], f"{entry['path']} expected is missing {field}"
         assert (_FIXTURES / entry["path"]).exists(), f"{entry['path']} does not exist"
-        assert entry["kind"] in ("wall", "counterexample")
+        assert entry["kind"] in _KINDS
 
 
 @pytest.mark.parametrize("entry", _manifest(), ids=lambda entry: entry["path"])
@@ -80,6 +84,52 @@ def test_corpus_expectation(entry: dict[str, Any]) -> None:
         assert signal_id in fired, f"{entry['path']} must fire {signal_id}, fired {sorted(fired)}"
     for signal_id in expected["signals_must_not_fire"]:
         assert signal_id not in fired, f"{entry['path']} must not fire {signal_id}"
+
+
+def _login_wall(entry: dict[str, Any]) -> ChallengeVerdict | None:
+    html = (_FIXTURES / entry["path"]).read_text(encoding="utf-8")
+    return ChallengeDetector.login_wall_verdict(
+        _verdict(entry),
+        html,
+        requested_url=entry["source_url"],
+        final_url=entry.get("final_url", entry["source_url"]),
+    )
+
+
+def _expects_login_wall(entry: dict[str, Any]) -> bool:
+    expected = entry["expected"]
+    scored_login: bool = expected["wall"] and expected["intervention_type"] == "login"
+
+    return bool(expected.get("login_wall", scored_login))
+
+
+@pytest.mark.parametrize("entry", _manifest(), ids=lambda entry: entry["path"])
+def test_corpus_login_wall_expectation(entry: dict[str, Any]) -> None:
+    # when
+    login = _login_wall(entry)
+
+    # then
+    assert (login is not None) is _expects_login_wall(entry), entry["path"]
+    if login is not None:
+        assert login.intervention_type == "login", entry["path"]
+
+
+def test_login_wall_fixtures_are_login_walls_only_through_the_address_they_ended_at() -> None:
+    # given
+    login_walls = [entry for entry in _manifest() if entry["kind"] == "login_wall"]
+
+    # when
+    without_final_url = [
+        _login_wall({key: value for key, value in entry.items() if key != "final_url"})
+        for entry in login_walls
+    ]
+
+    # then
+    assert login_walls, "the corpus must carry a page a read was redirected to for a login"
+    for entry in login_walls:
+        assert entry["expected"]["login_wall"] is True, entry["path"]
+        assert entry["final_url"] != entry["source_url"], entry["path"]
+    assert without_final_url == [None] * len(login_walls)
 
 
 def test_wall_fixtures_have_positive_margin_and_counterexamples_negative() -> None:
@@ -135,8 +185,6 @@ def test_every_fixture_within_size_bound() -> None:
 
 def test_no_fixture_contains_cookie_value() -> None:
     # given
-    import re
-
     from src.reader.cloudflare import challenge_signals
 
     catalogue = challenge_signals._CATALOGUE
@@ -159,26 +207,21 @@ def test_no_fixture_contains_cookie_value() -> None:
                 )
 
 
-def test_every_synthetic_entry_listed_in_open_question_4() -> None:
+def test_synthetic_entries_match_the_corpus_readme_list() -> None:
     # given
-    repo_root = Path(__file__).resolve().parents[5]
-    design = (repo_root / "openspec/changes/detect-challenge-walls-in-any-language/design.md").read_text(
-        encoding="utf-8"
-    )
-
-    def _norm(value: str) -> str:
-        return value.casefold().replace("-", "").replace("_", "").replace(" ", "")
-
-    question_4 = _norm(design.split("Open Question 4")[1].split("## Owner decisions")[0])
+    readme = (_FIXTURES / "README.md").read_text(encoding="utf-8")
+    section = readme.split("## Synthetic fixtures", 1)[1].split("\n## ", 1)[0]
+    listed = set(re.findall(r"^- `([^`]+)`$", section, flags=re.MULTILINE))
     manifest = _manifest()
 
-    # when / then
-    synthetics = [entry for entry in manifest if entry["synthetic"]]
-    assert synthetics, "the corpus must carry the synthetic fixtures"
-    for entry in synthetics:
-        assert _norm(str(entry["vendor"])) in question_4, (
-            f"{entry['path']} vendor {entry['vendor']} not listed in Open Question 4"
-        )
+    # when
+    synthetic_vendors = {str(entry["vendor"]) for entry in manifest if entry["synthetic"]}
+
+    # then
+    assert synthetic_vendors, "the corpus must carry the synthetic fixtures"
+    assert synthetic_vendors == listed, (
+        f"synthetic manifest vendors {sorted(synthetic_vendors)} differ from the README list {sorted(listed)}"
+    )
 
 
 def test_manifest_rejects_duplicate_vendor_with_synthetic() -> None:
@@ -393,7 +436,8 @@ def test_unfired_markers_are_exactly_the_dated_gaps() -> None:
     assert _unfired_markers(manifest) == _KNOWN_UNFIRED_MARKERS
 
     # and removing a fixture that solely fires a marker opens a new gap
-    reduced = [entry for entry in manifest if entry["path"] != "nowsecure-rendered.html"]
+    solely_firing = {"nowsecure-rendered.html", "scrapingcourse-cloudflare-cleared.html"}
+    reduced = [entry for entry in manifest if entry["path"] not in solely_firing]
     assert "cloudflare vendor_script challenges.cloudflare.com/turnstile/v0/api.js" in _unfired_markers(
         reduced
     )
@@ -402,14 +446,18 @@ def test_unfired_markers_are_exactly_the_dated_gaps() -> None:
 
 
 def _unfired_translations(manifest: list[dict[str, Any]]) -> list[str]:
-    from src.config.config import settings
     from src.reader.cloudflare import challenge_signals
-    from src.reader.cloudflare.challenge_signals import _page_texts, _parse_tree, normalise_phrase
+    from src.reader.cloudflare.challenge_signals import (
+        _markup_prefix,
+        _page_texts,
+        _parse_tree,
+        normalise_phrase,
+    )
 
     texts = []
     for entry in manifest:
         html = (_FIXTURES / entry["path"]).read_text(encoding="utf-8")
-        tree, _ = _parse_tree(html[: settings.CHALLENGE_DETECTION_MAX_BYTES])
+        tree, _ = _parse_tree(_markup_prefix(html))
         texts.append(_page_texts(tree) if tree is not None else ("", ""))
 
     def _fired(normalised: str, scope: list[str]) -> bool:

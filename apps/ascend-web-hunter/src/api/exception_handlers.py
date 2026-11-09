@@ -3,15 +3,17 @@ from typing import Any
 import httpx
 from ascend_python_common.errors import INTERNAL, VALIDATION, ErrorRegistry, ProblemCode
 from ascend_python_common.uri_guard import UnsafeUriError
+from pydantic import ValidationError
+from pydantic_core import ErrorDetails
 
 from src.api.exceptions import (
     ExtractionFailedError,
     ExtractionNotConfiguredError,
     FormatCombinationError,
     HumanInterventionRequiredException,
-    InvalidProfileError,
     NoCookiesForDomainError,
     NoVNCFlowBusyException,
+    NoVNCFlowNotFoundError,
     ScreenshotUnavailableError,
     TierDisabledError,
 )
@@ -19,6 +21,7 @@ from src.config.blocklist_loader import BlocklistRefreshThrottledError, Blocklis
 from src.config.config import settings
 from src.crawl.models import InvalidTenantError, JobNotFoundError
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
+from src.session.profile import InvalidProfileError
 
 EXTERNAL_SERVICE_UNAVAILABLE = ProblemCode("external_service_unavailable", 503)
 BLOCKLIST_REFRESH_INVALID = ProblemCode("blocklist_refresh_invalid", 502)
@@ -27,6 +30,7 @@ HUMAN_INTERVENTION_REQUIRED = ProblemCode("human_intervention_required", 428)
 NOVNC_BUSY = ProblemCode("novnc_busy", 409)
 UNSAFE_URI = ProblemCode("unsafe_uri", 400)
 JOB_NOT_FOUND = ProblemCode("job_not_found", 404)
+FLOW_NOT_FOUND = ProblemCode("flow_not_found", 404)
 INVALID_TENANT = ProblemCode("invalid_tenant", 400)
 TIER_DISABLED = ProblemCode("tier_disabled", 409)
 INVALID_PROFILE = ProblemCode("invalid_profile", 400)
@@ -73,6 +77,19 @@ def _novnc_extensions(exc: BaseException) -> dict[str, Any] | None:
     }
 
 
+def _validation_error_text(error: ErrorDetails) -> str:
+    location = ".".join(str(part) for part in error["loc"])
+
+    return f"{location}: {error['msg']}" if location else error["msg"]
+
+
+def _validation_detail(exc: BaseException) -> str:
+    assert isinstance(exc, ValidationError)
+    errors = exc.errors(include_url=False, include_context=False, include_input=False)
+
+    return "; ".join(_validation_error_text(error) for error in errors)
+
+
 def _throttle_retry_after(exc: BaseException) -> dict[str, str] | None:
     assert isinstance(exc, BlocklistRefreshThrottledError)
     return {"Retry-After": str(max(1, int(exc.retry_after_seconds) + 1))}
@@ -82,6 +99,7 @@ def build_error_registry() -> ErrorRegistry:
     registry = ErrorRegistry(internal_code=INTERNAL)
     registry.register(UnsafeUriError, UNSAFE_URI, str)
     registry.register(JobNotFoundError, JOB_NOT_FOUND, str)
+    registry.register(NoVNCFlowNotFoundError, FLOW_NOT_FOUND, str)
     registry.register(InvalidTenantError, INVALID_TENANT, str)
     registry.register(TierDisabledError, TIER_DISABLED, str)
     registry.register(InvalidProfileError, INVALID_PROFILE, str)
@@ -90,6 +108,7 @@ def build_error_registry() -> ErrorRegistry:
     registry.register(ScreenshotUnavailableError, SCREENSHOT_UNAVAILABLE, str)
     registry.register(FormatCombinationError, BAD_FORMAT_COMBINATION, str)
     registry.register(ExtractionFailedError, EXTRACTION_FAILED, str, expected=True)
+    registry.register(ValidationError, VALIDATION, _validation_detail)
     registry.register(ValueError, VALIDATION, str)
     registry.register(
         httpx.HTTPError,

@@ -1,10 +1,9 @@
-"""Redis key names of the crawl frontier (design D13).
+"""Redis key names of the crawl frontier.
 
 Every key starts with ``crawl_`` and holds the tenant in the second place,
 so ``crawl_*:{tenant}:*`` finds every Redis key of one tenant's crawl data.
 The one exception is the shared pickup set ``crawl_runnable``, which holds
-only ``{tenant}:{job_id}`` references. All builders live here so task 8.1
-can check every written key against the D13 patterns in one place.
+only ``{tenant}:{job_id}`` references. Every key is built in this module.
 """
 
 RUNNABLE_KEY = "crawl_runnable"

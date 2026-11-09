@@ -1,12 +1,14 @@
+import asyncio
 import base64
 import json
 import logging
 import random
 import time
+from collections.abc import Mapping
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Literal, cast
-from urllib.parse import urljoin, urlparse
+from typing import Any, Literal, NamedTuple, cast
+from urllib.parse import urldefrag, urljoin, urlparse
 from weakref import WeakSet
 
 from ascend_python_common.uri_guard import UnsafeUriError
@@ -29,25 +31,26 @@ from src.observability.metrics import (
     STRATEGY_ATTEMPTS_TOTAL,
     STRATEGY_DURATION_SECONDS,
 )
+from src.observability.safe_address import address_without_query, exception_text_without_queries
 from src.reader import tier_memory
 from src.reader.cloudflare.challenge_detector import ChallengeDetector
 from src.reader.cloudflare.challenge_signals import (
     ChallengeVerdict,
     assess,
     log_verdict,
-    record_verdict,
+    record_window_verdict,
 )
 from src.reader.cloudflare.cookie_manager import cookie_manager
-from src.reader.document_router import route_document
+from src.reader.document_router import RouteResult, route_document
 from src.reader.extraction import extract_structured, extract_tables, extract_text_with_fallback
 from src.reader.link_annotator import annotate_links
-from src.reader.recipe_store import build_object, replay_valid
+from src.reader.recipe_store import build_object, names_whole_document, replay_valid
 from src.reader.recipe_store import delete as recipe_delete
 from src.reader.recipe_store import lookup as recipe_lookup
 from src.reader.recipe_store import store as recipe_store_put
+from src.reader.schema_extraction import check_schema_size, clean_markup, schema_hash
 from src.reader.schema_extraction import run_model as run_schema_model
-from src.reader.schema_extraction import schema_hash
-from src.reader.strategies.base_strategy import BaseStrategy
+from src.reader.strategies.base_strategy import BaseStrategy, FetchedHtml
 from src.reader.strategies.beautifulsoup_strategy import BeautifulSoupStrategy
 from src.reader.strategies.camoufox_strategy import CamoufoxStrategy
 from src.reader.strategies.crawlee_strategy import CrawleeStrategy
@@ -79,8 +82,6 @@ TierName = Literal[
 ]
 OutputFormat = Literal["text", "structured", "schema", "tables", "screenshot"]
 
-# The ladder order. The escalation chain follows this tuple, never a sort on
-# the tier name, so a new tier is inserted here and nowhere else.
 TIER_ORDER: tuple[TierName, ...] = (
     "1-beautifulsoup",
     "2-trafilatura",
@@ -94,6 +95,24 @@ TIER_ORDER: tuple[TierName, ...] = (
 _PATCHRIGHT_TIER_NAME: TierName = "4a-patchright"
 _CAMOUFOX_TIER_NAME: TierName = "4b-camoufox"
 
+_READ_CACHE_MAX_ENTRIES = 1024
+_WRAPPER_MAX_OWN_WORDS = 25
+_NON_TEXT_TAGS = ("script", "style", "noscript", "template")
+_SECOND_LOOK_TIER = "reader"
+
+
+class ReadCacheKey(NamedTuple):
+    """The fields that together identify one read request for cache-aside."""
+
+    url: str
+    heavy_mode: bool
+    include_links: bool
+    profile: str
+    output_format: str
+    tier: str
+    schema_hash: str
+    link_filter: str
+
 
 def _cache_key(
     url: str,
@@ -103,12 +122,50 @@ def _cache_key(
     output_format: str | None,
     tier: TierName | None = None,
     schema_hash: str = "",
-) -> str:
-    """Return a string key that uniquely identifies a read request for cache-aside."""
-    return (
-        f"{url}|heavy={heavy_mode}|links={include_links}"
-        f"|profile={profile or ''}|fmt={output_format or 'text'}|tier={tier or ''}|schema={schema_hash}"
+    link_filter: str | None = None,
+) -> ReadCacheKey:
+    """Return the key that uniquely identifies a read request for cache-aside."""
+    return ReadCacheKey(
+        url=url,
+        heavy_mode=heavy_mode,
+        include_links=include_links,
+        profile=profile or "",
+        output_format=output_format or "text",
+        tier=tier or "",
+        schema_hash=schema_hash,
+        link_filter=link_filter or "",
     )
+
+
+async def _second_look(html: str, url: str) -> None:
+    """Judge a tier's page once more, counting one verdict under the tier ``reader``.
+
+    Raises:
+        ChallengeDetectedException: when the page is a wall or carries no content.
+    """
+    verdict = await asyncio.to_thread(assess, 200, html, record_metrics=False)
+    record_window_verdict(verdict, _SECOND_LOOK_TIER)
+    log_verdict(verdict, _SECOND_LOOK_TIER, url)
+    if not verdict.accepted:
+        raise ChallengeDetectedException(verdict)
+
+
+class PageResult(dict[str, Any]):
+    """A read answer that keeps the page HTML of the one fetch that served it as an attribute, never a key."""
+
+    page: str
+
+    def __init__(self, answer: Mapping[str, Any], page: str = "") -> None:
+        super().__init__(answer)
+        self.page = page
+
+    @classmethod
+    def of(cls, answer: dict[str, Any]) -> "PageResult":
+        """*answer* itself when it keeps a page, else *answer* with an empty page."""
+        if isinstance(answer, PageResult):
+            return answer
+
+        return cls(answer)
 
 
 _instances: WeakSet["WebReader"] = WeakSet()
@@ -136,7 +193,7 @@ class WebReader:
         self.user_agents = self._load_user_agents()
         self.url_validator = url_validator
 
-        self._memory_cache: dict[str, tuple[dict[str, Any], float]] = {}
+        self._memory_cache: dict[ReadCacheKey, tuple[dict[str, Any], float]] = {}
         _instances.add(self)
 
     def _build_strategies(self, profile: str | None = None) -> dict[str, BaseStrategy]:
@@ -192,9 +249,9 @@ class WebReader:
 
     @staticmethod
     def _drop_disabled_tiers(strategies: dict[str, BaseStrategy]) -> dict[str, BaseStrategy]:
-        """Skip tiers the operator switched off. A caller that names a disabled
-        tier explicitly is answered by the caller, not by silently running past
-        it, so the drop applies only to the unselected chain."""
+        """Skip tiers the operator switched off, on every chain. A caller that
+        names a disabled tier itself as its starting tier is refused by
+        `_require_tier_enabled` before this runs."""
         if not settings.CAMOUFOX_ENABLED:
             strategies = {
                 name: strategy for name, strategy in strategies.items() if name != _CAMOUFOX_TIER_NAME
@@ -203,17 +260,31 @@ class WebReader:
         return strategies
 
     @staticmethod
+    def _drop_human_tier(strategies: dict[str, BaseStrategy]) -> dict[str, BaseStrategy]:
+        """Stop the ladder before the human-intervention tier."""
+        return {name: strategy for name, strategy in strategies.items() if name != NOVNC_STRATEGY_NAME}
+
+    @staticmethod
     def _from_tier(strategies: dict[str, BaseStrategy], tier: TierName) -> dict[str, BaseStrategy]:
-        """Return *tier* and every tier after it, so escalation still runs from there."""
+        """Return *tier* and every tier after it, so escalation still runs from
+        there, or nothing when this chain dropped *tier*.
+
+        Raises:
+            ValueError: when *tier* is not a rung of the ladder at all.
+        """
+        if tier not in TIER_ORDER:
+            raise ValueError(f"unknown tier: {tier}")
+
         names = list(strategies)
+        if tier not in names:
+            return {}
 
         return {name: strategies[name] for name in names[names.index(tier) :]}
 
     @staticmethod
     def _require_tier_enabled(tier: str) -> None:
-        """Refuse a caller-selected tier the operator switched off. The drop in
-        `_drop_disabled_tiers` only applies to the unselected chain; naming a
-        disabled tier is answered, never silently run past."""
+        """Refuse a caller-selected starting tier the operator switched off:
+        naming a disabled tier is answered, never silently run past."""
         if tier == _CAMOUFOX_TIER_NAME and not settings.CAMOUFOX_ENABLED:
             raise TierDisabledError(_CAMOUFOX_TIER_NAME)
 
@@ -223,21 +294,23 @@ class WebReader:
         heavy_mode: bool,
         profile: str | None = None,
         tier: TierName | None = None,
+        allow_human_tier: bool = True,
     ) -> dict[str, BaseStrategy]:
         strategies = self._build_strategies(profile)
+        if not allow_human_tier:
+            strategies = self._drop_human_tier(strategies)
 
         if ChallengeDetector.is_login_redirect_url(url):
             logger.warning(
-                "WebReader: Pre-emptive URL redirect login detected on %s. Forcing NoVNC strategy.", url
+                "WebReader: Pre-emptive URL redirect login detected on %s. Forcing NoVNC strategy.",
+                address_without_query(url),
             )
-            return {NOVNC_STRATEGY_NAME: strategies[NOVNC_STRATEGY_NAME]}
+            return {name: strategies[name] for name in (NOVNC_STRATEGY_NAME,) if name in strategies}
 
-        # An explicit tier is the most specific instruction a caller can give, so it
-        # outranks heavy_mode and the producer-aware routing below (ADR-011).
         if tier is not None:
             self._require_tier_enabled(tier)
 
-            return self._from_tier(strategies, tier)
+            return self._from_tier(self._drop_disabled_tiers(strategies), tier)
 
         strategies = self._drop_disabled_tiers(strategies)
 
@@ -258,7 +331,7 @@ class WebReader:
         is never gated here: it has no session to expire and reads anonymously
         exactly as it always did.
         """
-        if not await cookie_manager.has_auth_cookies(url, profile):
+        if not await cookie_manager.has_auth_state(url, profile):
             return False
 
         return not await session_manager.validate(url, profile)
@@ -315,10 +388,13 @@ class WebReader:
         return False
 
     # ------------------------------------------------------------------
-    # Cache-aside helpers (7.1)
+    # Cache-aside helpers
     # ------------------------------------------------------------------
 
-    def _cache_get(self, key: str) -> dict[str, Any] | None:
+    def _cache_get(self, key: ReadCacheKey | None) -> dict[str, Any] | None:
+        if key is None:
+            return None
+
         entry = self._memory_cache.get(key)
         if entry is None:
             return None
@@ -331,8 +407,26 @@ class WebReader:
 
         return result
 
-    def _cache_put(self, key: str, result: dict[str, Any]) -> None:
-        self._memory_cache[key] = (result, time.monotonic())
+    def _cache_put(self, key: ReadCacheKey | None, result: dict[str, Any]) -> None:
+        """Store *result* as the newest entry, dropping expired entries and the
+        oldest ones past `_READ_CACHE_MAX_ENTRIES`. Insertion order is age order.
+        A None *key* is a read that skips the cache, so nothing is stored."""
+        if key is None:
+            return
+
+        now = time.monotonic()
+        self._drop_expired_entries(now)
+        self._memory_cache.pop(key, None)
+        self._memory_cache[key] = (result, now)
+        while len(self._memory_cache) > _READ_CACHE_MAX_ENTRIES:
+            del self._memory_cache[next(iter(self._memory_cache))]
+
+    def _drop_expired_entries(self, now: float) -> None:
+        for key, (_result, stored_at) in list(self._memory_cache.items()):
+            if now - stored_at <= settings.READ_CACHE_TTL_SECONDS:
+                return
+
+            del self._memory_cache[key]
 
     def clear_cache(self) -> int:
         """Drop the whole in-process read cache, returning the dropped count."""
@@ -349,9 +443,7 @@ class WebReader:
         for the remainder of its TTL. Returns the number of entries removed.
         """
         stale_keys = [
-            key
-            for key in self._memory_cache
-            if cookie_manager.registrable_domain(key.split("|", 1)[0]) == domain
+            key for key in self._memory_cache if cookie_manager.registrable_domain(key.url) == domain
         ]
         for key in stale_keys:
             del self._memory_cache[key]
@@ -364,22 +456,40 @@ class WebReader:
 
     @staticmethod
     def _main_pdf_link(page_html: str, url: str) -> str | None:
-        """First `.pdf` link of a page, resolved against the page URL (design D6)."""
+        """The `.pdf` main link of a document wrapper page, or None.
+
+        A page is a wrapper when one `.pdf` address, resolved against the page
+        URL, is the only target its links point to, and its own text, link text
+        left out, stays under `_WRAPPER_MAX_OWN_WORDS` words. An article that
+        also links a PDF is read as the article.
+        """
         soup = BeautifulSoup(page_html, "html.parser")
-        for anchor in soup.find_all("a", href=True):
-            resolved = urljoin(url, str(anchor.get("href")))
-            if urlparse(resolved).path.lower().endswith(".pdf"):
-                return resolved
+        anchors = soup.find_all("a", href=True)
+        targets = {urldefrag(urljoin(url, str(anchor.get("href")))).url for anchor in anchors}
+        targets.discard(urldefrag(url).url)
+        if len(targets) != 1:
+            return None
 
-        return None
+        (target,) = targets
+        if not urlparse(target).path.lower().endswith(".pdf"):
+            return None
 
-    def _cached_unless_screenshot(self, key: str, fmt: str, url: str) -> dict[str, Any] | None:
+        for element in [*anchors, *soup.find_all(_NON_TEXT_TAGS)]:
+            element.decompose()
+        if len(soup.get_text(" ").split()) >= _WRAPPER_MAX_OWN_WORDS:
+            return None
+
+        return target
+
+    def _cached_unless_screenshot(
+        self, key: ReadCacheKey | None, fmt: str, url: str
+    ) -> dict[str, Any] | None:
         if fmt == "screenshot":
             return None
         cached = self._cache_get(key)
         if cached is not None:
             READ_CACHE_HITS_TOTAL.inc()
-            logger.debug("WebReader: cache hit for %s", url)
+            logger.debug("WebReader: cache hit for %s", address_without_query(url))
 
         return cached
 
@@ -397,37 +507,60 @@ class WebReader:
 
         return capable
 
-    async def _route_direct(self, url: str, key: str, fmt: str) -> dict[str, Any] | None:
-        routed = await route_document(url)
-        if routed is None:
-            return None
-        if routed.ok:
-            result: dict[str, Any] = {
-                "content": routed.content,
-                "status": "success",
-                "mode": "document-router",
-                "route": routed.route,
-            }
-        else:
-            result = {
-                "content": "",
-                "status": "error",
-                "reason": "routing_error",
-                "route": routed.route,
-                "routing_error": routed.error,
-            }
-        if fmt != "screenshot":
-            self._cache_put(key, result)
+    @staticmethod
+    def _routed_document(routed: RouteResult) -> dict[str, Any]:
+        return {
+            "content": routed.content,
+            "status": "success",
+            "mode": "document-router",
+            "route": routed.route,
+        }
 
-        return result
+    @staticmethod
+    def _refused_document(refused: RouteResult) -> dict[str, Any]:
+        return {
+            "content": "",
+            "status": "error",
+            "reason": "routing_error",
+            "route": refused.route,
+            "routing_error": refused.error,
+        }
 
-    def _cache_result(self, key: str, fmt: str, result: dict[str, Any]) -> None:
-        if fmt != "screenshot":
+    @staticmethod
+    def _with_routing_error(result: dict[str, Any], failed_route: RouteResult | None) -> dict[str, Any]:
+        """Name a failed direct route on the HTML extraction that answered instead."""
+        if failed_route is None:
+            return result
+
+        return PageResult(
+            {**result, "route": failed_route.route, "routing_error": failed_route.error},
+            PageResult.of(result).page,
+        )
+
+    def _finish_read(
+        self, key: ReadCacheKey | None, fmt: str, result: dict[str, Any], failed_route: RouteResult | None
+    ) -> dict[str, Any]:
+        finished = self._with_routing_error(result, failed_route)
+        self._cache_result(key, fmt, finished)
+
+        return finished
+
+    @staticmethod
+    async def _remember_tier(url: str, name: str, tier: TierName | None, heavy_mode: bool) -> None:
+        """Remember the tier that served an unpinned read, so the next read of
+        the domain starts there. A read with a caller tier or heavy_mode chose
+        its own start and says nothing about the domain."""
+        if tier is None and not heavy_mode:
+            await tier_memory.record(url, name)
+
+    def _cache_result(self, key: ReadCacheKey | None, fmt: str, result: dict[str, Any]) -> None:
+        """Cache a whole successful read: never a screenshot, never a read whose routing failed."""
+        if fmt != "screenshot" and "routing_error" not in result:
             self._cache_put(key, result)
 
     @staticmethod
     async def _screenshot_result(name: str, strategy: BaseStrategy, url: str) -> dict[str, Any] | None:
-        """Base64 PNG from the browser tier that served the read (design D7)."""
+        """Base64 PNG from the browser tier that served the read."""
         capture = getattr(strategy, "screenshot_page", None)
         if capture is None:
             raise ScreenshotUnavailableError(f"tier {name} cannot produce a screenshot")
@@ -435,22 +568,21 @@ class WebReader:
         if page is None:
             return None
         html, png = page
-        if not ChallengeDetector.is_content_accepted(200, html):
-            verdict = assess(200, html)
-            record_verdict(verdict, "reader")
-            log_verdict(verdict, "reader", url)
-            raise ChallengeDetectedException(verdict)
+        await _second_look(html, url)
 
-        return {
-            "content": base64.b64encode(png).decode("ascii"),
-            "status": "success",
-            "mode": name,
-        }
+        return PageResult(
+            {
+                "content": base64.b64encode(png).decode("ascii"),
+                "status": "success",
+                "mode": name,
+            },
+            html,
+        )
 
     async def _execute_screenshot_format(
         self, name: str, strategy: BaseStrategy, url: str, started: float, dlabel: str
     ) -> dict[str, Any] | None:
-        """One navigation returns the rendered HTML and the PNG (design D7)."""
+        """One navigation returns the rendered HTML and the PNG."""
         shot = await self._screenshot_result(name, strategy, url)
         if shot is None:
             self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
@@ -459,12 +591,11 @@ class WebReader:
             return None
 
         self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
-        await tier_memory.record(url, name)
 
         return shot
 
     async def _execute_tables_format(
-        self, name: str, url: str, page_html: str, started: float, dlabel: str
+        self, name: str, page_html: str, started: float, dlabel: str
     ) -> dict[str, Any] | None:
         tables = extract_tables(page_html)
         if not tables:
@@ -476,7 +607,6 @@ class WebReader:
         flat = " ".join(cell for table in tables for row in table for cell in row)
         if self.validator.validate(flat):
             self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
-            await tier_memory.record(url, name)
 
             return {"content": flat, "tables": tables, "status": "success", "mode": name}
 
@@ -488,7 +618,7 @@ class WebReader:
     async def _with_main_pdf(
         self, url: str, page_html: str, content: str, mode: str, output_format: str | None
     ) -> dict[str, Any]:
-        """Merge a routed main `.pdf` link into a text result (design D6)."""
+        """Merge a routed main `.pdf` link into a text result."""
         if output_format not in (None, "text"):
             return {"content": content, "status": "success", "mode": mode}
         linked = await self._maybe_route_main_pdf(url, page_html)
@@ -528,26 +658,71 @@ class WebReader:
         output_format: OutputFormat | None = None,
         tier: TierName | None = None,
         extraction_schema: dict[str, Any] | None = None,
+        *,
+        allow_human_tier: bool = True,
     ) -> dict[str, Any]:
+        """Read *url* in *output_format*. With *allow_human_tier* false the
+        ladder stops before 6-novnc, for callers no human watches."""
+        page_read = await self.read_page(
+            url,
+            heavy_mode,
+            profile,
+            output_format,
+            tier,
+            extraction_schema,
+            allow_human_tier=allow_human_tier,
+        )
+
+        return dict(page_read)
+
+    async def read_page(
+        self,
+        url: str,
+        heavy_mode: bool = False,
+        profile: str | None = None,
+        output_format: OutputFormat | None = None,
+        tier: TierName | None = None,
+        extraction_schema: dict[str, Any] | None = None,
+        *,
+        allow_human_tier: bool = True,
+        use_read_cache: bool = True,
+    ) -> PageResult:
+        """The answer of :meth:`read`, keeping the page HTML of the fetch that served it.
+
+        With *use_read_cache* false the read neither answers from nor writes to the read cache.
+        """
         _challenge_verdict.set(None)
         if await self._session_expired(url, profile):
-            return self._create_session_expired_response(url, profile)
+            return PageResult(self._create_session_expired_response(url, profile))
 
         fmt: str = output_format or "text"
         if fmt == "schema" and extraction_schema is None:
             raise ValueError("extraction_schema is required with output_format=schema")
+        if extraction_schema is not None:
+            check_schema_size(extraction_schema)
         digest = schema_hash(extraction_schema) if extraction_schema is not None else ""
-        key = _cache_key(url, heavy_mode, False, profile, fmt, tier, digest)
+        key = _cache_key(url, heavy_mode, False, profile, fmt, tier, digest) if use_read_cache else None
         cached = self._cached_unless_screenshot(key, fmt, url)
         if cached is not None:
-            return cached
+            return PageResult.of(cached)
 
-        routed = await self._route_direct(url, key, fmt)
-        if routed is not None:
+        direct = await route_document(url)
+        if direct is not None and direct.ok:
+            routed = PageResult(self._routed_document(direct))
+            self._cache_result(key, fmt, routed)
+
             return routed
+        if direct is not None and direct.ends_read:
+            return PageResult(self._refused_document(direct))
 
-        logger.info("Reading URL: %s (heavy_mode: %s, profile: %s, tier: %s)", url, heavy_mode, profile, tier)
-        strategies_to_run = await self._select_strategies(url, heavy_mode, profile, tier)
+        logger.info(
+            "Reading URL: %s (heavy_mode: %s, profile: %s, tier: %s)",
+            address_without_query(url),
+            heavy_mode,
+            profile,
+            tier,
+        )
+        strategies_to_run = await self._select_strategies(url, heavy_mode, profile, tier, allow_human_tier)
         strategies_to_run = self._only_screenshot_capable(strategies_to_run, fmt)
         started_at = time.perf_counter()
         budget_exhausted = False
@@ -566,11 +741,14 @@ class WebReader:
                 escalate_failures=tier is None and fmt != "schema",
             )
             if result:
-                self._cache_result(key, fmt, result)
+                await self._remember_tier(url, name, tier, heavy_mode)
 
-                return result
+                return PageResult.of(self._finish_read(key, fmt, result, direct))
+            if self._landed_on_login():
+                break
 
-        if budget_exhausted and NOVNC_STRATEGY_NAME in strategies_to_run:
+        login_landing = self._landed_on_login()
+        if (budget_exhausted or login_landing) and NOVNC_STRATEGY_NAME in strategies_to_run:
             novnc_result = await self._execute_strategy(
                 NOVNC_STRATEGY_NAME,
                 strategies_to_run[NOVNC_STRATEGY_NAME],
@@ -579,11 +757,18 @@ class WebReader:
                 extraction_schema=extraction_schema,
             )
             if novnc_result:
-                self._cache_result(key, fmt, novnc_result)
+                await self._remember_tier(url, NOVNC_STRATEGY_NAME, tier, heavy_mode)
 
-                return novnc_result
+                return PageResult.of(self._finish_read(key, fmt, novnc_result, direct))
 
-        return self._create_failure_response(url, budget_exhausted=budget_exhausted)
+        return PageResult.of(
+            self._with_routing_error(
+                self._create_failure_response(
+                    url, budget_exhausted=budget_exhausted, login_required=login_landing
+                ),
+                direct,
+            )
+        )
 
     async def read_with_links(
         self,
@@ -593,27 +778,63 @@ class WebReader:
         profile: str | None = None,
         output_format: OutputFormat | None = None,
         tier: TierName | None = None,
+        *,
+        allow_human_tier: bool = True,
     ) -> dict[str, Any]:
+        """Read *url* with its links annotated. With *allow_human_tier* false the
+        ladder stops before 6-novnc, for callers no human watches."""
+        linked = await self.read_linked_page(
+            url,
+            link_filter,
+            heavy_mode,
+            profile,
+            output_format,
+            tier,
+            allow_human_tier=allow_human_tier,
+        )
+
+        return dict(linked)
+
+    async def read_linked_page(
+        self,
+        url: str,
+        link_filter: str | None = None,
+        heavy_mode: bool = False,
+        profile: str | None = None,
+        output_format: OutputFormat | None = None,
+        tier: TierName | None = None,
+        *,
+        allow_human_tier: bool = True,
+        use_read_cache: bool = True,
+    ) -> PageResult:
+        """The answer of :meth:`read_with_links`, keeping the page HTML of the fetch that served it.
+
+        With *use_read_cache* false the read neither answers from nor writes to the read cache.
+        """
         _challenge_verdict.set(None)
         if await self._session_expired(url, profile):
-            return self._create_session_expired_response(url, profile)
+            return PageResult(self._create_session_expired_response(url, profile))
 
-        key = _cache_key(url, heavy_mode, True, profile, output_format, tier)
+        key = (
+            _cache_key(url, heavy_mode, True, profile, output_format, tier, link_filter=link_filter)
+            if use_read_cache
+            else None
+        )
         cached = self._cache_get(key)
         if cached is not None:
             READ_CACHE_HITS_TOTAL.inc()
-            logger.debug("WebReader: cache hit (with links) for %s", url)
+            logger.debug("WebReader: cache hit (with links) for %s", address_without_query(url))
 
-            return cached
+            return PageResult.of(cached)
 
         logger.info(
             "Reading URL with links: %s (heavy_mode: %s, profile: %s, tier: %s)",
-            url,
+            address_without_query(url),
             heavy_mode,
             profile,
             tier,
         )
-        strategies_to_run = await self._select_strategies(url, heavy_mode, profile, tier)
+        strategies_to_run = await self._select_strategies(url, heavy_mode, profile, tier, allow_human_tier)
         started_at = time.perf_counter()
         budget_exhausted = False
 
@@ -626,40 +847,52 @@ class WebReader:
             if html:
                 content, links = annotate_links(html, url, link_filter)
                 if self.validator.validate(content):
-                    result = {"content": content, "links": links, "status": "success", "mode": name}
-                    await tier_memory.record(url, name)
+                    result = PageResult(
+                        {"content": content, "links": links, "status": "success", "mode": name}, html
+                    )
+                    await self._remember_tier(url, name, tier, heavy_mode)
                     self._cache_put(key, result)
 
                     return result
 
                 logger.info("Strategy %s validation failed after annotation.", name)
+            if self._landed_on_login():
+                break
 
-        if budget_exhausted and NOVNC_STRATEGY_NAME in strategies_to_run:
+        login_landing = self._landed_on_login()
+        if (budget_exhausted or login_landing) and NOVNC_STRATEGY_NAME in strategies_to_run:
             html = await self._execute_html_strategy(
                 NOVNC_STRATEGY_NAME, strategies_to_run[NOVNC_STRATEGY_NAME], url
             )
             if html:
                 content, links = annotate_links(html, url, link_filter)
                 if self.validator.validate(content):
-                    result = {
-                        "content": content,
-                        "links": links,
-                        "status": "success",
-                        "mode": NOVNC_STRATEGY_NAME,
-                    }
-                    await tier_memory.record(url, NOVNC_STRATEGY_NAME)
+                    result = PageResult(
+                        {
+                            "content": content,
+                            "links": links,
+                            "status": "success",
+                            "mode": NOVNC_STRATEGY_NAME,
+                        },
+                        html,
+                    )
+                    await self._remember_tier(url, NOVNC_STRATEGY_NAME, tier, heavy_mode)
                     self._cache_put(key, result)
 
                     return result
 
-        return self._create_failure_response(url, budget_exhausted=budget_exhausted)
+        return PageResult(
+            self._create_failure_response(
+                url, budget_exhausted=budget_exhausted, login_required=login_landing
+            )
+        )
 
     # ------------------------------------------------------------------
     # Internal execution helpers
     # ------------------------------------------------------------------
 
     @staticmethod
-    async def _novnc_or_tier_html(name: str, strategy: BaseStrategy, url: str) -> str:
+    async def _novnc_or_tier_html(name: str, strategy: BaseStrategy, url: str) -> FetchedHtml | str:
         verdict = _challenge_verdict.get()
         if name == NOVNC_STRATEGY_NAME and verdict is not None:
             return await cast("NoVNCStrategy", strategy).get_html(url, verdict)
@@ -673,21 +906,18 @@ class WebReader:
         page_html: str,
         extraction_schema: dict[str, Any],
     ) -> dict[str, Any]:
-        """Schema extraction with recipe replay (design D3 and D4)."""
+        """Schema extraction with recipe replay."""
         domain = cookie_manager.registrable_domain(url)
         digest = schema_hash(extraction_schema)
         selectors = await recipe_lookup(domain, digest)
         if selectors is not None:
-            replayed = build_object(page_html, selectors, extraction_schema)
-            if replay_valid(replayed, extraction_schema):
-                await tier_memory.record(url, name)
-
-                return {"content": replayed, "status": "success", "mode": name, "recipe": "replay"}
+            if not names_whole_document(page_html, selectors):
+                replayed = build_object(page_html, selectors, extraction_schema)
+                if replay_valid(replayed, extraction_schema):
+                    return {"content": replayed, "status": "success", "mode": name, "recipe": "replay"}
             await recipe_delete(domain, digest)
-        text = extract_text_with_fallback(page_html)
-        data, fresh = await run_schema_model(text, extraction_schema)
-        await recipe_store_put(domain, digest, fresh)
-        await tier_memory.record(url, name)
+        data, fresh = await run_schema_model(clean_markup(page_html), extraction_schema)
+        await recipe_store_put(domain, digest, fresh, page_html, expected=data, schema=extraction_schema)
 
         return {"content": data, "status": "success", "mode": name, "recipe": "model"}
 
@@ -711,14 +941,13 @@ class WebReader:
             return schemed
 
         if output_format == "tables":
-            return await self._execute_tables_format(name, url, page_html, started, dlabel)
+            return await self._execute_tables_format(name, page_html, started, dlabel)
 
         if output_format == "structured":
             structured = extract_structured(page_html)
             structured_content = structured.get("content", "")
             if self.validator.validate(structured_content):
                 self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
-                await tier_memory.record(url, name)
 
                 return {**structured, "status": "success", "mode": name}
 
@@ -731,7 +960,6 @@ class WebReader:
         text = extract_text_with_fallback(page_html)
         if self.validator.validate(text):
             self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
-            await tier_memory.record(url, name)
 
             return await self._with_main_pdf(url, page_html, text, name, output_format)
 
@@ -765,20 +993,20 @@ class WebReader:
 
                 return None
 
-            if not ChallengeDetector.is_content_accepted(200, html):
-                verdict = assess(200, html)
-                record_verdict(verdict, "reader")
-                log_verdict(verdict, "reader", url)
-                raise ChallengeDetectedException(verdict)
+            await _second_look(html, url)
 
-            return await self._format_result(
+            formatted = await self._format_result(
                 name, url, html, output_format, extraction_schema, started, dlabel
             )
+
+            return None if formatted is None else PageResult(formatted, html)
         except ChallengeDetectedException as exc:
             _challenge_verdict.set(exc.verdict)
             self._record_strategy_outcome(name, "challenge_detected", dlabel, time.perf_counter() - started)
             logger.info(
-                "Strategy %s detected a challenge on %s; falling through to the next tier.", name, url
+                "Strategy %s detected a challenge on %s; falling through to the next tier.",
+                name,
+                address_without_query(url),
             )
 
             return None
@@ -799,7 +1027,10 @@ class WebReader:
             if not escalate_failures:
                 raise
             logger.info(
-                "Strategy %s could not fetch %s (%s); falling through to the next tier.", name, url, exc
+                "Strategy %s could not fetch %s (%s); falling through to the next tier.",
+                name,
+                address_without_query(url),
+                exc,
             )
 
             return None
@@ -809,7 +1040,12 @@ class WebReader:
             raise
         except Exception as e:
             self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
-            logger.warning("Strategy %s failed for %s: %s", name, url, e)
+            logger.warning(
+                "Strategy %s failed for %s: %s",
+                name,
+                address_without_query(url),
+                exception_text_without_queries(e),
+            )
 
             return None
 
@@ -819,7 +1055,7 @@ class WebReader:
         strategy: BaseStrategy,
         url: str,
         escalate_failures: bool = False,
-    ) -> str:
+    ) -> FetchedHtml | str:
         started = time.perf_counter()
         dlabel = domain_label(url)
 
@@ -827,11 +1063,7 @@ class WebReader:
             logger.info("--- Strategy %s STARTED ---", name)
             html = await self._novnc_or_tier_html(name, strategy, url)
             if html:
-                if not ChallengeDetector.is_content_accepted(200, html):
-                    verdict = assess(200, html)
-                    record_verdict(verdict, "reader")
-                    log_verdict(verdict, "reader", url)
-                    raise ChallengeDetectedException(verdict)
+                await _second_look(html, url)
 
                 self._record_strategy_outcome(name, "success", dlabel, time.perf_counter() - started)
 
@@ -856,7 +1088,10 @@ class WebReader:
             if not escalate_failures:
                 raise
             logger.info(
-                "Strategy %s could not fetch %s (%s); falling through to the next tier.", name, url, exc
+                "Strategy %s could not fetch %s (%s); falling through to the next tier.",
+                name,
+                address_without_query(url),
+                exc,
             )
 
             return ""
@@ -868,18 +1103,41 @@ class WebReader:
             _challenge_verdict.set(exc.verdict)
             self._record_strategy_outcome(name, "challenge_detected", dlabel, time.perf_counter() - started)
             logger.info(
-                "Strategy %s detected a challenge on %s; falling through to the next tier.", name, url
+                "Strategy %s detected a challenge on %s; falling through to the next tier.",
+                name,
+                address_without_query(url),
             )
 
             return ""
         except Exception as e:
             self._record_strategy_outcome(name, "exception", dlabel, time.perf_counter() - started)
-            logger.warning("Strategy %s get_html failed for %s: %s", name, url, e)
+            logger.warning(
+                "Strategy %s get_html failed for %s: %s",
+                name,
+                address_without_query(url),
+                exception_text_without_queries(e),
+            )
 
         return ""
 
     @staticmethod
-    def _create_failure_response(url: str, *, budget_exhausted: bool = False) -> dict[str, Any]:
+    def _landed_on_login() -> bool:
+        """True when the latest challenge verdict of this read came from the login landing rule."""
+        verdict = _challenge_verdict.get()
+
+        return verdict is not None and verdict.login_landing
+
+    @staticmethod
+    def _create_failure_response(
+        url: str, *, budget_exhausted: bool = False, login_required: bool = False
+    ) -> dict[str, Any]:
+        if login_required:
+            return {
+                "content": "",
+                "status": "error",
+                "reason": "login_required",
+                "error": f"A login is required to read {url}",
+            }
         reason = "budget_exhausted" if budget_exhausted else "all_tiers_failed"
 
         return {

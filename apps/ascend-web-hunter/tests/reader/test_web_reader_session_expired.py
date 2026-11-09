@@ -24,7 +24,7 @@ _ARTICLE_HTML = (
 def _gate(has_auth: bool, valid: bool) -> list[Any]:
     return [
         patch(
-            "src.reader.web_reader.cookie_manager.has_auth_cookies",
+            "src.reader.web_reader.cookie_manager.has_auth_state",
             new=AsyncMock(return_value=has_auth),
         ),
         patch("src.reader.web_reader.session_manager.validate", new=AsyncMock(return_value=valid)),
@@ -97,7 +97,7 @@ async def test_a_target_with_no_stored_login_is_never_validated() -> None:
     # when
     with (
         patch(
-            "src.reader.web_reader.cookie_manager.has_auth_cookies",
+            "src.reader.web_reader.cookie_manager.has_auth_state",
             new=AsyncMock(return_value=False),
         ),
         patch("src.reader.web_reader.session_manager.validate", new=validate),

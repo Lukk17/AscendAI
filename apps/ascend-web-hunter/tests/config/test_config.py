@@ -1,4 +1,6 @@
 import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -7,6 +9,8 @@ import pytest
 from pydantic import ValidationError
 
 from src.config.config import Settings
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_settings_defaults() -> None:
@@ -439,6 +443,7 @@ _CHALLENGE_DEFAULTS: dict[str, Any] = {
     "CHALLENGE_WEIGHT_NO_ARTICLE": 20,
     "CHALLENGE_WEIGHT_RICH_CONTENT": -70,
     "CHALLENGE_WEIGHT_MANY_LINKS": -20,
+    "CHALLENGE_WEIGHT_SERVED_PAGE": -30,
     "CHALLENGE_WEIGHT_PHRASE_TITLE": 60,
     "CHALLENGE_WEIGHT_PHRASE_BODY": 30,
 }
@@ -467,6 +472,7 @@ _CHALLENGE_VALID_OVERRIDES: dict[str, str] = {
     "CHALLENGE_WEIGHT_NO_ARTICLE": "15",
     "CHALLENGE_WEIGHT_RICH_CONTENT": "-50",
     "CHALLENGE_WEIGHT_MANY_LINKS": "-10",
+    "CHALLENGE_WEIGHT_SERVED_PAGE": "-15",
     "CHALLENGE_WEIGHT_PHRASE_TITLE": "55",
     "CHALLENGE_WEIGHT_PHRASE_BODY": "25",
 }
@@ -495,6 +501,7 @@ _CHALLENGE_REJECTED: dict[str, str] = {
     "CHALLENGE_WEIGHT_NO_ARTICLE": "2000",
     "CHALLENGE_WEIGHT_RICH_CONTENT": "-2000",
     "CHALLENGE_WEIGHT_MANY_LINKS": "-2000",
+    "CHALLENGE_WEIGHT_SERVED_PAGE": "-2000",
     "CHALLENGE_WEIGHT_PHRASE_TITLE": "2000",
     "CHALLENGE_WEIGHT_PHRASE_BODY": "2000",
 }
@@ -593,6 +600,16 @@ def test_challenge_validator_rejects_positive_many_links() -> None:
     # when / then
     with patch.dict(os.environ, env):
         with pytest.raises(ValidationError, match="CHALLENGE_WEIGHT_MANY_LINKS"):
+            Settings()
+
+
+def test_challenge_validator_rejects_positive_served_page() -> None:
+    # given
+    env = {"CHALLENGE_WEIGHT_SERVED_PAGE": "5"}
+
+    # when / then
+    with patch.dict(os.environ, env):
+        with pytest.raises(ValidationError, match="CHALLENGE_WEIGHT_SERVED_PAGE"):
             Settings()
 
 
@@ -730,9 +747,11 @@ _EXTRACTION_DEFAULTS: dict[str, Any] = {
     "RECIPE_TTL_SECONDS": 604800,
     "RECIPE_SELECTOR_MAX_CHARS": 512,
     "DOCUMENT_MAX_BYTES": 52428800,
+    "READ_RESPONSE_MAX_BYTES": 52428800,
     "DOCLING_SERVE_URL": "http://docling-serve:5001",
     "ASCEND_OCR_URL": "http://ascend-ocr:7022",
     "OCR_ROUTE_TIMEOUT_SECONDS": 300.0,
+    "OCR_DELETE_DRAIN_SECONDS": 5.0,
     "AUDIO_SCRIBE_URL": "http://ascend-audio-scribe:7017",
     "READ_CACHE_PURGE_RECONNECT_SECONDS": 5.0,
 }
@@ -747,9 +766,11 @@ _EXTRACTION_VALID_OVERRIDES: dict[str, str] = {
     "RECIPE_TTL_SECONDS": "3600",
     "RECIPE_SELECTOR_MAX_CHARS": "256",
     "DOCUMENT_MAX_BYTES": "1048576",
+    "READ_RESPONSE_MAX_BYTES": "1",
     "DOCLING_SERVE_URL": "http://localhost:5001",
     "ASCEND_OCR_URL": "http://localhost:7022",
     "OCR_ROUTE_TIMEOUT_SECONDS": "60",
+    "OCR_DELETE_DRAIN_SECONDS": "2.5",
     "AUDIO_SCRIBE_URL": "http://localhost:7017",
     "READ_CACHE_PURGE_RECONNECT_SECONDS": "1",
 }
@@ -761,7 +782,9 @@ _EXTRACTION_REJECTED: dict[str, str] = {
     "RECIPE_TTL_SECONDS": "59",
     "RECIPE_SELECTOR_MAX_CHARS": "0",
     "DOCUMENT_MAX_BYTES": "0",
+    "READ_RESPONSE_MAX_BYTES": "0",
     "OCR_ROUTE_TIMEOUT_SECONDS": "0",
+    "OCR_DELETE_DRAIN_SECONDS": "0",
     "READ_CACHE_PURGE_RECONNECT_SECONDS": "0",
 }
 
@@ -816,7 +839,6 @@ _CRAWL_DEFAULTS: dict[str, Any] = {
     "CRAWL_DEFAULT_DEPTH": 2,
     "CRAWL_MAX_PAGES": 10000,
     "CRAWL_DEFAULT_PAGE_BUDGET": 100,
-    "CRAWL_ROBOTS_OPT_OUT_DOMAINS": (),
     "CRAWL_RESULT_S3_BUCKET": "web-hunter-crawls",
     "CRAWL_RESULT_S3_PREFIX": "crawl-results/",
     "CRAWL_JOB_RETENTION_SECONDS": 604800,
@@ -828,7 +850,19 @@ _CRAWL_DEFAULTS: dict[str, Any] = {
     "CRAWL_WORKER_CONCURRENCY": 4,
     "CRAWL_WORKER_IDLE_SECONDS": 1.0,
     "CRAWL_POLL_AFTER_SECONDS": 5,
+    "CRAWL_SITEMAP_MAX_DOCUMENTS": 50,
+    "CRAWL_SITEMAP_MAX_BYTES": 52428800,
+    "CRAWL_ROBOTS_MAX_BYTES": 512000,
+    "CRAWL_ROBOTS_MAX_RULES": 1000000,
+    "CRAWL_ROBOTS_CACHE_MAX_ORIGINS": 256,
+    "CRAWL_ROBOTS_CACHE_MAX_RULES": 2000000,
+    "CRAWL_ROBOTS_SKIP_FACTOR": 10,
+    "DOCUMENT_FETCH_TIMEOUT_SECONDS": 300.0,
+    "CRAWL_ROBOTS_TIMEOUT_SECONDS": 30.0,
+    "CRAWL_SITEMAP_TIMEOUT_SECONDS": 60.0,
+    "CRAWL_MAX_DELAY_SECONDS": 60.0,
     "OBJECT_STORE_S3_ENDPOINT": "http://localhost:9070",
+    "OBJECT_STORE_S3_PUBLIC_ENDPOINT": "http://localhost:9070",
     "OBJECT_STORE_S3_ACCESS_KEY": "",
     "OBJECT_STORE_S3_SECRET_KEY": "",
 }
@@ -840,19 +874,30 @@ _CRAWL_VALID_OVERRIDES: dict[str, str] = {
     "CRAWL_DEFAULT_DEPTH": "1",
     "CRAWL_MAX_PAGES": "500",
     "CRAWL_DEFAULT_PAGE_BUDGET": "50",
-    "CRAWL_ROBOTS_OPT_OUT_DOMAINS": "example.com,example.org",
     "CRAWL_RESULT_S3_BUCKET": "custom-crawls",
     "CRAWL_RESULT_S3_PREFIX": "custom-prefix/",
     "CRAWL_JOB_RETENTION_SECONDS": "86400",
     "CRAWL_DOMAIN_CONCURRENCY": "4",
     "CRAWL_DEFAULT_DELAY_SECONDS": "2.5",
     "CRAWL_PROXY_URL": "http://proxy.example.com:8080",
-    "CRAWL_CLAIM_LEASE_SECONDS": "60",
+    "CRAWL_CLAIM_LEASE_SECONDS": "90",
     "CRAWL_CLAIM_MAX_EXPIRIES": "3",
     "CRAWL_WORKER_CONCURRENCY": "2",
     "CRAWL_WORKER_IDLE_SECONDS": "0.5",
     "CRAWL_POLL_AFTER_SECONDS": "10",
+    "CRAWL_SITEMAP_MAX_DOCUMENTS": "5",
+    "CRAWL_SITEMAP_MAX_BYTES": "1048576",
+    "CRAWL_ROBOTS_MAX_BYTES": "1048576",
+    "CRAWL_ROBOTS_MAX_RULES": "5000",
+    "CRAWL_ROBOTS_CACHE_MAX_ORIGINS": "16",
+    "CRAWL_ROBOTS_CACHE_MAX_RULES": "3000000",
+    "CRAWL_ROBOTS_SKIP_FACTOR": "3",
+    "DOCUMENT_FETCH_TIMEOUT_SECONDS": "12.5",
+    "CRAWL_ROBOTS_TIMEOUT_SECONDS": "5.5",
+    "CRAWL_SITEMAP_TIMEOUT_SECONDS": "30",
+    "CRAWL_MAX_DELAY_SECONDS": "90",
     "OBJECT_STORE_S3_ENDPOINT": "http://host.docker.internal:9070",
+    "OBJECT_STORE_S3_PUBLIC_ENDPOINT": "http://203.0.113.5:9070",
     "OBJECT_STORE_S3_ACCESS_KEY": "test-key",
     "OBJECT_STORE_S3_SECRET_KEY": "test-secret",
 }
@@ -872,7 +917,22 @@ _CRAWL_REJECTED: dict[str, str] = {
     "CRAWL_WORKER_CONCURRENCY": "0",
     "CRAWL_WORKER_IDLE_SECONDS": "0",
     "CRAWL_POLL_AFTER_SECONDS": "0",
+    "CRAWL_SITEMAP_MAX_DOCUMENTS": "0",
+    "CRAWL_SITEMAP_MAX_BYTES": "0",
+    "CRAWL_ROBOTS_MAX_BYTES": "511999",
+    "CRAWL_ROBOTS_MAX_RULES": "0",
+    "CRAWL_ROBOTS_CACHE_MAX_ORIGINS": "0",
+    "CRAWL_ROBOTS_CACHE_MAX_RULES": "0",
+    "CRAWL_ROBOTS_SKIP_FACTOR": "0",
+    "DOCUMENT_FETCH_TIMEOUT_SECONDS": "0",
+    "CRAWL_ROBOTS_TIMEOUT_SECONDS": "0",
+    "CRAWL_SITEMAP_TIMEOUT_SECONDS": "0",
+    "CRAWL_MAX_DELAY_SECONDS": "0",
 }
+
+
+def test_robots_opt_out_setting_is_gone() -> None:
+    assert "CRAWL_ROBOTS_OPT_OUT_DOMAINS" not in Settings.model_fields
 
 
 def test_crawl_setting_defaults() -> None:
@@ -930,6 +990,50 @@ def test_crawl_validator_rejects_default_depth_above_max() -> None:
             Settings()
 
 
+def test_crawl_validator_refuses_a_rule_cache_below_the_rule_limit_of_one_file() -> None:
+    # given
+    env = {"CRAWL_ROBOTS_CACHE_MAX_RULES": "999", "CRAWL_ROBOTS_MAX_RULES": "1000"}
+
+    # when / then
+    with patch.dict(os.environ, env):
+        with pytest.raises(ValidationError, match=r"CRAWL_ROBOTS_CACHE_MAX_RULES.*CRAWL_ROBOTS_MAX_RULES"):
+            Settings()
+
+
+def test_crawl_validator_accepts_a_rule_cache_equal_to_the_rule_limit_of_one_file() -> None:
+    # given
+    env = {"CRAWL_ROBOTS_CACHE_MAX_RULES": "1000", "CRAWL_ROBOTS_MAX_RULES": "1000"}
+
+    # when
+    with patch.dict(os.environ, env):
+        settings = Settings()
+
+    # then
+    assert settings.CRAWL_ROBOTS_CACHE_MAX_RULES == 1000
+
+
+def test_crawl_validator_refuses_a_sitemap_timeout_equal_to_the_claim_lease() -> None:
+    # given
+    env = {"CRAWL_SITEMAP_TIMEOUT_SECONDS": "120", "CRAWL_CLAIM_LEASE_SECONDS": "120"}
+
+    # when / then
+    with patch.dict(os.environ, env):
+        with pytest.raises(ValidationError, match=r"CRAWL_SITEMAP_TIMEOUT_SECONDS.*CLAIM_LEASE"):
+            Settings()
+
+
+def test_crawl_validator_accepts_a_sitemap_timeout_just_below_the_claim_lease() -> None:
+    # given
+    env = {"CRAWL_SITEMAP_TIMEOUT_SECONDS": "119.5", "CRAWL_CLAIM_LEASE_SECONDS": "120"}
+
+    # when
+    with patch.dict(os.environ, env):
+        settings = Settings()
+
+    # then
+    assert settings.CRAWL_SITEMAP_TIMEOUT_SECONDS == 119.5
+
+
 def test_crawl_validator_rejects_default_page_budget_above_max() -> None:
     # given
     env = {"CRAWL_DEFAULT_PAGE_BUDGET": "20000", "CRAWL_MAX_PAGES": "10000"}
@@ -938,3 +1042,34 @@ def test_crawl_validator_rejects_default_page_budget_above_max() -> None:
     with patch.dict(os.environ, env):
         with pytest.raises(ValidationError, match=r"CRAWL_DEFAULT_PAGE_BUDGET.*CRAWL_MAX_PAGES"):
             Settings()
+
+
+@pytest.mark.parametrize("profile", ["default", "work_profile-2", "a", "x" * 64])
+def test_session_default_profile_accepts_a_profile_identifier(profile: str) -> None:
+    # when
+    with patch.dict(os.environ, {"SESSION_DEFAULT_PROFILE": profile}):
+        settings = Settings()
+
+    # then
+    assert profile == settings.SESSION_DEFAULT_PROFILE
+
+
+@pytest.mark.parametrize("profile", ["", "x" * 65, "../other", "work profile", "default\n", "prof:1"])
+def test_session_default_profile_refuses_a_value_that_is_not_a_profile_identifier(profile: str) -> None:
+    # when / then
+    with patch.dict(os.environ, {"SESSION_DEFAULT_PROFILE": profile}):
+        with pytest.raises(ValidationError, match="SESSION_DEFAULT_PROFILE"):
+            Settings()
+
+
+def test_the_config_module_does_not_import_the_mcp_framework() -> None:
+    # given
+    probe = "import sys, src.config.config; print('fastmcp' in sys.modules)"
+
+    # when
+    answer = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=True, cwd=PROJECT_ROOT
+    )
+
+    # then
+    assert answer.stdout.strip() == "False"

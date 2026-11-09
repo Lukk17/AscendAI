@@ -2,10 +2,9 @@ from prometheus_client import Counter, Gauge, Histogram
 
 from src.config.config import settings
 
-# outcome label value "ok", observed once per completed search
 SEARCH_RESULTS_RETURNED = Histogram(
     "search_results_returned",
-    "Number of search results returned per search",
+    "Number of search results returned per completed search",
     ["engine", "outcome"],
     buckets=(1, 2, 3, 5, 10, 20, 50),
 )
@@ -20,8 +19,6 @@ STRATEGY_DURATION_SECONDS = Histogram(
     "strategy_duration_seconds",
     "Wall-clock duration of each strategy invocation",
     ["strategy"],
-    # Buckets extend past READ_TOTAL_BUDGET=90s plus a head-room tail
-    # for NoVNC monitor tasks (10 min default).
     buckets=(0.1, 0.5, 1, 2, 5, 10, 30, 60, 90, 120, 300, 600),
 )
 
@@ -107,4 +104,10 @@ CHALLENGE_SCORE = Histogram(
     "challenge_score",
     "Scored challenge verdict totals",
     buckets=tuple(float(bound) for bound in challenge_score_buckets(settings.CHALLENGE_SCORE_THRESHOLD)),
+)
+
+CRAWL_RESULT_EXPIRY_RULE_APPLIED = Gauge(
+    "crawl_result_expiry_rule_applied",
+    "Whether this process set the crawl result bucket lifecycle rule: 1 set, 0 refused or unreachable",
+    ["bucket"],
 )

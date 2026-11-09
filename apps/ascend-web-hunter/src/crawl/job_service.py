@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime
 
 import redis.asyncio as redis
-from ascend_python_common.uri_guard import FetchPolicy, check_fetch_uri
+from ascend_python_common.uri_guard import check_fetch_uri
 
 from src.config.config import settings
 from src.crawl.frontier import Frontier
@@ -21,13 +21,15 @@ from src.crawl.keys import (
 from src.crawl.models import (
     DEFAULT_TENANT,
     TENANT_PATTERN,
+    UNREADABLE_RECORD_ERRORS,
     CrawlRequest,
     InvalidTenantError,
     JobCounts,
     JobRecord,
 )
-from src.crawl.robots import ensure_opt_out
+from src.reader.browser_guard import web_hunter_fetch_policy
 from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.schema_extraction import check_schema_size
 
 TENANT_HEADER = "X-Ascend-Tenant"
 
@@ -54,18 +56,12 @@ class CrawlJobService:
     def frontier(self) -> Frontier:
         return Frontier(self.client)
 
-    def _fetch_policy(self) -> FetchPolicy:
-        return FetchPolicy(
-            allowed_hosts=tuple(settings.ALLOWED_PRIVATE_HOSTS),
-            file_root=None,
-            max_redirect_hops=settings.FETCH_MAX_REDIRECT_HOPS,
-        )
-
     async def submit_job(self, tenant_id: str, request: CrawlRequest) -> JobRecord:
+        if request.extraction_schema is not None:
+            check_schema_size(request.extraction_schema)
         for seed in request.seeds:
-            await check_fetch_uri(str(seed), self._fetch_policy())
-        seeds = [str(seed) for seed in request.seeds]
-        ensure_opt_out(seeds, request.respect_robots)
+            await check_fetch_uri(str(seed), web_hunter_fetch_policy())
+        seeds = list(dict.fromkeys(str(seed) for seed in request.seeds))
         record = JobRecord(
             job_id=uuid.uuid4().hex,
             tenant_id=tenant_id,
@@ -107,7 +103,7 @@ class CrawlJobService:
             return None
         try:
             return JobRecord.model_validate_json(raw)
-        except ValueError:
+        except UNREADABLE_RECORD_ERRORS:
             return None
 
     async def list_jobs(self, tenant_id: str) -> list[JobRecord]:
@@ -118,7 +114,7 @@ class CrawlJobService:
                 continue
             try:
                 records.append(JobRecord.model_validate_json(raw))
-            except ValueError:
+            except UNREADABLE_RECORD_ERRORS:
                 continue
         return records
 

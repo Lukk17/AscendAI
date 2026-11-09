@@ -196,6 +196,32 @@ def test_assess_increments_signals_and_score() -> None:
     )
 
 
+def test_assess_without_record_metrics_leaves_signals_and_score_to_the_window_record() -> None:
+    # given
+    from src.reader.cloudflare.challenge_signals import assess, record_window_verdict
+
+    page = "<html><body><div id='cf-challenge-running'></div></body></html>"
+    signal = metrics.CHALLENGE_SIGNALS_FIRED_TOTAL.labels(
+        signal="interstitial_structure", vendor="cloudflare"
+    )
+    verdicts = metrics.CHALLENGE_VERDICTS_TOTAL.labels(verdict="wall", tier="window-test")
+    signals_before = signal._value.get()
+    sum_before = metrics.CHALLENGE_SCORE._sum.get()
+
+    # when
+    verdict = assess(200, page, record_metrics=False)
+    signals_after_assess = signal._value.get()
+    sum_after_assess = metrics.CHALLENGE_SCORE._sum.get()
+    record_window_verdict(verdict, "window-test")
+
+    # then
+    assert signals_after_assess == signals_before
+    assert sum_after_assess == sum_before
+    assert signal._value.get() - signals_before == 1.0
+    assert metrics.CHALLENGE_SCORE._sum.get() - sum_before == float(verdict.score)
+    assert verdicts._value.get() == 1.0
+
+
 def test_verdict_log_line_carries_score_vendor_type_and_signals(caplog: pytest.LogCaptureFixture) -> None:
     # given
     import logging

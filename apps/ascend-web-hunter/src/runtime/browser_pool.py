@@ -4,6 +4,7 @@ import logging
 from playwright.async_api import Browser, Playwright, async_playwright
 
 from src.config.config import settings
+from src.reader.browser_guard import chromium_guard_args
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class BrowserPool:
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(
             headless=settings.PLAYWRIGHT_HEADLESS,
-            args=["--no-sandbox"],
+            args=["--no-sandbox", *chromium_guard_args()],
         )
         logger.info(
             f"BrowserPool: launched Chromium (headless={settings.PLAYWRIGHT_HEADLESS}, "

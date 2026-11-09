@@ -66,6 +66,7 @@ def _make_browser(page: MagicMock) -> tuple[MagicMock, MagicMock]:
     context.new_page = AsyncMock(return_value=page)
     context.close = AsyncMock()
     context.cookies = AsyncMock(return_value=[])
+    context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
     context.route = AsyncMock()
     context.route_web_socket = None
     page.context = context
@@ -116,13 +117,13 @@ def _base_patches(browser: MagicMock, entered: MagicMock) -> Any:
         )
         stack.enter_context(
             patch(
-                "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+                "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
                 return_value=False,
             )
         )
         stack.enter_context(
             patch(
-                "src.reader.strategies.patchright_strategy.assess",
+                "src.reader.strategies.browser_read.assess",
                 return_value=_accepted_verdict(),
             )
         )
@@ -160,11 +161,11 @@ async def test_patchright_replays_storage_state_and_returns_html() -> None:
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=_accepted_verdict(),
         ),
     ):
@@ -182,7 +183,7 @@ async def test_patchright_replays_storage_state_and_returns_html() -> None:
 
 @pytest.mark.asyncio
 async def test_patchright_omits_storage_state_when_absent() -> None:
-    """Without a stored session the context gets the fingerprint UA and no storage_state."""
+    """Without a stored session the browser keeps its own user agent and gets no storage_state."""
     # given
     page = _make_page()
     browser, _ = _make_browser(page)
@@ -196,7 +197,7 @@ async def test_patchright_omits_storage_state_when_absent() -> None:
     # then
     call_kwargs = browser.new_context.call_args.kwargs
     assert "storage_state" not in call_kwargs
-    assert "user_agent" in call_kwargs
+    assert "user_agent" not in call_kwargs
 
 
 @pytest.mark.asyncio
@@ -226,11 +227,11 @@ async def test_patchright_wall_verdict_raises() -> None:
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=_wall_verdict(),
         ),
         patch("src.reader.strategies.patchright_strategy.settings.CHALLENGE_CLEAR_WAIT_SECONDS", 0),
@@ -267,11 +268,11 @@ async def test_patchright_login_wall_early_exit_raises() -> None:
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=_wall_verdict("login"),
         ),
     ):
@@ -307,11 +308,11 @@ async def test_patchright_login_redirect_url_raises_before_navigation() -> None:
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=True,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=_accepted_verdict(),
         ),
     ):
@@ -387,11 +388,11 @@ async def test_patchright_late_login_wall_raises() -> None:
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             side_effect=[_accepted_verdict(), _wall_verdict("login")],
         ),
     ):
@@ -427,11 +428,11 @@ async def test_patchright_post_render_block_raises() -> None:
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             side_effect=[_accepted_verdict(), _wall_verdict()],
         ),
     ):
@@ -485,11 +486,11 @@ async def test_patchright_passes_proxy_to_context() -> None:
             return_value={"server": "socks5://proxy:1080"},
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=_accepted_verdict(),
         ),
     ):
@@ -497,7 +498,7 @@ async def test_patchright_passes_proxy_to_context() -> None:
         await strategy.get_html("https://example.com")
 
     # then
-    assert browser.new_context.call_args.kwargs["proxy"] == {"server": "socks5://proxy:1080"}
+    assert browser.new_context.call_args.kwargs["proxy"] == {"server": "chained:socks5://proxy:1080"}
 
 
 @pytest.mark.asyncio
@@ -535,11 +536,11 @@ async def test_patchright_wall_retry_then_deadline_exit_returns_render() -> None
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             side_effect=_assess_seq,
         ),
         patch("src.reader.strategies.patchright_strategy.settings.EXTRACT_TIMEOUT", 0.05),
@@ -583,11 +584,11 @@ async def test_patchright_zero_budget_skips_poll_and_returns_render() -> None:
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=_accepted_verdict(),
         ),
         patch("src.reader.strategies.patchright_strategy.settings.EXTRACT_TIMEOUT", 0),
@@ -644,7 +645,7 @@ async def test_patchright_refused_navigation_raises_unsafe_uri() -> None:
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
@@ -698,11 +699,11 @@ async def test_patchright_recorded_navigation_raises_post_render() -> None:
             return_value=None,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.patchright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=_accepted_verdict(),
         ),
         patch(

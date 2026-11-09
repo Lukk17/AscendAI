@@ -47,7 +47,7 @@ def _accepted_verdict() -> Any:
 def _factory(page_url: str, cookie_name: str) -> Any:
     page = MagicMock()
     page.url = page_url
-    page.goto = AsyncMock()
+    page.goto = AsyncMock(return_value=None)
     page.content = AsyncMock(return_value="<html><body>ok</body></html>")
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
@@ -56,6 +56,7 @@ def _factory(page_url: str, cookie_name: str) -> Any:
     context.storage_state = AsyncMock(
         return_value={"cookies": [{"name": cookie_name, "value": "TOKEN"}], "origins": []}
     )
+    context.cookies = AsyncMock(return_value=context.storage_state.return_value["cookies"])
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()
     browser.new_context = AsyncMock(return_value=context)

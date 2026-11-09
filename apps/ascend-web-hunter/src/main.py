@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from functools import partial
 from typing import TYPE_CHECKING
 
 import redis.asyncio as redis
@@ -18,8 +19,10 @@ from src.config.blocklist_loader import blocklist_loader
 from src.config.config import settings
 from src.config.startup_banner import build_service_banner
 from src.crawl.worker import Worker
+from src.reader.browser_guard import browser_tunnel
 from src.reader.cache_purge import run_subscriber
 from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.document_router import close_document_router
 from src.reader.novnc.flow_registry import novnc_flow_registry
 from src.reader.web_reader import clear_all_caches, purge_domain_everywhere
 from src.runtime.browser_pool import browser_pool
@@ -29,6 +32,17 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
 logger = logging.getLogger("uvicorn")
+_TRAFILATURA_NO_TEXT_MESSAGE = "discarding data: %s"
+
+
+class _TrafilaturaNoTextFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.msg != _TRAFILATURA_NO_TEXT_MESSAGE
+
+
+logging.getLogger("trafilatura.core").addFilter(_TrafilaturaNoTextFilter())
+
+REST_ROUTERS = (rest_router, rest_router_v2, rest_session_router, blocklist_router, crawl_router)
 
 
 async def _novnc_sweep_loop() -> None:
@@ -43,7 +57,7 @@ async def _novnc_sweep_loop() -> None:
 
 
 class _ProcessPurgeReader:
-    """PurgeReader over every live WebReader of this process (design D7)."""
+    """PurgeReader over every live WebReader of this process."""
 
     @staticmethod
     def clear_cache() -> int:
@@ -62,10 +76,15 @@ class _ServiceLifespan:
         self._crawl_stop = asyncio.Event()
         self._crawl_tasks: list[asyncio.Task[None]] = []
         self._crawl_redis: redis.Redis | None = None
+        self._result_expiry: asyncio.Task[None] | None = None
 
     def _build_crawl_worker(self) -> Worker:
         self._crawl_redis = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
         return Worker(self._crawl_redis)
+
+    async def _start_result_expiry(self, worker: Worker) -> None:
+        self._result_expiry = asyncio.create_task(worker.apply_result_expiry())
+        await asyncio.wait({self._result_expiry}, timeout=settings.STARTUP_PROBE_TIMEOUT_SECONDS)
 
     async def __aenter__(self) -> None:
         if blocklist_loader.state is None:
@@ -73,6 +92,7 @@ class _ServiceLifespan:
             raise RuntimeError("Blocklist was not loaded before startup")
         rule_count = blocklist_loader.state.rule_count
         logger.info("Blocklist ready: %s rules from %s", rule_count, blocklist_loader.blocklist_path)
+        await browser_tunnel.start()
         await browser_pool.start()
         self._novnc_sweeper = asyncio.create_task(_novnc_sweep_loop())
         self._purge_stop = asyncio.Event()
@@ -84,6 +104,7 @@ class _ServiceLifespan:
             )
         )
         worker = self._build_crawl_worker()
+        await self._start_result_expiry(worker)
         self._crawl_stop = asyncio.Event()
         self._crawl_tasks = [
             asyncio.create_task(worker.run_forever(self._crawl_stop))
@@ -97,6 +118,10 @@ class _ServiceLifespan:
                 task.cancel()
             await asyncio.gather(*self._crawl_tasks, return_exceptions=True)
             self._crawl_tasks = []
+        if self._result_expiry is not None:
+            self._result_expiry.cancel()
+            await asyncio.gather(self._result_expiry, return_exceptions=True)
+            self._result_expiry = None
         if self._crawl_redis is not None:
             try:
                 await self._crawl_redis.aclose()
@@ -122,6 +147,14 @@ class _ServiceLifespan:
         except Exception as exc:
             logger.warning("shutdown: failed to stop browser pool: %s", exc)
         try:
+            await browser_tunnel.stop()
+        except Exception as exc:
+            logger.warning("shutdown: failed to stop browser tunnel: %s", exc)
+        await self._close_outbound_clients()
+
+    @staticmethod
+    async def _close_outbound_clients() -> None:
+        try:
             await rest_search_client.aclose()
         except Exception as exc:
             logger.warning("shutdown: failed to close REST SearxngClient: %s", exc)
@@ -129,6 +162,10 @@ class _ServiceLifespan:
             await mcp_search_client.aclose()
         except Exception as exc:
             logger.warning("shutdown: failed to close MCP SearxngClient: %s", exc)
+        try:
+            await close_document_router()
+        except Exception as exc:
+            logger.warning("shutdown: failed to close the document router: %s", exc)
 
 
 def service_lifespan() -> _ServiceLifespan:
@@ -153,7 +190,7 @@ def _service_definition() -> ServiceDefinition:
         distribution="ascend-web-hunter",
         settings=settings,
         mcp=mcp,
-        routers=(rest_router, rest_router_v2, rest_session_router, blocklist_router, crawl_router),
+        routers=REST_ROUTERS,
         error_registry=error_registry,
         probes={
             "redis": _redis_probe,
@@ -161,7 +198,7 @@ def _service_definition() -> ServiceDefinition:
             "searxng_breaker": _searxng_breaker_probe,
         },
         lifespan=service_lifespan(),
-        startup_banner=build_service_banner,
+        startup_banner=partial(build_service_banner, REST_ROUTERS),
         rate_limit_storage_uri=settings.REDIS_URL,
     )
 

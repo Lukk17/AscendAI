@@ -4,7 +4,7 @@ Each slot maps to a rectangle of the configured window size. Positions
 cascade by the configured offset with a wrapping modulus, so however large
 the cap is set no window is ever placed partly or wholly off screen. This
 module holds no size or offset of its own: every figure is passed in, read
-from the settings of task 1.1 by the caller.
+from the settings by the caller.
 """
 
 from dataclasses import dataclass

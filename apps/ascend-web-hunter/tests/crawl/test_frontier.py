@@ -6,7 +6,7 @@ import redis.asyncio as async_redis
 from fakeredis.aioredis import FakeRedis
 
 from src.config.config import settings
-from src.crawl.frontier import Frontier
+from src.crawl.frontier import ALL_PAGES_FAILED_ERROR, Frontier, claim_entry
 from src.crawl.keys import (
     RUNNABLE_KEY,
     claims_key,
@@ -118,9 +118,24 @@ def _claim_kwargs(frontier: Frontier, **overrides: object) -> dict[str, Any]:
         "member": MEMBER,
         "max_expiries": settings.CRAWL_CLAIM_MAX_EXPIRIES,
         "updated_at": "t",
+        "tenant_id": TENANT,
+        "job_id": JOB,
+        "domain": "example.com",
+        "robots_skip_factor": settings.CRAWL_ROBOTS_SKIP_FACTOR,
     }
     kwargs.update(overrides)
     return kwargs
+
+
+def _domain_claim_kwargs(frontier: Frontier, domain: str, **overrides: object) -> dict[str, Any]:
+    return _claim_kwargs(
+        frontier,
+        queue_key=queue_key(TENANT, JOB, domain),
+        inflight_key=inflight_key(TENANT, JOB, domain),
+        next_fetch_key=next_fetch_key(TENANT, JOB, domain),
+        domain=domain,
+        **overrides,
+    )
 
 
 def _finish_kwargs(**overrides: object) -> dict[str, Any]:
@@ -130,7 +145,7 @@ def _finish_kwargs(**overrides: object) -> dict[str, Any]:
         "claims_key": claims_key(TENANT, JOB),
         "pages_key": pages_key(TENANT, JOB),
         "runnable_key": RUNNABLE_KEY,
-        "entry": "0\thttps://example.com/",
+        "entry": claim_entry(0, "example.com", "https://example.com/"),
         "outcome": "ok",
         "page_line": '{"url": "https://example.com/"}',
         "max_depth": 2,
@@ -142,6 +157,7 @@ def _finish_kwargs(**overrides: object) -> dict[str, Any]:
         "links_json": "[]",
         "updated_at": "t",
         "member": MEMBER,
+        "robots_skip_factor": settings.CRAWL_ROBOTS_SKIP_FACTOR,
     }
     kwargs.update(overrides)
     return kwargs
@@ -279,7 +295,7 @@ async def test_page_budget_holds_for_both_instances_together(frontier: Frontier)
 
     # when the first page is claimed and finished
     assert (await frontier.claim(**_claim_kwargs(frontier, page_budget=1)))[0] == "claimed"
-    entry = "0\thttps://example.com/a"
+    entry = claim_entry(0, "example.com", "https://example.com/a")
     await frontier.finish(**_finish_kwargs(entry=entry))
 
     # then the second claim finds the budget bound and finalizes the job
@@ -371,7 +387,9 @@ async def test_finish_at_budget_with_queued_remainder_succeeds(frontier: Frontie
     assert (await frontier.claim(**_claim_kwargs(frontier, page_budget=10)))[0] == "claimed"
 
     # when the claimed page finishes while one URL is still queued
-    answer = await frontier.finish(**_finish_kwargs(entry="0\thttps://example.com/a"))
+    answer = await frontier.finish(
+        **_finish_kwargs(entry=claim_entry(0, "example.com", "https://example.com/a"))
+    )
 
     # then the job succeeds instead of stalling in running
     assert answer == ["succeeded"]
@@ -402,7 +420,9 @@ async def test_finish_at_budget_with_inflight_left_stays_running(
     assert (await Frontier(redis).claim(**_claim_kwargs(frontier, page_budget=10)))[0] == "claimed"
 
     # when one of the two claims finishes at the budget
-    answer = await frontier.finish(**_finish_kwargs(entry="0\thttps://example.com/a"))
+    answer = await frontier.finish(
+        **_finish_kwargs(entry=claim_entry(0, "example.com", "https://example.com/a"))
+    )
 
     # then the job stays running until the last claim drains
     assert answer == ["running"]
@@ -460,10 +480,11 @@ async def test_claim_expiring_twice_counts_failed(frontier: Frontier, redis: Fak
     assert (await frontier.claim(**_claim_kwargs(frontier, now_ms=NOW + 2000, lease_ms=1000)))[0] == "claimed"
     answer = await frontier.claim(**_claim_kwargs(frontier, now_ms=NOW + 4000, lease_ms=1000))
 
-    # then the URL counts as failed and nothing is left to claim
-    assert answer == ["empty"]
+    # then the URL counts as failed and the job with nothing left ends failed
+    assert answer == ["ended", "failed"]
     record = await _record(frontier._client)
     assert record["counts"]["failed"] == 1
+    assert record["state"] == "failed"
 
 
 async def test_setting_of_3_expiries_allows_third_claim(frontier: Frontier) -> None:
@@ -481,9 +502,322 @@ async def test_setting_of_3_expiries_allows_third_claim(frontier: Frontier) -> N
     assert answer[0] == "claimed"
 
 
+def _two_domain_groups() -> str:
+    return json.dumps(
+        [
+            {"domain": "example.com", "urls": [{"u": "https://example.com/a", "d": 0}]},
+            {"domain": "other.org", "urls": [{"u": "https://other.org/b", "d": 0}]},
+        ]
+    )
+
+
+async def _submit_two_domains(frontier: Frontier) -> None:
+    await _submit(
+        frontier,
+        job_json=_job_json(
+            domains=["example.com", "other.org"],
+            counts={"queued": 2, "fetched": 0, "unchanged": 0, "failed": 0, "skipped_unsafe": 0},
+            pending=2,
+        ),
+        groups=_two_domain_groups(),
+    )
+
+
+async def test_claim_entry_records_the_claimed_domain(frontier: Frontier, redis: FakeRedis) -> None:
+    # given
+    await _submit(frontier, groups=_groups("https://example.com/a"))
+
+    # when
+    await frontier.claim(**_claim_kwargs(frontier))
+
+    # then the claim names the domain whose counter it raised
+    assert await redis.zrange(claims_key(TENANT, JOB), 0, -1) == [
+        claim_entry(0, "example.com", "https://example.com/a")
+    ]
+
+
+async def test_expired_claim_returns_to_its_own_domain(frontier: Frontier, redis: FakeRedis) -> None:
+    # given a claim on other.org whose lease has passed
+    await _submit_two_domains(frontier)
+    claimed = await frontier.claim(**_domain_claim_kwargs(frontier, "other.org", now_ms=NOW, lease_ms=1000))
+    assert claimed[0] == "claimed"
+
+    # when a claim on example.com runs past that lease
+    answer = await frontier.claim(**_claim_kwargs(frontier, now_ms=NOW + 2000, lease_ms=1000))
+
+    # then the expired URL is back in the other.org queue with its counter lowered
+    assert answer == ["claimed", "https://example.com/a", "0"]
+    assert await redis.lrange(queue_key(TENANT, JOB, "other.org"), 0, -1) == ["0\thttps://other.org/b"]
+    assert await redis.get(inflight_key(TENANT, JOB, "other.org")) == "0"
+    assert await redis.get(inflight_key(TENANT, JOB, "example.com")) == "1"
+    assert await redis.llen(queue_key(TENANT, JOB, "example.com")) == 0
+
+
+async def test_claim_failed_by_expiry_lowers_its_own_domain_counter(
+    frontier: Frontier, redis: FakeRedis
+) -> None:
+    # given a claim on other.org that may expire only once
+    await _submit_two_domains(frontier)
+    kwargs = _domain_claim_kwargs(frontier, "other.org", now_ms=NOW, lease_ms=1000, max_expiries=1)
+    assert (await frontier.claim(**kwargs))[0] == "claimed"
+
+    # when a claim on example.com runs past that lease
+    answer = await frontier.claim(**_claim_kwargs(frontier, now_ms=NOW + 2000, lease_ms=1000, max_expiries=1))
+
+    # then the URL counts failed, its counter is back to zero and the job runs on
+    assert answer[0] == "claimed"
+    assert await redis.get(inflight_key(TENANT, JOB, "other.org")) == "0"
+    assert await redis.llen(queue_key(TENANT, JOB, "other.org")) == 0
+    record = await _record(redis)
+    assert record["counts"]["failed"] == 1
+    assert record["pending"] == 1
+    assert record["state"] == "running"
+
+
+async def test_claim_ends_job_failed_when_its_last_url_fails_by_expiry(
+    frontier: Frontier, redis: FakeRedis
+) -> None:
+    # given the only URL of a job claimed with a single allowed expiry
+    await _submit(frontier, groups=_groups("https://example.com/a"))
+    assert (await frontier.claim(**_claim_kwargs(frontier, lease_ms=1000, max_expiries=1)))[0] == "claimed"
+
+    # when the next claim runs past the lease
+    answer = await frontier.claim(
+        **_claim_kwargs(frontier, now_ms=NOW + 2000, lease_ms=1000, max_expiries=1, updated_at="t2")
+    )
+
+    # then the job ends failed exactly as the finish script ends it
+    assert answer == ["ended", "failed"]
+    record = await _record(redis)
+    assert record["state"] == "failed"
+    assert record["error"] == ALL_PAGES_FAILED_ERROR
+    assert record["pending"] == 0
+    assert record["updated_at"] == "t2"
+    assert await redis.get(inflight_key(TENANT, JOB, "example.com")) == "0"
+    assert await redis.zscore(RUNNABLE_KEY, MEMBER) is None
+
+
+async def test_claim_ends_job_succeeded_when_last_url_fails_after_a_fetched_page(
+    frontier: Frontier, redis: FakeRedis
+) -> None:
+    # given one fetched page and one claimed URL left with a single allowed expiry
+    await _submit(frontier, groups=_groups("https://example.com/a", "https://example.com/b"))
+    assert (await frontier.claim(**_claim_kwargs(frontier)))[0] == "claimed"
+    await frontier.finish(**_finish_kwargs(entry=claim_entry(0, "example.com", "https://example.com/a")))
+    assert (await frontier.claim(**_claim_kwargs(frontier, lease_ms=1000, max_expiries=1)))[0] == "claimed"
+
+    # when the next claim runs past the lease
+    answer = await frontier.claim(**_claim_kwargs(frontier, now_ms=NOW + 2000, lease_ms=1000, max_expiries=1))
+
+    # then the job ends succeeded
+    assert answer == ["ended", "succeeded"]
+    record = await _record(redis)
+    assert record["state"] == "succeeded"
+    assert record.get("error") is None
+
+
+async def test_legacy_claim_entry_without_domain_returns_to_claiming_domain(
+    frontier: Frontier, redis: FakeRedis
+) -> None:
+    # given a claim written before claims named their domain
+    await _submit(frontier, groups=json.dumps([{"domain": "example.com", "urls": []}]))
+    await redis.set(job_key(TENANT, JOB), _job_json(pending=1, state="running"))
+    await redis.zadd(claims_key(TENANT, JOB), {"0\thttps://example.com/old": NOW - 1})
+    await redis.set(inflight_key(TENANT, JOB, "example.com"), 1)
+
+    # when the next claim takes it back
+    answer = await frontier.claim(**_claim_kwargs(frontier))
+
+    # then it is requeued and claimed again on the claiming domain
+    assert answer == ["claimed", "https://example.com/old", "0"]
+    assert await redis.get(inflight_key(TENANT, JOB, "example.com")) == "1"
+
+
+async def test_concurrent_claims_never_exceed_page_budget(frontier: Frontier) -> None:
+    # given three queued URLs, a budget of two and room for every claim
+    await _submit(
+        frontier,
+        groups=_groups("https://example.com/a", "https://example.com/b", "https://example.com/c"),
+    )
+    other = Frontier(frontier._client)
+
+    # when three claims arrive before any page finishes
+    first = await frontier.claim(**_claim_kwargs(frontier, page_budget=2, domain_cap=5))
+    second = await other.claim(**_claim_kwargs(other, page_budget=2, domain_cap=5))
+    third = await frontier.claim(**_claim_kwargs(frontier, page_budget=2, domain_cap=5))
+
+    # then the claims in flight count against the budget
+    assert first[0] == "claimed"
+    assert second[0] == "claimed"
+    assert third == ["budget"]
+
+
+async def test_claim_at_budget_with_every_page_failed_ends_failed(
+    frontier: Frontier, redis: FakeRedis
+) -> None:
+    # given a job at its budget whose only finished page failed
+    await _submit(
+        frontier,
+        job_json=_job_json(
+            counts={"queued": 1, "fetched": 0, "unchanged": 0, "failed": 1, "skipped_unsafe": 0},
+            pending=1,
+        ),
+        groups=_groups("https://example.com/b"),
+    )
+
+    # when the next claim finds the budget bound
+    answer = await frontier.claim(**_claim_kwargs(frontier, page_budget=1))
+
+    # then the job ends failed
+    assert answer == ["budget", "failed"]
+    assert (await _record(redis))["state"] == "failed"
+
+
+def _skipped_job(robots_skipped: int, *, fetched: int = 1) -> str:
+    return _job_json(
+        counts={
+            "queued": 1,
+            "fetched": fetched,
+            "unchanged": 0,
+            "failed": 0,
+            "skipped_unsafe": 0,
+            "robots_skipped": robots_skipped,
+        },
+        pending=1,
+    )
+
+
+async def test_claim_at_the_robots_skip_ceiling_ends_the_job(frontier: Frontier, redis: FakeRedis) -> None:
+    # given a budget of 2, a factor of 10 and 20 pages skipped for robots.txt
+    await _submit(frontier, job_json=_skipped_job(20), groups=_groups("https://example.com/b"))
+
+    # when
+    answer = await frontier.claim(**_claim_kwargs(frontier, page_budget=2, robots_skip_factor=10))
+
+    # then
+    assert answer == ["budget", "succeeded"]
+    assert (await _record(redis))["state"] == "succeeded"
+
+
+async def test_claim_below_the_robots_skip_ceiling_goes_on(frontier: Frontier) -> None:
+    # given
+    await _submit(frontier, job_json=_skipped_job(19), groups=_groups("https://example.com/b"))
+
+    # when
+    answer = await frontier.claim(**_claim_kwargs(frontier, page_budget=2, robots_skip_factor=10))
+
+    # then
+    assert answer[0] == "claimed"
+
+
+async def test_claim_at_the_robots_skip_ceiling_with_a_claim_in_flight_waits_for_it(
+    frontier: Frontier,
+) -> None:
+    # given a job at the ceiling with one page still claimed
+    await _submit(
+        frontier,
+        job_json=_skipped_job(20),
+        groups=_groups("https://example.com/a", "https://example.com/b"),
+    )
+    assert (
+        await frontier.claim(**_claim_kwargs(frontier, page_budget=5, domain_cap=5, robots_skip_factor=100))
+    )[0] == "claimed"
+
+    # when
+    answer = await frontier.claim(
+        **_claim_kwargs(frontier, page_budget=2, domain_cap=5, robots_skip_factor=10)
+    )
+
+    # then
+    assert answer == ["budget"]
+
+
+async def test_finish_reaching_the_robots_skip_ceiling_ends_the_job(
+    frontier: Frontier, redis: FakeRedis
+) -> None:
+    # given 19 skips, a budget of 2 and queued links still waiting
+    request = _request_with_patterns(page_budget=2)
+    job = json.loads(_skipped_job(19))
+    job["request"] = request
+    job["pending"] = 5
+    await _submit(frontier, job_json=json.dumps(job))
+    assert (await frontier.claim(**_claim_kwargs(frontier, page_budget=2, robots_skip_factor=10)))[
+        0
+    ] == "claimed"
+
+    # when the 20th skip finishes
+    answer = await frontier.finish(**_finish_kwargs(outcome="robots_skipped", robots_skip_factor=10))
+
+    # then
+    assert answer == ["succeeded"]
+    assert (await _record(redis))["counts"]["robots_skipped"] == 20
+
+
+async def test_finish_below_the_robots_skip_ceiling_keeps_the_job_running(frontier: Frontier) -> None:
+    # given
+    job = json.loads(_skipped_job(18))
+    job["request"] = _request_with_patterns(page_budget=2)
+    job["pending"] = 5
+    await _submit(frontier, job_json=json.dumps(job))
+    assert (await frontier.claim(**_claim_kwargs(frontier, page_budget=2, robots_skip_factor=10)))[
+        0
+    ] == "claimed"
+
+    # when
+    answer = await frontier.finish(**_finish_kwargs(outcome="robots_skipped", robots_skip_factor=10))
+
+    # then
+    assert answer == ["running"]
+
+
+@pytest.mark.parametrize("refusal", ["capped", "wait", "empty", "budget"])
+async def test_refused_claim_keeps_the_job_record_lifetime(
+    frontier: Frontier, redis: FakeRedis, refusal: str
+) -> None:
+    # given a job whose record has little lifetime left and a claim that will be refused
+    await _submit(frontier, groups=_groups("https://example.com/a", "https://example.com/b"))
+    overrides: dict[str, object] = {}
+    if refusal == "capped":
+        await redis.set(inflight_key(TENANT, JOB, "example.com"), 2)
+        overrides["domain_cap"] = 2
+    elif refusal == "wait":
+        await redis.set(next_fetch_key(TENANT, JOB, "example.com"), NOW + 5000)
+    elif refusal == "empty":
+        await redis.delete(queue_key(TENANT, JOB, "example.com"))
+    else:
+        assert (await frontier.claim(**_claim_kwargs(frontier)))[0] == "claimed"
+        overrides["page_budget"] = 1
+    await redis.expire(job_key(TENANT, JOB), 100)
+
+    # when the claim is refused
+    answer = await frontier.claim(**_claim_kwargs(frontier, **overrides))
+
+    # then the record is not renewed, so a job nobody can progress still expires
+    assert answer[0] == refusal
+    assert 0 < await redis.ttl(job_key(TENANT, JOB)) <= 100
+
+
+async def test_refused_claim_that_took_back_a_claim_saves_the_record(
+    frontier: Frontier, redis: FakeRedis
+) -> None:
+    # given an expired claim and a domain at its cap
+    await _submit(frontier, groups=_groups("https://example.com/a", "https://example.com/b"))
+    assert (await frontier.claim(**_claim_kwargs(frontier, lease_ms=1000)))[0] == "claimed"
+    await redis.set(inflight_key(TENANT, JOB, "example.com"), 3)
+
+    # when a capped claim runs past the lease
+    answer = await frontier.claim(**_claim_kwargs(frontier, now_ms=NOW + 2000, lease_ms=1000, domain_cap=2))
+
+    # then the take-back is saved in the record
+    assert answer == ["capped"]
+    record = await _record(redis)
+    assert record["claim_expiries"] == {"https://example.com/a": 1}
+    assert record["counts"]["queued"] == 2
+
+
 async def test_claim_keeps_existing_expiry_counts(frontier: Frontier) -> None:
     # given a job whose URL already expired once under a limit of 3
-    await _submit(frontier, job_json=_job_json(claim_expiries={"https://example.com/": 1}))
+    await _submit(frontier, job_json=_job_json(claim_expiries={"https://example.com/": 1}, pending=2))
     await frontier._client.rpush(queue_key(TENANT, JOB, "example.com"), "0\thttps://example.com/")
 
     # when it is claimed and expires again
@@ -511,7 +845,9 @@ async def test_finish_appends_page_and_counts_and_queues_only_unseen(
             {"u": "https://example.com/a", "d": 1, "domain": "example.com"},
         ]
     )
-    answer = await frontier.finish(**_finish_kwargs(entry="0\thttps://example.com/a", links_json=links))
+    answer = await frontier.finish(
+        **_finish_kwargs(entry=claim_entry(0, "example.com", "https://example.com/a"), links_json=links)
+    )
 
     # then the page is appended, only the unseen link is queued and the job runs on
     assert answer == ["running"]
@@ -542,6 +878,49 @@ async def test_finish_moves_to_succeeded_when_nothing_is_left(frontier: Frontier
     assert await redis.zscore(RUNNABLE_KEY, MEMBER) is None
 
 
+async def test_finish_ends_job_failed_when_every_page_failed(frontier: Frontier, redis: FakeRedis) -> None:
+    # given the last claimed URL of a job
+    await _submit(frontier)
+    assert (await frontier.claim(**_claim_kwargs(frontier)))[0] == "claimed"
+
+    # when it finishes failed with nothing left
+    answer = await frontier.finish(**_finish_kwargs(outcome="failed", page_line=""))
+
+    # then the job ends failed with its error and leaves the runnable set
+    assert answer == ["failed"]
+    record = await _record(redis)
+    assert record["state"] == "failed"
+    assert record["error"] == ALL_PAGES_FAILED_ERROR
+    assert await redis.zscore(RUNNABLE_KEY, MEMBER) is None
+
+
+async def test_finish_at_budget_with_every_page_failed_ends_failed(
+    frontier: Frontier, redis: FakeRedis
+) -> None:
+    # given a budget of 1 with one URL still queued behind the claimed one
+    await _submit(
+        frontier,
+        job_json=_job_json(
+            request=_request_with_patterns(page_budget=1),
+            counts={"queued": 2, "fetched": 0, "unchanged": 0, "failed": 0, "skipped_unsafe": 0},
+            pending=2,
+        ),
+        groups=_groups("https://example.com/a", "https://example.com/b"),
+    )
+    assert (await frontier.claim(**_claim_kwargs(frontier, page_budget=10)))[0] == "claimed"
+
+    # when the claimed page fails at the budget
+    answer = await frontier.finish(
+        **_finish_kwargs(
+            entry=claim_entry(0, "example.com", "https://example.com/a"), outcome="failed", page_line=""
+        )
+    )
+
+    # then the job ends failed
+    assert answer == ["failed"]
+    assert (await _record(redis))["state"] == "failed"
+
+
 async def test_finish_heals_empty_map_patterns(frontier: Frontier, redis: FakeRedis) -> None:
     # given a claimed URL whose record real Redis corrupted to maps
     await _submit(frontier)
@@ -569,7 +948,7 @@ async def test_finish_counts_unchanged_failed_and_skipped(frontier: Frontier, re
     assert claimed[0] == "claimed"
 
     # when it finishes unchanged with two skipped unsafe links and no stored line
-    entry = f"{claimed[2]}\t{claimed[1]}"
+    entry = claim_entry(claimed[2], "example.com", claimed[1])
     answer = await frontier.finish(
         **_finish_kwargs(entry=entry, outcome="unchanged", page_line="", skipped_delta=2)
     )
@@ -590,7 +969,9 @@ async def test_finish_failed_outcome_counts_failed(frontier: Frontier, redis: Fa
 
     # when it finishes failed
     answer = await frontier.finish(
-        **_finish_kwargs(entry=f"{claimed[2]}\t{claimed[1]}", outcome="failed", page_line="")
+        **_finish_kwargs(
+            entry=claim_entry(claimed[2], "example.com", claimed[1]), outcome="failed", page_line=""
+        )
     )
 
     # then the job fails the page and stays running on the empty frontier
@@ -634,7 +1015,9 @@ async def test_finish_on_missing_job_answers_gone(frontier: Frontier) -> None:
 async def test_finish_on_cancelled_job_writes_nothing(frontier: Frontier, redis: FakeRedis) -> None:
     # given a cancelled job that still holds a claim
     await _submit(frontier, job_json=_job_json(state="cancelled"))
-    await redis.zadd(claims_key(TENANT, JOB), {"0\thttps://example.com/": NOW + 1000})
+    await redis.zadd(
+        claims_key(TENANT, JOB), {claim_entry(0, "example.com", "https://example.com/"): NOW + 1000}
+    )
 
     # when the late page finishes
     answer = await frontier.finish(**_finish_kwargs())
@@ -642,6 +1025,34 @@ async def test_finish_on_cancelled_job_writes_nothing(frontier: Frontier, redis:
     # then nothing is written
     assert answer == ["cancelled"]
     assert await redis.llen(pages_key(TENANT, JOB)) == 0
+
+
+@pytest.mark.parametrize(
+    "stored_claim",
+    [
+        claim_entry(0, "example.com", "https://example.com/"),
+        "0\thttps://example.com/",
+    ],
+    ids=["three-field", "two-field-from-older-instance"],
+)
+async def test_finish_matches_claim_in_either_format(
+    frontier: Frontier, redis: FakeRedis, stored_claim: str
+) -> None:
+    # given a running job whose only claim was written in the stored format
+    await _submit(frontier)
+    await redis.set(job_key(TENANT, JOB), _job_json(pending=1, state="running"))
+    await redis.zadd(claims_key(TENANT, JOB), {stored_claim: NOW + 1000})
+    await redis.set(inflight_key(TENANT, JOB, "example.com"), 1)
+
+    # when a new worker finishes it with the three-field entry
+    answer = await frontier.finish(**_finish_kwargs())
+
+    # then the claim is released and the page is counted
+    assert answer == ["succeeded"]
+    assert await redis.zcard(claims_key(TENANT, JOB)) == 0
+    assert await redis.get(inflight_key(TENANT, JOB, "example.com")) == "0"
+    assert await redis.lrange(pages_key(TENANT, JOB), 0, -1) == ['{"url": "https://example.com/"}']
+    assert (await _record(redis))["counts"]["fetched"] == 1
 
 
 async def test_finish_on_succeeded_job_answers_stale(frontier: Frontier) -> None:
@@ -680,7 +1091,7 @@ async def test_concurrent_instances_lose_no_update(frontier: Frontier, redis: Fa
         for index in range(2):
             answer = await instances[index % 2].claim(**_claim_kwargs(instances[index % 2]))
             assert answer[0] == "claimed"
-            entries.append(f"{answer[2]}\t{answer[1]}")
+            entries.append(claim_entry(answer[2], "example.com", answer[1]))
         for position, entry in enumerate(entries):
             done = await instances[position % 2].finish(
                 **_finish_kwargs(entry=entry, page_line=f'{{"n": {round_index}}}')
@@ -767,75 +1178,6 @@ async def test_cancel_on_terminal_job_answers_idle(frontier: Frontier) -> None:
         member=MEMBER,
     )
     assert answer == ["idle", "succeeded"]
-
-
-async def test_mark_failed_moves_to_failed_and_deletes_frontier_keys(
-    frontier: Frontier, redis: FakeRedis
-) -> None:
-    # given a running job
-    await _submit(frontier)
-    await frontier.claim(**_claim_kwargs(frontier))
-
-    # when it is marked failed
-    answer = await frontier.mark_failed(
-        job_key=job_key(TENANT, JOB),
-        seen_key=seen_key(TENANT, JOB),
-        claims_key=claims_key(TENANT, JOB),
-        pages_key=pages_key(TENANT, JOB),
-        runnable_key=RUNNABLE_KEY,
-        updated_at="2026-10-19T00:00:00+00:00",
-        retention=settings.CRAWL_JOB_RETENTION_SECONDS,
-        error="boom",
-        tenant_id=TENANT,
-        job_id=JOB,
-        member=MEMBER,
-    )
-
-    # then the record carries the error and every frontier key is gone
-    assert answer == ["failed"]
-    record = await _record(frontier._client)
-    assert record["state"] == "failed"
-    assert record["error"] == "boom"
-    assert await redis.exists(seen_key(TENANT, JOB), claims_key(TENANT, JOB)) == 0
-    assert await redis.zscore(RUNNABLE_KEY, MEMBER) is None
-
-
-async def test_mark_failed_on_missing_job_answers_gone(frontier: Frontier) -> None:
-    answer = await frontier.mark_failed(
-        job_key=job_key(TENANT, JOB),
-        seen_key=seen_key(TENANT, JOB),
-        claims_key=claims_key(TENANT, JOB),
-        pages_key=pages_key(TENANT, JOB),
-        runnable_key=RUNNABLE_KEY,
-        updated_at="2026-10-19T00:00:00+00:00",
-        retention=settings.CRAWL_JOB_RETENTION_SECONDS,
-        error="boom",
-        tenant_id=TENANT,
-        job_id=JOB,
-        member=MEMBER,
-    )
-    assert answer == ["gone"]
-
-
-async def test_mark_failed_on_terminal_job_answers_idle(frontier: Frontier) -> None:
-    # given
-    await _submit(frontier, job_json=_job_json(state="cancelled"))
-
-    # when / then
-    answer = await frontier.mark_failed(
-        job_key=job_key(TENANT, JOB),
-        seen_key=seen_key(TENANT, JOB),
-        claims_key=claims_key(TENANT, JOB),
-        pages_key=pages_key(TENANT, JOB),
-        runnable_key=RUNNABLE_KEY,
-        updated_at="2026-10-19T00:00:00+00:00",
-        retention=settings.CRAWL_JOB_RETENTION_SECONDS,
-        error="boom",
-        tenant_id=TENANT,
-        job_id=JOB,
-        member=MEMBER,
-    )
-    assert answer == ["idle", "cancelled"]
 
 
 async def test_add_urls_queues_only_unseen(frontier: Frontier, redis: FakeRedis) -> None:
@@ -962,3 +1304,71 @@ async def test_delete_frontier_removes_every_key(frontier: Frontier, redis: Fake
         )
         == 0
     )
+
+
+async def _finish_skipped(redis: FakeRedis, record: str) -> list[str]:
+    await redis.set(job_key(TENANT, JOB), record)
+    await redis.zadd(claims_key(TENANT, JOB), {claim_entry(0, "example.com", "https://example.com/a"): 1})
+    return await Frontier(redis).finish(
+        job_key=job_key(TENANT, JOB),
+        seen_key=seen_key(TENANT, JOB),
+        claims_key=claims_key(TENANT, JOB),
+        pages_key=pages_key(TENANT, JOB),
+        runnable_key=RUNNABLE_KEY,
+        entry=claim_entry(0, "example.com", "https://example.com/a"),
+        outcome="robots_skipped",
+        page_line='{"status":"skipped"}',
+        max_depth=2,
+        retention=60,
+        skipped_delta=0,
+        tenant_id=TENANT,
+        job_id=JOB,
+        domain="example.com",
+        links_json="[]",
+        updated_at="t2",
+        member=runnable_member(TENANT, JOB),
+        robots_skip_factor=10,
+    )
+
+
+async def test_finish_counts_a_robots_skip_apart_from_failed_and_outside_the_budget(redis: FakeRedis) -> None:
+    # given a running job with one page left and a budget one finished page away
+    counts = {
+        "queued": 0,
+        "fetched": 1,
+        "unchanged": 0,
+        "failed": 0,
+        "skipped_unsafe": 0,
+        "robots_skipped": 2,
+    }
+    job = _job_json(
+        state="running",
+        counts=counts,
+        request={**_request_with_patterns(), "page_budget": 2},
+        pending=2,
+    )
+
+    # when
+    answer = await _finish_skipped(redis, job)
+
+    # then the job keeps running, because the skip did not reach the budget
+    assert answer == ["running"]
+    stored = json.loads(str(await redis.get(job_key(TENANT, JOB))))
+    assert stored["counts"]["robots_skipped"] == 3
+    assert stored["counts"]["failed"] == 0
+    assert stored["pending"] == 1
+    assert await redis.lrange(pages_key(TENANT, JOB), 0, -1) == ['{"status":"skipped"}']
+
+
+async def test_finish_reads_a_record_written_before_the_robots_skip_count_existed(redis: FakeRedis) -> None:
+    # given a job record without the count, and one last page
+    counts = {"queued": 0, "fetched": 1, "unchanged": 0, "failed": 0, "skipped_unsafe": 0}
+    job = _job_json(state="running", counts=counts, pending=1)
+
+    # when
+    answer = await _finish_skipped(redis, job)
+
+    # then the job ends and the count starts from zero
+    assert answer == ["succeeded"]
+    stored = json.loads(str(await redis.get(job_key(TENANT, JOB))))
+    assert stored["counts"]["robots_skipped"] == 1

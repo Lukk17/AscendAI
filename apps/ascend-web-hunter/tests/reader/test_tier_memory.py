@@ -90,7 +90,7 @@ async def test_cheaper_tier_overwrites() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dearer_tier_does_not_overwrite() -> None:
+async def test_dearer_tier_overwrites() -> None:
     # given
     fake = _FakeRedis()
 
@@ -101,7 +101,7 @@ async def test_dearer_tier_does_not_overwrite() -> None:
         remembered = await tier_memory.get(_URL)
 
     # then
-    assert remembered == "1-beautifulsoup"
+    assert remembered == "5-crawlee_adaptive"
 
 
 @pytest.mark.asyncio
@@ -215,3 +215,13 @@ async def test_bytes_value_is_decoded() -> None:
 
     # then
     assert remembered == "4b-camoufox"
+
+
+@pytest.mark.asyncio
+async def test_memory_fallback_without_a_record_is_none() -> None:
+    # when
+    with patch("src.reader.tier_memory.cookie_manager", new=_manager_with(None)):
+        remembered = await tier_memory.get(_URL)
+
+    # then
+    assert remembered is None

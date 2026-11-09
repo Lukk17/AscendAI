@@ -4,6 +4,7 @@ import pytest
 
 from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
 from src.api.mcp.mcp_server import session_establish, web_read, web_search
+from src.session.session_manager import EstablishedFlow
 
 
 @pytest.mark.asyncio
@@ -117,7 +118,9 @@ async def test_mcp_session_establish_success_pins_today_status_object() -> None:
         patch(
             "src.api.mcp.mcp_server.session_manager.establish",
             new_callable=AsyncMock,
-            return_value=vnc_url,
+            return_value=EstablishedFlow(
+                vnc_url=vnc_url, intervention_type="login", flow_id="9f2c41ab77de", joined=False, window=None
+            ),
         ),
     ):
         result = await session_establish("http://example.com/")

@@ -1,7 +1,6 @@
 """Scored challenge-wall verdict shared by every fetch tier and the NoVNC monitor.
 
-One decision function, one score and one threshold (design Decision 1 and
-Decision 2 of ``detect-challenge-walls-in-any-language``). Family A (vendor
+One decision function, one score and one threshold. Family A (vendor
 signatures) and family B (HTTP evidence) are language-independent; family C
 (page structure) reads attribute values and element names only; family D
 (content shape) reads one trafilatura extraction; family E (phrases) is the
@@ -10,6 +9,7 @@ supplement, matched after normalisation.
 
 import json
 import logging
+import re
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -25,14 +25,23 @@ from src.observability.metrics import (
     CHALLENGE_SIGNALS_FIRED_TOTAL,
     CHALLENGE_VERDICTS_TOTAL,
 )
+from src.observability.safe_address import address_without_query
 
 logger = logging.getLogger(__name__)
 
 _CATALOGUE_PATH = Path(__file__).parent / "challenge_dictionary.json"
 
-_BLOCK_STATUSES = frozenset({403, 429, 503})
+BLOCK_STATUSES = frozenset({403, 429, 503})
 
 _DEFINITIVE_SIGNALS = frozenset({"definitive_header", "status_empty_body"})
+
+_STYLE_TAG_START = re.compile(r"<style\b", re.IGNORECASE)
+
+_STYLE_TAG_CLOSE = re.compile(r"</style\s*>", re.IGNORECASE)
+
+_TAG_END = ">"
+
+_DATA_URI_VALUE = re.compile(r"""(=\s*["'])data:[^"']*""", re.IGNORECASE)
 
 
 def normalise_phrase(value: str) -> str:
@@ -53,6 +62,28 @@ def _normalise_marker(value: str) -> str:
     return value.casefold()
 
 
+_RICH_CONTENT_SIGNAL = "rich_content"
+
+_SERVED_PAGE_STATUS = 200
+
+_VENDOR_ONLY_SIGNALS = frozenset({"vendor_script", "vendor_presence"})
+
+_CHALLENGE_EVIDENCE_SIGNALS = frozenset(
+    {
+        "definitive_header",
+        "interstitial_structure",
+        "captcha_input",
+        "captcha_element",
+        "form_dominance",
+        "script_only_body",
+        "phrase_title",
+        "phrase_body",
+        "thin_text",
+        "no_article",
+    }
+)
+
+
 @dataclass(frozen=True)
 class FiredSignal:
     id: str
@@ -71,10 +102,15 @@ class ChallengeVerdict:
     wall: bool
     has_content: bool
     intervention_type: str
+    login_landing: bool = False
 
     @property
     def accepted(self) -> bool:
         return not self.wall and self.has_content
+
+    @property
+    def has_rich_content(self) -> bool:
+        return any(signal.id == _RICH_CONTENT_SIGNAL for signal in self.signals)
 
 
 def _signal_weight(signal_id: str) -> int:
@@ -86,6 +122,8 @@ class _Catalogue:
     vendors: dict[str, dict[str, Any]]
     phrases: dict[str, dict[str, Any]]
     login_title_patterns: tuple[str, ...]
+    login_path_segments: frozenset[str]
+    login_return_parameters: frozenset[str]
 
 
 def load_catalogue(path: str | Path = _CATALOGUE_PATH) -> _Catalogue:
@@ -101,9 +139,17 @@ def load_catalogue(path: str | Path = _CATALOGUE_PATH) -> _Catalogue:
         vendors = raw["vendors"]
         phrases = raw["phrases"]
         login_title_patterns = tuple(raw["login_title_patterns"])
+        login_path_segments = frozenset(raw["login_path_segments"])
+        login_return_parameters = frozenset(name.casefold() for name in raw["login_return_parameters"])
     except (KeyError, TypeError, AttributeError) as exc:
         raise ValueError(f"challenge catalogue at {catalogue_path} is malformed: {exc}") from exc
-    return _Catalogue(vendors=vendors, phrases=phrases, login_title_patterns=login_title_patterns)
+    return _Catalogue(
+        vendors=vendors,
+        phrases=phrases,
+        login_title_patterns=login_title_patterns,
+        login_path_segments=login_path_segments,
+        login_return_parameters=login_return_parameters,
+    )
 
 
 _CATALOGUE = load_catalogue()
@@ -256,7 +302,7 @@ def _interstitial_structure_signal(prefix: str, status_code: int) -> FiredSignal
 
 
 def _status_signals(status_code: int, html_length: int) -> list[FiredSignal]:
-    if status_code not in _BLOCK_STATUSES:
+    if status_code not in BLOCK_STATUSES:
         return []
     if html_length == 0:
         return [
@@ -287,6 +333,33 @@ def _status_signals(status_code: int, html_length: int) -> list[FiredSignal]:
             evidence=str(status_code),
         )
     ]
+
+
+def _without_style_bodies(markup: str) -> str:
+    """markup with the text between each style tag and its closing tag removed, in one pass."""
+    kept: list[str] = []
+    position = 0
+    while (opening := _STYLE_TAG_START.search(markup, position)) is not None:
+        opening_end = markup.find(_TAG_END, opening.end())
+        if opening_end == -1:
+            break
+        closing = _STYLE_TAG_CLOSE.search(markup, opening_end + 1)
+        if closing is None:
+            break
+        kept.append(markup[position : opening_end + 1])
+        kept.append(closing.group())
+        position = closing.end()
+    kept.append(markup[position:])
+
+    return "".join(kept)
+
+
+def _markup_prefix(html: str) -> str:
+    """The parsed prefix of html, with inline style bodies and data URI values emptied."""
+    window = html[: settings.CHALLENGE_SHAPE_MAX_BYTES]
+    markup = _DATA_URI_VALUE.sub(r"\1data:", _without_style_bodies(window))
+
+    return markup[: settings.CHALLENGE_DETECTION_MAX_BYTES]
 
 
 def _parse_tree(prefix: str) -> tuple[Any | None, bool]:
@@ -476,9 +549,9 @@ def _shape_signals(
     if words >= settings.CHALLENGE_RICH_CONTENT_WORDS:
         fired.append(
             FiredSignal(
-                id="rich_content",
+                id=_RICH_CONTENT_SIGNAL,
                 family="shape",
-                weight=_signal_weight("rich_content"),
+                weight=_signal_weight(_RICH_CONTENT_SIGNAL),
                 vendor=None,
                 evidence="rich-content",
             )
@@ -494,6 +567,22 @@ def _shape_signals(
             )
         )
     return fired
+
+
+def _served_page_signal(status_code: int, fired: Sequence[FiredSignal]) -> FiredSignal | None:
+    """The guard for a page answered 200 whose only challenge evidence is a vendor's script or presence."""
+    ids = {signal.id for signal in fired}
+    only_vendor_evidence = ids & _VENDOR_ONLY_SIGNALS and not ids & _CHALLENGE_EVIDENCE_SIGNALS
+    if status_code != _SERVED_PAGE_STATUS or not only_vendor_evidence:
+        return None
+
+    return FiredSignal(
+        id="served_page",
+        family="shape",
+        weight=_signal_weight("served_page"),
+        vendor=None,
+        evidence="vendor-only",
+    )
 
 
 def _phrase_variants(phrase_id: str) -> list[tuple[str, str]]:
@@ -623,7 +712,7 @@ def verdict_label(verdict: ChallengeVerdict) -> str:
 
 
 def as_login_verdict(verdict: ChallengeVerdict) -> ChallengeVerdict:
-    """Escalate a title-login page that did not score a wall on its own: keep the
+    """Escalate a login page that did not score a login wall on its own: keep the
     scored verdict and take the login intervention type for the 428."""
     if verdict.intervention_type == "login":
         return verdict
@@ -633,6 +722,19 @@ def as_login_verdict(verdict: ChallengeVerdict) -> ChallengeVerdict:
 def record_verdict(verdict: ChallengeVerdict, tier: str) -> None:
     """Count one verdict for the tier that called assess."""
     CHALLENGE_VERDICTS_TOTAL.labels(verdict=verdict_label(verdict), tier=tier).inc()
+
+
+def record_window_verdict(verdict: ChallengeVerdict, tier: str) -> None:
+    """Record the fired signals, the score and the verdict of a check that was
+    assessed with record_metrics off, once, as one read."""
+    _record_signals_and_score(verdict.signals, verdict.score)
+    record_verdict(verdict, tier)
+
+
+def _record_signals_and_score(signals: Sequence[FiredSignal], score: int) -> None:
+    for signal in signals:
+        CHALLENGE_SIGNALS_FIRED_TOTAL.labels(signal=signal.id, vendor=signal.vendor or "none").inc()
+    CHALLENGE_SCORE.observe(score)
 
 
 def log_verdict(verdict: ChallengeVerdict, tier: str, url: str) -> None:
@@ -650,7 +752,7 @@ def log_verdict(verdict: ChallengeVerdict, tier: str, url: str) -> None:
         verdict.intervention_type,
         signals,
         tier,
-        url,
+        address_without_query(url),
     )
     if verdict.wall or verdict.score >= verdict.threshold / 2:
         logger.info(*message)
@@ -663,8 +765,12 @@ def assess(
     html_content: str,
     headers: Any | None = None,
     cookie_names: Sequence[str] | None = (),
+    *,
+    record_metrics: bool = True,
 ) -> ChallengeVerdict:
-    """Score one fetched page and return the frozen verdict every tier shares."""
+    """Score one fetched page and return the frozen verdict every tier shares.
+    With record_metrics off the fired signals and the score are left for
+    record_window_verdict."""
     html = html_content or ""
     prefix = html[: settings.CHALLENGE_DETECTION_MAX_BYTES]
 
@@ -679,7 +785,7 @@ def assess(
     )
     fired.extend(_status_signals(status_code, len(html)))
 
-    tree, parse_failed = _parse_tree(prefix)
+    tree, parse_failed = _parse_tree(_markup_prefix(html))
     if parse_failed and prefix:
         fired.append(
             FiredSignal(
@@ -701,14 +807,16 @@ def assess(
     title_hit, visible_text = _page_texts(tree) if tree is not None else ("", "")
     fired.extend(_family_e_signals(title_hit, visible_text))
     fired.extend(_shape_signals(extracted_words, len(html), tree))
+    served_page = _served_page_signal(status_code, fired)
+    if served_page is not None:
+        fired.append(served_page)
 
     score = sum(signal.weight for signal in fired)
     threshold = settings.CHALLENGE_SCORE_THRESHOLD
     wall = score >= threshold or any(signal.id in _DEFINITIVE_SIGNALS for signal in fired)
 
-    for signal in fired:
-        CHALLENGE_SIGNALS_FIRED_TOTAL.labels(signal=signal.id, vendor=signal.vendor or "none").inc()
-    CHALLENGE_SCORE.observe(score)
+    if record_metrics:
+        _record_signals_and_score(fired, score)
 
     if len(html) >= settings.CHALLENGE_WALL_MAX_BYTES:
         has_content = True

@@ -1,4 +1,6 @@
-from unittest.mock import patch
+import asyncio
+from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -67,3 +69,57 @@ async def test_lifespan_exit_tolerates_crawl_redis_close_failure() -> None:
     # then the client is dropped anyway
     assert lifespan._crawl_redis is None
     assert lifespan._crawl_tasks == []
+
+
+@pytest.mark.asyncio
+async def test_lifespan_applies_the_result_expiry_rule_at_worker_startup(
+    stub_crawl_result_expiry: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given the real startup step and a worker whose rule applies at once
+    from src import main as main_module
+    from src.crawl.worker import Worker
+
+    monkeypatch.setattr(main_module._ServiceLifespan, "_start_result_expiry", stub_crawl_result_expiry)
+    applied = AsyncMock()
+    monkeypatch.setattr(Worker, "apply_result_expiry", applied)
+    lifespan = main_module.service_lifespan()
+
+    # when
+    await lifespan.__aenter__()
+    started = lifespan._result_expiry
+    await lifespan.__aexit__(None, None, None)
+
+    # then the rule was applied once before startup finished and the task is cleared on exit
+    applied.assert_awaited_once_with()
+    assert started is not None
+    assert started.done()
+    assert lifespan._result_expiry is None
+
+
+@pytest.mark.asyncio
+async def test_lifespan_startup_never_waits_past_the_probe_budget_for_the_expiry_rule(
+    stub_crawl_result_expiry: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given a store that never answers and a tiny startup budget
+    from src import main as main_module
+    from src.crawl.worker import Worker
+
+    monkeypatch.setattr(main_module._ServiceLifespan, "_start_result_expiry", stub_crawl_result_expiry)
+    monkeypatch.setattr(settings, "STARTUP_PROBE_TIMEOUT_SECONDS", 0.01)
+    never = asyncio.Event()
+
+    async def hang(self: Worker) -> None:
+        await never.wait()
+
+    monkeypatch.setattr(Worker, "apply_result_expiry", hang)
+    lifespan = main_module.service_lifespan()
+
+    # when
+    await asyncio.wait_for(lifespan.__aenter__(), timeout=5)
+    pending = lifespan._result_expiry
+    await lifespan.__aexit__(None, None, None)
+
+    # then startup finished while the rule was still pending and exit cancelled it
+    assert pending is not None
+    assert pending.cancelled()
+    assert lifespan._result_expiry is None

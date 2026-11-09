@@ -1,10 +1,11 @@
-"""Cross-container read-cache purge over Redis pub/sub (design D7).
+"""Cross-container read-cache purge over Redis pub/sub.
 
 The read cache stays in each process. When a session clear purges one
 domain, the clearing container purges its own cache and publishes the
 registrable domain on the ``read_cache_purge`` channel. Every container runs
 one subscriber task (started and cancelled by the lifespan in ``src/main.py``)
-that drops that domain's cached entries when a message arrives. Redis keeps
+that drops that domain's cached entries when a message arrives. A quiet
+channel is normal and never counts as a lost connection. Redis keeps
 no message for a subscriber that is not connected, so after the subscriber
 reconnects it drops its whole read cache once. It waits
 ``READ_CACHE_PURGE_RECONNECT_SECONDS`` between two connection attempts. A
@@ -24,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 READ_CACHE_PURGE_CHANNEL = "read_cache_purge"
 
+_MESSAGE_WAIT_SECONDS = 1.0
+
 ClientFactory = Callable[[], Any | None]
 
 
@@ -35,7 +38,7 @@ class PurgeReader(Protocol):
 
 
 async def publish_purge(domain: str) -> bool:
-    """Publish one domain purge, never raising (design D7)."""
+    """Publish one domain purge, never raising."""
     client = cookie_manager.redis_client
     if client is None:
         return False
@@ -93,7 +96,7 @@ async def run_subscriber(
     get_client: ClientFactory,
     stop: asyncio.Event,
 ) -> None:
-    """Drop purged domains until *stop* is set, surviving reconnects (design D7)."""
+    """Drop purged domains until *stop* is set, surviving reconnects."""
     first_connection = True
     while not stop.is_set():
         client = get_client()
@@ -117,16 +120,17 @@ async def run_subscriber(
             reader.clear_cache()
         first_connection = False
         try:
-            async for message in pubsub.listen():
-                if stop.is_set():
-                    break
+            while not stop.is_set():
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=_MESSAGE_WAIT_SECONDS
+                )
                 domain = _message_domain(message)
                 if domain is not None:
                     reader.clear_cache_for_domain(domain)
         except asyncio.CancelledError:
             raise
         except Exception:
-            logger.warning("read_cache_purge: connection lost, retrying")
+            logger.warning("read_cache_purge: connection lost, retrying", exc_info=True)
         finally:
             await _unsubscribe(pubsub)
             await _close(pubsub)

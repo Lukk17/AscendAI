@@ -3,6 +3,8 @@ from urllib.parse import urlparse
 from ascend_python_common.settings import CsvTuple, RateLimit, ServiceSettings
 from pydantic import Field, field_validator, model_validator
 
+from src.session.profile_pattern import PROFILE_PATTERN, is_valid_profile
+
 
 class Settings(ServiceSettings):
     API_PORT: int = Field(default=7021, ge=1, le=65535, description="Port for the FastAPI/MCP server")
@@ -151,7 +153,10 @@ class Settings(ServiceSettings):
     NOVNC_FLOW_CANCEL_GRACE_SECONDS: float = Field(
         default=10.0,
         gt=0,
-        description="Bounds reclamation and shutdown. A browser that has not closed in this time will not.",
+        description=(
+            "Bounds reclamation, shutdown and a window close. "
+            "A browser that has not closed in this time will not."
+        ),
     )
     NOVNC_BUSY_RETRY_AFTER_SECONDS: int = Field(
         default=30,
@@ -183,16 +188,11 @@ class Settings(ServiceSettings):
     )
     NETWORKIDLE_POLL_MS: int = Field(
         default=1000,
-        description=(
-            "Page-quiet poll interval in milliseconds for browser tiers. "
-            "Added by `enhance-web-search-tier-ladder`."
-        ),
+        description="Page-quiet poll interval in milliseconds for browser tiers.",
     )
     SCROLL_PAUSE_MS: int = Field(
         default=200,
-        description=(
-            "Pause in milliseconds between two scroll steps. Added by `enhance-web-search-tier-ladder`."
-        ),
+        description="Pause in milliseconds between two scroll steps.",
     )
 
     MIN_FLESCH_SCORE: float = Field(default=20.0, description="Minimum Flesch reading ease score")
@@ -255,9 +255,7 @@ class Settings(ServiceSettings):
     TIER_MEMORY_TTL_SECONDS: int = Field(
         default=86400,
         ge=60,
-        description=(
-            "TTL in seconds for the per-domain tier memory. Added by `enhance-web-search-tier-ladder`."
-        ),
+        description="TTL in seconds for the per-domain tier memory.",
     )
 
     # Challenge detection
@@ -278,7 +276,7 @@ class Settings(ServiceSettings):
         ),
     )
 
-    # Challenge scoring: tuning values (design Decision 2, owner rule 98 of 2026-10-08)
+    # Challenge scoring: tuning values
     CHALLENGE_SCORE_THRESHOLD: int = Field(
         default=100,
         ge=1,
@@ -317,7 +315,7 @@ class Settings(ServiceSettings):
         description="Bounds the extraction the shape family uses. Larger pages contribute no shape signal.",
     )
 
-    # Challenge scoring: per-signal weights (design Decision 2, owner rule 98 of 2026-10-08)
+    # Challenge scoring: per-signal weights
     CHALLENGE_WEIGHT_DEFINITIVE_HEADER: int = Field(
         default=200, ge=-1_000, le=1_000, description="Weight of the definitive_header signal."
     )
@@ -366,6 +364,9 @@ class Settings(ServiceSettings):
     CHALLENGE_WEIGHT_MANY_LINKS: int = Field(
         default=-20, ge=-1_000, le=1_000, description="Weight of the many_links guard signal."
     )
+    CHALLENGE_WEIGHT_SERVED_PAGE: int = Field(
+        default=-30, ge=-1_000, le=1_000, description="Weight of the served_page guard signal."
+    )
     CHALLENGE_WEIGHT_PHRASE_TITLE: int = Field(
         default=60, ge=-1_000, le=1_000, description="Weight of the phrase_title signal."
     )
@@ -387,7 +388,7 @@ class Settings(ServiceSettings):
         ),
     )
 
-    # Group 4 - Anti-bot evasion: proxy seam (off by default)
+    # Anti-bot evasion: proxy seam (off by default)
     PROXY_URL: str = Field(
         default="",
         description=(
@@ -396,7 +397,7 @@ class Settings(ServiceSettings):
         ),
     )
 
-    # Group 7 - Caching: read-result cache TTL
+    # Caching: read-result cache TTL
     READ_CACHE_TTL_SECONDS: int = Field(
         default=300,
         description="TTL in seconds for the read-result cache-aside entries (default 5 min).",
@@ -404,253 +405,292 @@ class Settings(ServiceSettings):
     READ_CACHE_PURGE_RECONNECT_SECONDS: float = Field(
         default=5.0,
         gt=0,
-        description=(
-            "Wait in seconds between two connection attempts of the read cache purge subscriber. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
-        ),
+        description="Wait in seconds between two connection attempts of the read cache purge subscriber.",
     )
 
-    # Group 2 position 6 - Schema extraction, recipes and document routing
+    # Schema extraction, recipes and document routing
     EXTRACTION_SCHEMA_MAX_BYTES: int = Field(
         default=16384,
         ge=1,
-        description=(
-            "Maximum size in bytes of the caller-supplied extraction schema. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
-        ),
+        description="Maximum size in bytes of the caller-supplied extraction schema.",
     )
     EXTRACTION_LLM_BASE_URL: str = Field(
         default="",
         description=(
             "Base URL of the OpenAI-compatible endpoint schema extraction calls. "
-            "Empty turns the schema format off. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
+            "Empty turns the schema format off."
         ),
     )
     EXTRACTION_LLM_MODEL: str = Field(
         default="",
-        description=(
-            "Model name sent to the extraction endpoint. Added by `enhance-web-search-extraction-and-tiers`."
-        ),
+        description="Model name sent to the extraction endpoint.",
     )
     EXTRACTION_LLM_API_KEY: str = Field(
         default="",
         description=(
-            "API key for the extraction endpoint, read from the repository .env file only. "
-            "Empty when unset. Added by `enhance-web-search-extraction-and-tiers`."
+            "API key for the extraction endpoint, read from the repository .env file only. Empty when unset."
         ),
     )
     EXTRACTION_LLM_MAX_INPUT_CHARS: int = Field(
         default=60000,
         ge=1,
         description=(
-            "Page text characters sent to the extraction endpoint before the cap cuts them. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
+            "Characters of the cleaned page markup sent to the extraction endpoint before the cap cuts them."
         ),
     )
     EXTRACTION_LLM_TIMEOUT_SECONDS: float = Field(
         default=60.0,
         gt=0,
-        description=(
-            "Timeout in seconds for one extraction model call. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
-        ),
+        description="Timeout in seconds for one extraction model call.",
     )
     RECIPE_TTL_SECONDS: int = Field(
         default=604800,
         ge=60,
-        description=(
-            "TTL in seconds for a stored extraction recipe. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
-        ),
+        description="TTL in seconds for a stored extraction recipe.",
     )
     RECIPE_SELECTOR_MAX_CHARS: int = Field(
         default=512,
         ge=1,
-        description=(
-            "Maximum characters of one stored CSS selector. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
-        ),
+        description="Maximum characters of one stored CSS selector.",
     )
     DOCUMENT_MAX_BYTES: int = Field(
         default=52428800,
         ge=1,
+        description="Maximum bytes fetched for one routed PDF, image or audio file.",
+    )
+    DOCUMENT_FETCH_TIMEOUT_SECONDS: float = Field(
+        default=300.0,
+        gt=0,
+        description="Longest time one routed PDF, image or audio download may take, redirects included.",
+    )
+    BROWSER_RESPONSE_MAX_BYTES: int = Field(
+        default=52428800,
+        ge=1,
         description=(
-            "Maximum bytes fetched for one routed PDF, image or audio file. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
+            "Maximum bytes the browser tunnel carries from a site on one connection. A connection that "
+            "goes past it is closed."
+        ),
+    )
+    BROWSER_TUNNEL_CONNECT_TIMEOUT_SECONDS: float = Field(
+        default=10.0,
+        gt=0,
+        description="Longest wait for a browser request head and for one connection of the browser tunnel.",
+    )
+    BROWSER_TUNNEL_MAX_CONNECTIONS: int = Field(
+        default=256,
+        ge=1,
+        description="Most connections the browser tunnel carries at once. A connection above it answers 503.",
+    )
+    BROWSER_TUNNEL_IDLE_TIMEOUT_SECONDS: float = Field(
+        default=60.0,
+        gt=0,
+        description="Longest time a browser tunnel connection may carry no bytes in either direction.",
+    )
+    READ_RESPONSE_MAX_BYTES: int = Field(
+        default=52428800,
+        ge=1,
+        description=(
+            "Maximum bytes of one page answer the fast read tiers take, the compressed bytes and the "
+            "inflated bytes alike. A larger answer ends that tier as a failure."
         ),
     )
     DOCLING_SERVE_URL: str = Field(
         default="http://docling-serve:5001",
         description=(
-            "Base URL of the docling-serve document conversion service. "
-            "Empty turns the PDF route off. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
+            "Base URL of the docling-serve document conversion service. Empty turns the PDF route off."
         ),
     )
     ASCEND_OCR_URL: str = Field(
         default="http://ascend-ocr:7022",
-        description=(
-            "Base URL of the ascend-ocr service. Empty turns the image route off. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
-        ),
+        description="Base URL of the ascend-ocr service. Empty turns the image route off.",
     )
     OCR_ROUTE_TIMEOUT_SECONDS: float = Field(
         default=300.0,
         gt=0,
+        description="Timeout in seconds polling one ascend-ocr job.",
+    )
+    OCR_DELETE_DRAIN_SECONDS: float = Field(
+        default=5.0,
+        gt=0,
         description=(
-            "Timeout in seconds polling one ascend-ocr job. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
+            "Seconds shutdown waits for the background ascend-ocr job deletes before it cancels them."
         ),
     )
     AUDIO_SCRIBE_URL: str = Field(
         default="http://ascend-audio-scribe:7017",
-        description=(
-            "Base URL of the ascend-audio-scribe service. Empty turns the audio route off. "
-            "Added by `enhance-web-search-extraction-and-tiers`."
-        ),
+        description="Base URL of the ascend-audio-scribe service. Empty turns the audio route off.",
     )
 
-    # Group 2 position 9 - Crawl jobs at scale (design D16 of `enhance-web-search-crawl-at-scale`)
+    # Crawl jobs
     CRAWL_MAX_SEEDS: int = Field(
         default=20,
         ge=1,
-        description=("Most seeds in one crawl request. Added by `enhance-web-search-crawl-at-scale`."),
+        description="Most seeds in one crawl request.",
     )
     CRAWL_MAX_PATTERNS: int = Field(
         default=50,
         ge=1,
-        description=(
-            "Most include patterns and most exclude patterns in one crawl request. "
-            "Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Most include patterns and most exclude patterns in one crawl request.",
     )
     CRAWL_MAX_DEPTH: int = Field(
         default=5,
         ge=0,
-        description=(
-            "Largest `max_depth` a crawl request may ask for. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Largest `max_depth` a crawl request may ask for.",
     )
     CRAWL_DEFAULT_DEPTH: int = Field(
         default=2,
         ge=0,
-        description=(
-            "`max_depth` when the request has none, refused at startup above `CRAWL_MAX_DEPTH`. "
-            "Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="`max_depth` when the request has none, refused at startup above `CRAWL_MAX_DEPTH`.",
     )
     CRAWL_MAX_PAGES: int = Field(
         default=10000,
         ge=1,
-        description=(
-            "Largest `page_budget` a crawl request may ask for. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Largest `page_budget` a crawl request may ask for.",
     )
     CRAWL_DEFAULT_PAGE_BUDGET: int = Field(
         default=100,
         ge=1,
-        description=(
-            "`page_budget` when the request has none, refused at startup above `CRAWL_MAX_PAGES`. "
-            "Added by `enhance-web-search-crawl-at-scale`."
-        ),
-    )
-    CRAWL_ROBOTS_OPT_OUT_DOMAINS: CsvTuple = Field(
-        default=(),
-        description=(
-            "Seed domains for which `respect_robots` false is accepted, a site the operator owns. "
-            "Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="`page_budget` when the request has none, refused at startup above `CRAWL_MAX_PAGES`.",
     )
     CRAWL_RESULT_S3_BUCKET: str = Field(
         default="web-hunter-crawls",
-        description=("Bucket of the crawl results. Added by `enhance-web-search-crawl-at-scale`."),
+        description="Bucket of the crawl results.",
     )
     CRAWL_RESULT_S3_PREFIX: str = Field(
         default="crawl-results/",
-        description=(
-            "Key prefix of the crawl results after the tenant prefix. "
-            "Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Key prefix of the crawl results after the tenant prefix.",
     )
     CRAWL_JOB_RETENTION_SECONDS: int = Field(
         default=604800,
         ge=60,
-        description=(
-            "Lifetime of job records, results, frontier keys and recrawl state. "
-            "Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Lifetime of job records, results, frontier keys and recrawl state.",
     )
     CRAWL_DOMAIN_CONCURRENCY: int = Field(
         default=2,
         ge=1,
-        description=(
-            "Pages of one domain read at once, all instances together. "
-            "Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Pages of one domain read at once, all instances together.",
     )
     CRAWL_DEFAULT_DELAY_SECONDS: float = Field(
         default=1.0,
         ge=0,
-        description=(
-            "Least time between two fetches of one domain. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Least time between two fetches of one domain.",
     )
     CRAWL_PROXY_URL: str = Field(
         default="",
-        description=(
-            "Customer proxy for crawl fetches only. Empty turns it off. "
-            "Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Customer proxy for crawl fetches only. Empty turns it off.",
     )
     CRAWL_CLAIM_LEASE_SECONDS: int = Field(
         default=120,
         ge=1,
-        description=("Lifetime of a page claim. Added by `enhance-web-search-crawl-at-scale`."),
+        description="Lifetime of a page claim.",
     )
     CRAWL_CLAIM_MAX_EXPIRIES: int = Field(
         default=2,
         ge=1,
-        description=(
-            "Claim expiries after which a URL counts as failed. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Claim expiries after which a URL counts as failed.",
     )
     CRAWL_WORKER_CONCURRENCY: int = Field(
         default=4,
         ge=1,
-        description=(
-            "Crawl worker tasks each instance starts. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Crawl worker tasks each instance starts.",
     )
     CRAWL_WORKER_IDLE_SECONDS: float = Field(
         default=1.0,
         gt=0,
-        description=(
-            "Wait of a worker that found nothing to claim. Added by `enhance-web-search-crawl-at-scale`."
-        ),
+        description="Wait of a worker that found nothing to claim.",
     )
     CRAWL_POLL_AFTER_SECONDS: int = Field(
         default=5,
         ge=1,
+        description="The `poll_after_seconds` hint of a crawl submission.",
+    )
+    CRAWL_SITEMAP_MAX_DOCUMENTS: int = Field(
+        default=50,
+        ge=1,
+        description="Most sitemap files one instance fetches per job, sitemap indexes included.",
+    )
+    CRAWL_SITEMAP_MAX_BYTES: int = Field(
+        default=52428800,
+        ge=1,
         description=(
-            "The `poll_after_seconds` hint of a crawl submission. "
-            "Added by `enhance-web-search-crawl-at-scale`."
+            "Most bytes read from one sitemap file, before and after gzip inflation, "
+            "a larger file is skipped."
         ),
+    )
+    CRAWL_ROBOTS_MAX_BYTES: int = Field(
+        default=512000,
+        ge=512000,
+        description=(
+            "Most bytes read from one robots.txt, at least the 500 KiB RFC 9309 requires, "
+            "the rest of a larger file is ignored."
+        ),
+    )
+    CRAWL_ROBOTS_MAX_RULES: int = Field(
+        default=1000000,
+        ge=1,
+        description=(
+            "Most rule objects one robots.txt may expand to, counted as the rule sets of its "
+            "user-agent lines times the rules of its other lines. "
+            "A file above it disallows every page of its origin."
+        ),
+    )
+    CRAWL_ROBOTS_CACHE_MAX_ORIGINS: int = Field(
+        default=256,
+        ge=1,
+        description="Most parsed robots.txt files one instance keeps. The least recently used is evicted.",
+    )
+    CRAWL_ROBOTS_CACHE_MAX_RULES: int = Field(
+        default=2000000,
+        ge=1,
+        description=(
+            "Most rule objects the parsed robots.txt files of one instance may hold together. "
+            "The least recently used files are evicted until the total is back under it. "
+            "A value below CRAWL_ROBOTS_MAX_RULES is refused at startup."
+        ),
+    )
+    CRAWL_ROBOTS_SKIP_FACTOR: int = Field(
+        default=10,
+        ge=1,
+        description=(
+            "A job ends once its pages skipped for robots.txt reach page_budget times this number, "
+            "so a page full of disallowed links cannot keep a job running for hours."
+        ),
+    )
+    CRAWL_ROBOTS_TIMEOUT_SECONDS: float = Field(
+        default=30.0,
+        gt=0,
+        description="Longest wait for one robots.txt. A file that takes longer counts as unreachable.",
+    )
+    CRAWL_SITEMAP_TIMEOUT_SECONDS: float = Field(
+        default=60.0,
+        gt=0,
+        description=(
+            "Longest sitemap work of one page, refused at startup at or above `CRAWL_CLAIM_LEASE_SECONDS`."
+        ),
+    )
+    CRAWL_MAX_DELAY_SECONDS: float = Field(
+        default=60.0,
+        gt=0,
+        description="Largest `Crawl-delay` a robots.txt can ask for. A larger value is cut to this.",
     )
     OBJECT_STORE_S3_ENDPOINT: str = Field(
         default="http://localhost:9070",
-        description=("Address of the S3-compatible store. Added by `enhance-web-search-crawl-at-scale`."),
+        description="Address of the S3-compatible store.",
+    )
+    OBJECT_STORE_S3_PUBLIC_ENDPOINT: str = Field(
+        default="http://localhost:9070",
+        description="The address ascend-ocr signs its result addresses with.",
     )
     OBJECT_STORE_S3_ACCESS_KEY: str = Field(
         default="",
-        description=("Access key of the store. Added by `enhance-web-search-crawl-at-scale`."),
+        description="Access key of the store.",
     )
     OBJECT_STORE_S3_SECRET_KEY: str = Field(
         default="",
-        description=("Secret key of the store. Added by `enhance-web-search-crawl-at-scale`."),
+        description="Secret key of the store.",
     )
 
-    # Group 7 - Observability: per-domain metric label cardinality cap
+    # Observability: per-domain metric label cardinality cap
     DOMAIN_METRIC_CARDINALITY_CAP: int = Field(
         default=50,
         description=(
@@ -659,7 +699,7 @@ class Settings(ServiceSettings):
         ),
     )
 
-    # Group 7 - Circuit breaker thresholds
+    # Circuit breaker thresholds
     BREAKER_FAILURE_THRESHOLD: int = Field(
         default=3,
         description="Consecutive failures before a circuit breaker opens.",
@@ -701,6 +741,13 @@ class Settings(ServiceSettings):
             )
         return value
 
+    @field_validator("SESSION_DEFAULT_PROFILE")
+    @classmethod
+    def _validate_session_default_profile(cls, value: str) -> str:
+        if not is_valid_profile(value):
+            raise ValueError(f"SESSION_DEFAULT_PROFILE must match {PROFILE_PATTERN}, got {value!r}")
+        return value
+
     @model_validator(mode="after")
     def _validate_challenge_weights(self) -> "Settings":
         if self.CHALLENGE_WALL_MAX_BYTES > self.CHALLENGE_SHAPE_MAX_BYTES:
@@ -711,9 +758,12 @@ class Settings(ServiceSettings):
             raise ValueError("CHALLENGE_WEIGHT_RICH_CONTENT must not be positive")
         if self.CHALLENGE_WEIGHT_MANY_LINKS > 0:
             raise ValueError("CHALLENGE_WEIGHT_MANY_LINKS must not be positive")
+        if self.CHALLENGE_WEIGHT_SERVED_PAGE > 0:
+            raise ValueError("CHALLENGE_WEIGHT_SERVED_PAGE must not be positive")
         negative_guards = {
             "CHALLENGE_WEIGHT_RICH_CONTENT",
             "CHALLENGE_WEIGHT_MANY_LINKS",
+            "CHALLENGE_WEIGHT_SERVED_PAGE",
         }
         allowed_single = {
             "CHALLENGE_WEIGHT_DEFINITIVE_HEADER",
@@ -736,6 +786,7 @@ class Settings(ServiceSettings):
             "CHALLENGE_WEIGHT_NO_ARTICLE",
             "CHALLENGE_WEIGHT_RICH_CONTENT",
             "CHALLENGE_WEIGHT_MANY_LINKS",
+            "CHALLENGE_WEIGHT_SERVED_PAGE",
             "CHALLENGE_WEIGHT_PHRASE_TITLE",
             "CHALLENGE_WEIGHT_PHRASE_BODY",
         )
@@ -759,6 +810,10 @@ class Settings(ServiceSettings):
             raise ValueError("CRAWL_DEFAULT_DEPTH must not exceed CRAWL_MAX_DEPTH")
         if self.CRAWL_DEFAULT_PAGE_BUDGET > self.CRAWL_MAX_PAGES:
             raise ValueError("CRAWL_DEFAULT_PAGE_BUDGET must not exceed CRAWL_MAX_PAGES")
+        if self.CRAWL_ROBOTS_CACHE_MAX_RULES < self.CRAWL_ROBOTS_MAX_RULES:
+            raise ValueError("CRAWL_ROBOTS_CACHE_MAX_RULES must not be below CRAWL_ROBOTS_MAX_RULES")
+        if self.CRAWL_SITEMAP_TIMEOUT_SECONDS >= self.CRAWL_CLAIM_LEASE_SECONDS:
+            raise ValueError("CRAWL_SITEMAP_TIMEOUT_SECONDS must stay below CRAWL_CLAIM_LEASE_SECONDS")
         return self
 
 

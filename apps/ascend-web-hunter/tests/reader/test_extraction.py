@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
+from bs4 import BeautifulSoup
+
 from src.reader.extraction import (
     _ensemble_score,
     _readability_extract,
@@ -108,6 +110,16 @@ def test_ensemble_prefers_readability_on_the_aside_page() -> None:
     # then
     assert result["source"] == "readability"
     assert "Visiting hours" in result["content"]
+
+
+def test_structured_content_is_the_text_format_plain_text_when_readability_wins() -> None:
+    # when
+    result = extract_structured(_READABILITY_WINS_HTML)
+
+    # then
+    assert result["source"] == "readability"
+    assert result["content"] == extract_text_with_fallback(_READABILITY_WINS_HTML)
+    assert "<" not in result["content"]
 
 
 def test_ensemble_readability_win_scores_rank_unmocked() -> None:
@@ -275,6 +287,56 @@ def test_extract_text_returns_empty_string_when_both_extractors_fail() -> None:
 
     # then
     assert result == ""
+
+
+def test_extract_text_is_plain_text_with_paragraph_breaks_when_readability_wins() -> None:
+    # when
+    result = extract_text_with_fallback(_READABILITY_WINS_HTML)
+
+    # then
+    lines = result.split("\n")
+    assert "<" not in result
+    assert "readabilityBody" not in result
+    assert lines[0] == "City garden opens its gates"
+    assert "Visiting hours" in lines
+    assert "The garden welcomes visitors every day from nine in the morning until sunset." in lines
+
+
+def test_extract_text_counts_the_same_words_as_the_readability_winner() -> None:
+    # given
+    read_html: str = _readability_extract(_READABILITY_WINS_HTML)["content"]
+    visible_words = BeautifulSoup(read_html, "html.parser").get_text(" ", strip=True).split()
+
+    # when
+    result = extract_text_with_fallback(_READABILITY_WINS_HTML)
+
+    # then
+    assert result.split() == visible_words
+
+
+def test_extract_text_decodes_entities_and_keeps_inline_tags_on_one_line() -> None:
+    # given
+    read_html = (
+        "<html><body><div><h2>Menu&nbsp;today</h2>"
+        "<p>Fish &amp; chips cost &pound;5, <a href='/m'>see <b>the</b> list</a>.<br>Open late"
+        "<script>var hidden = 1;</script><style>p { color: red; }</style></p>"
+        "<!-- hidden note --><ul><li>Tea</li><li>Coffee</li></ul>Closing words</div></body></html>"
+    )
+
+    # when
+    with (
+        patch("src.reader.extraction._trafilatura_text", return_value=""),
+        patch(
+            "src.reader.extraction._readability_extract",
+            return_value=_structured(read_html, "readability"),
+        ),
+    ):
+        result = extract_text_with_fallback(_GOOD_HTML)
+
+    # then
+    assert result == (
+        "Menu today\nFish & chips cost \u00a35, see the list.\nOpen late\nTea\nCoffee\nClosing words"
+    )
 
 
 def test_embedded_metadata_holds_the_product_block_in_every_syntax() -> None:

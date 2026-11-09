@@ -59,7 +59,7 @@ def _build_factory(
 ) -> Any:
     page = MagicMock()
     page.url = "https://dead-site.com/"
-    page.goto = AsyncMock()
+    page.goto = AsyncMock(return_value=None)
     page.content = AsyncMock(return_value="<html><body><div id='cf-challenge-running'></div></body></html>")
     page.evaluate = AsyncMock(return_value="UA")
     page.is_closed = MagicMock(return_value=page_closed)
@@ -67,9 +67,11 @@ def _build_factory(
     context.route = AsyncMock()
     context.route_web_socket = None
     if poll_error is not None:
+        context.cookies = AsyncMock(side_effect=poll_error)
         context.storage_state = AsyncMock(side_effect=poll_error)
     else:
         context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
+        context.cookies = AsyncMock(return_value=context.storage_state.return_value["cookies"])
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()
     browser.new_context = AsyncMock(return_value=context)

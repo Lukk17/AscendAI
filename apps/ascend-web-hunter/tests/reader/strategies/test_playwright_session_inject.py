@@ -82,7 +82,7 @@ async def test_playwright_injects_storage_state_when_present() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
     ):
@@ -117,7 +117,7 @@ async def test_playwright_omits_storage_state_when_absent() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
     ):
@@ -178,7 +178,7 @@ async def test_playwright_refused_navigation_raises_unsafe_uri() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
@@ -214,7 +214,7 @@ async def test_playwright_plain_navigation_error_propagates() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
     ):
@@ -246,11 +246,11 @@ async def test_playwright_recorded_navigation_raises_post_render() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch(
-            "src.reader.strategies.playwright_strategy.assess",
+            "src.reader.strategies.browser_read.assess",
             return_value=_accepted_clean_verdict(),
         ),
         patch(
@@ -261,3 +261,44 @@ async def test_playwright_recorded_navigation_raises_post_render() -> None:
         strategy = PlaywrightStrategy(lambda: "DefaultUA", _make_url_validator())
         with pytest.raises(UnsafeUriError):
             await strategy.get_html("https://example.com/article")
+
+
+@pytest.mark.asyncio
+async def test_playwright_restores_a_local_storage_only_login() -> None:
+    """A saved login the site keeps only in localStorage reaches the browser context."""
+    # given
+    from src.reader.cloudflare.cookie_manager import PRODUCED_BY_NOVNC, CookieManager
+
+    CookieManager._instance = None
+    manager = CookieManager()
+    manager._memory_store = {}
+    manager.redis_client = None
+    login: dict[str, Any] = {
+        "cookies": [],
+        "origins": [
+            {"origin": "https://app.example.com", "localStorage": [{"name": "auth_token", "value": "TOKEN"}]}
+        ],
+    }
+    await manager.save_storage_state(
+        "https://app.example.com", login, "UA/1.0", None, PRODUCED_BY_NOVNC, replaces_login=True
+    )
+    browser, _context = _make_browser_and_context()
+
+    # when
+    with (
+        patch(
+            "src.reader.strategies.playwright_strategy.browser_pool.get_browser",
+            new=AsyncMock(return_value=browser),
+        ),
+        patch("src.reader.strategies.playwright_strategy.cookie_manager", manager),
+        patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
+        patch(
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
+            return_value=False,
+        ),
+    ):
+        strategy = PlaywrightStrategy(lambda: "DefaultUA", _make_url_validator())
+        await strategy.get_html("https://app.example.com/dashboard")
+
+    # then
+    assert browser.new_context.call_args.kwargs["storage_state"] == login

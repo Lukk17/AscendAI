@@ -49,12 +49,13 @@ def _make_flow(
 def _factory(page_url: str, *, goto_ok: bool = True) -> Any:
     page = MagicMock()
     page.url = page_url
-    page.goto = AsyncMock() if goto_ok else AsyncMock(side_effect=RuntimeError("nav"))
+    page.goto = AsyncMock(return_value=None) if goto_ok else AsyncMock(side_effect=RuntimeError("nav"))
     page.evaluate = AsyncMock(return_value="UA")
     context = MagicMock()
     context.route = AsyncMock()
     context.route_web_socket = None
     context.storage_state = AsyncMock(return_value={"cookies": [{"name": "k", "value": "v"}], "origins": []})
+    context.cookies = AsyncMock(return_value=context.storage_state.return_value["cookies"])
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()
     browser.new_context = AsyncMock(return_value=context)
@@ -127,13 +128,14 @@ async def test_monitor_records_rejected_outcome_when_timeout_still_blocked() -> 
     # given
     page = MagicMock()
     page.url = "http://novncmetricrejected.com"
-    page.goto = AsyncMock()
+    page.goto = AsyncMock(return_value=None)
     page.evaluate = AsyncMock(return_value="UA")
     page.content = AsyncMock(return_value="<html><body><div id='cf-challenge-running'></div></body></html>")
     context = MagicMock()
     context.route = AsyncMock()
     context.route_web_socket = None
     context.storage_state = AsyncMock(return_value={"cookies": [], "origins": []})
+    context.cookies = AsyncMock(return_value=context.storage_state.return_value["cookies"])
     context.new_page = AsyncMock(return_value=page)
     browser = MagicMock()
     browser.new_context = AsyncMock(return_value=context)

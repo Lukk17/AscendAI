@@ -10,7 +10,7 @@ from src.api.readiness import probe_searxng
 from src.config.config import Settings
 from src.config.config import settings as service_settings
 from src.config.startup_banner import _probe_url_sync, _redis_check_sync
-from src.reader.strategies import curl_cffi_fetcher
+from src.reader.browser_guard import web_hunter_fetch_policy
 
 
 @pytest.mark.asyncio
@@ -125,7 +125,7 @@ async def test_curl_cffi_tier_stops_after_second_redirect(
 ) -> None:
     # given
     monkeypatch.setattr(service_settings, "FETCH_MAX_REDIRECT_HOPS", 2)
-    policy = curl_cffi_fetcher._fetch_policy()
+    policy = web_hunter_fetch_policy()
     calls: list[str] = []
 
     async def send_hop(target: Any) -> HopAnswer[str]:

@@ -270,10 +270,12 @@ async def test_read_heavy_mode_skips_producer_lookup_and_goes_browser_first() ->
 
 @pytest.mark.asyncio
 async def test_prefer_browser_does_not_treat_a_freshly_saved_empty_cookie_jar_as_a_stored_session() -> None:
-    """establish() legitimately writes a record with zero cookies for a page
-    nobody was challenged on (see NoVNCStrategy's monitor). The tier chooser
-    must not read that record as grounds to force the browser tier -- it
-    buys no auth benefit and costs exactly what tiering exists to avoid.
+    """A NoVNC captcha flow saves whatever cookies the page holds once it is
+    accepted, which can be none at all (see NoVNCStrategy's monitor). A login
+    flow, which establish() opens, saves only after a real login, so it never
+    writes such a record. The tier chooser must not read a zero-cookie record
+    as grounds to force the browser tier: it buys no auth benefit and costs
+    exactly what tiering exists to avoid.
     Exercises the real CookieManager, not the module's default mock, so the
     fix is proven where it lives (the read side), not merely asserted."""
     # given
@@ -994,3 +996,193 @@ async def test_read_rejects_amazon_style_interstitial_and_escalates() -> None:
     ):
         with pytest.raises(HumanInterventionRequiredException):
             await WebReader().read("https://www.amazon.pl/dp/B09D14YFR9")
+
+
+class _SecondLookStub:
+    def __init__(self, html: str) -> None:
+        self._html = html
+
+    async def extract(self, _url: str) -> str:
+        return self._html
+
+    async def get_html(self, _url: str) -> str:
+        return self._html
+
+    async def screenshot_page(self, _url: str) -> tuple[str, bytes]:
+        return self._html, b"\x89PNG"
+
+
+def _reader_verdicts(outcome: str) -> float:
+    from prometheus_client import REGISTRY
+
+    return (
+        REGISTRY.get_sample_value("challenge_verdicts_total", {"verdict": outcome, "tier": "reader"}) or 0.0
+    )
+
+
+def _sample_total(sample_name: str) -> float:
+    from prometheus_client import REGISTRY
+
+    return sum(
+        sample.value
+        for family in REGISTRY.collect()
+        for sample in family.samples
+        if sample.name == sample_name
+    )
+
+
+async def _read_text(reader: WebReader) -> dict[str, Any]:
+    return await reader.read("http://test.com", tier="1-beautifulsoup")
+
+
+async def _read_screenshot(reader: WebReader) -> dict[str, Any]:
+    return await reader.read("http://test.com", output_format="screenshot", tier="4-playwright_stealth")
+
+
+async def _read_links(reader: WebReader) -> dict[str, Any]:
+    return await reader.read_with_links("http://test.com", tier="1-beautifulsoup")
+
+
+_SECOND_LOOK_READS: list[Any] = [
+    pytest.param(_read_text, id="read"),
+    pytest.param(_read_screenshot, id="screenshot"),
+    pytest.param(_read_links, id="read_with_links"),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("read", _SECOND_LOOK_READS)
+@pytest.mark.parametrize(
+    ("html", "outcome"),
+    [pytest.param(_WALL_HTML, "wall", id="wall"), pytest.param(_ARTICLE_HTML, "content", id="content")],
+)
+async def test_the_second_look_counts_one_verdict_one_score_and_one_signal_set_under_reader(
+    read: Any, html: str, outcome: str
+) -> None:
+    # given
+    from src.reader.cloudflare.challenge_signals import assess
+
+    reader = WebReader()
+    stub = _SecondLookStub(html)
+    signals_per_check = len(assess(200, html, record_metrics=False).signals)
+    outcome_before = _reader_verdicts(outcome)
+    verdicts_before = _sample_total("challenge_verdicts_total")
+    scores_before = _sample_total("challenge_score_count")
+    signals_before = _sample_total("challenge_signals_fired_total")
+
+    # when
+    with patch.object(
+        reader, "_select_strategies", new=AsyncMock(return_value={"4-playwright_stealth": stub})
+    ):
+        await read(reader)
+
+    # then
+    assert _reader_verdicts(outcome) == outcome_before + 1.0
+    assert _sample_total("challenge_verdicts_total") == verdicts_before + 1.0
+    assert _sample_total("challenge_score_count") == scores_before + 1.0
+    assert _sample_total("challenge_signals_fired_total") == signals_before + signals_per_check
+
+
+_USER_INFO_READ_URL = "https://reader:hunter2@test.com/page?X-Amz-Signature=secret"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        AsyncMock(return_value=_WALL_HTML),
+        AsyncMock(side_effect=RuntimeError(f"tier broke at {_USER_INFO_READ_URL}")),
+    ],
+    ids=["challenge", "failure"],
+)
+async def test_tier_log_lines_name_the_read_without_its_user_info(
+    caplog: pytest.LogCaptureFixture, outcome: AsyncMock
+) -> None:
+    # given
+    import logging
+
+    reader = WebReader()
+    strategy = MagicMock()
+    strategy.get_html = outcome
+
+    # when
+    with caplog.at_level(logging.DEBUG):
+        await reader._execute_strategy("1-beautifulsoup", strategy, _USER_INFO_READ_URL)
+        await reader._execute_html_strategy("1-beautifulsoup", strategy, _USER_INFO_READ_URL)
+
+    # then
+    assert "https://test.com/page" in caplog.text
+    assert "hunter2" not in caplog.text
+    assert "X-Amz-Signature" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_failed_tier_logs_the_reason_without_the_query(caplog: pytest.LogCaptureFixture) -> None:
+    # given
+    import logging
+
+    reader = WebReader()
+    strategy = MagicMock()
+    strategy.get_html = AsyncMock(
+        side_effect=RuntimeError(f"net::ERR_CONNECTION_REFUSED at {_USER_INFO_READ_URL}")
+    )
+
+    # when
+    with caplog.at_level(logging.WARNING):
+        await reader._execute_strategy("1-beautifulsoup", strategy, _USER_INFO_READ_URL)
+        await reader._execute_html_strategy("1-beautifulsoup", strategy, _USER_INFO_READ_URL)
+
+    # then
+    reason = "net::ERR_CONNECTION_REFUSED at https://test.com/page"
+    assert f"Strategy 1-beautifulsoup failed for https://test.com/page: {reason}" in caplog.text
+    assert f"Strategy 1-beautifulsoup get_html failed for https://test.com/page: {reason}" in caplog.text
+    assert "hunter2" not in caplog.text
+    assert "X-Amz-Signature" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_read_logs_its_address_without_user_info(caplog: pytest.LogCaptureFixture) -> None:
+    # given
+    import logging
+
+    reader = WebReader()
+    strategy = MagicMock()
+    strategy.get_html = AsyncMock(return_value=_ARTICLE_HTML)
+
+    # when
+    with (
+        caplog.at_level(logging.DEBUG),
+        patch.object(reader, "_build_strategies", return_value={"1-beautifulsoup": strategy}),
+        patch("src.reader.web_reader.route_document", new=AsyncMock(return_value=None)),
+    ):
+        await reader.read(_USER_INFO_READ_URL)
+        await reader.read(_USER_INFO_READ_URL)
+        await reader.read_with_links(_USER_INFO_READ_URL)
+        await reader.read_with_links(_USER_INFO_READ_URL)
+
+    # then
+    assert "Reading URL: https://test.com/page" in caplog.text
+    assert "Reading URL with links: https://test.com/page" in caplog.text
+    assert "cache hit for https://test.com/page" in caplog.text
+    assert "cache hit (with links) for https://test.com/page" in caplog.text
+    assert "hunter2" not in caplog.text
+    assert "X-Amz-Signature" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_login_redirect_read_logs_its_address_without_user_info(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # given
+    import logging
+
+    reader = WebReader()
+
+    # when
+    with caplog.at_level(logging.WARNING):
+        await reader._select_strategies("https://reader:hunter2@test.com/?login=1", heavy_mode=False)
+
+    # then
+    assert "Pre-emptive URL redirect login detected on https://test.com/." in caplog.text
+    assert "login=1" not in caplog.text
+    assert "hunter2" not in caplog.text

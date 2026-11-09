@@ -1,14 +1,19 @@
 import fnmatch
 from datetime import UTC, datetime
+from functools import cached_property
 from typing import Any, Final, Literal
 
-from pydantic import AnyUrl, BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.config.config import settings
+from src.reader.cloudflare.cookie_manager import cookie_manager
 from src.reader.web_reader import OutputFormat
+from src.session.profile import InvalidProfileError, Profile, SeedUrl
 
 DEFAULT_TENANT: Final[str] = "default"
 TENANT_PATTERN: Final[str] = r"^[a-z0-9-]{1,64}$"
+
+UNREADABLE_RECORD_ERRORS: Final[tuple[type[Exception], ...]] = (ValueError, InvalidProfileError)
 
 JobState = Literal["waiting", "running", "succeeded", "failed", "cancelled"]
 
@@ -28,7 +33,7 @@ class InvalidTenantError(ValueError):
 
 
 class CrawlRequest(BaseModel):
-    seeds: list[AnyUrl] = Field(min_length=1, max_length=settings.CRAWL_MAX_SEEDS)
+    seeds: list[SeedUrl] = Field(min_length=1, max_length=settings.CRAWL_MAX_SEEDS)
     include_patterns: list[str] = Field(default_factory=list, max_length=settings.CRAWL_MAX_PATTERNS)
     exclude_patterns: list[str] = Field(default_factory=list, max_length=settings.CRAWL_MAX_PATTERNS)
     max_depth: int = Field(
@@ -42,18 +47,19 @@ class CrawlRequest(BaseModel):
         le=settings.CRAWL_MAX_PAGES,
     )
     same_domain_only: bool = True
-    respect_robots: bool = True
+    respect_robots: bool = False
     output_format: OutputFormat = "text"
     extraction_schema: dict[str, Any] | None = None
-    profile: str | None = None
+    profile: Profile | None = None
+
+    @cached_property
+    def seed_domains(self) -> frozenset[str]:
+        return frozenset(cookie_manager.registrable_domain(str(seed)) for seed in self.seeds)
 
     @field_validator("include_patterns", "exclude_patterns", mode="before")
     @classmethod
     def _coerce_empty_map_patterns(cls, value: object) -> object:
-        # The Redis Lua scripts round-trip the record through cjson, which
-        # reads an empty JSON array back as an empty Lua table and writes it
-        # back as an empty JSON object. An empty map here is that artifact,
-        # never a real pattern list.
+        """Read an empty JSON object, the shape a cjson round trip gives an empty array, as no patterns."""
         if isinstance(value, dict) and len(value) == 0:
             return []
         return value
@@ -79,6 +85,7 @@ class JobCounts(BaseModel):
     unchanged: int = Field(default=0, ge=0)
     failed: int = Field(default=0, ge=0)
     skipped_unsafe: int = Field(default=0, ge=0)
+    robots_skipped: int = Field(default=0, ge=0)
 
 
 class JobRecord(BaseModel):
@@ -98,9 +105,7 @@ class JobRecord(BaseModel):
     @field_validator("claim_expiries", mode="before")
     @classmethod
     def _coerce_expiries(cls, value: object) -> object:
-        # The Redis Lua scripts round-trip the record through cjson, which
-        # reads an empty map back as an empty array. A list here is that
-        # artifact, never a real expiry count.
+        """Read a JSON array, the shape a cjson round trip gives an empty map, as no expiries."""
         if isinstance(value, list):
             return {}
         return value

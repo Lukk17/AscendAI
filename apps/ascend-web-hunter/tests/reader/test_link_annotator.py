@@ -114,3 +114,17 @@ def test_annotate_links_no_anchors_returns_empty_map() -> None:
     # then
     assert links == {}
     assert "No links here" in content
+
+
+def test_annotate_links_keeps_spaces_around_inline_markup_inside_an_anchor() -> None:
+    # given
+    html = (
+        '<p>See <a href="https://example.com/map"><b>Open</b>Street<i>Map</i> data  <em>export</em></a>'
+        " now.</p>"
+    )
+
+    # when
+    content, links = annotate_links(html, BASE_URL)
+
+    # then
+    assert content == "See OpenStreetMap data export [1] now."
