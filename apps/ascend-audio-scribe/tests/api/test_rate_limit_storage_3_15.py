@@ -113,8 +113,10 @@ async def test_two_apps_on_shared_storage_refuse_transcription_over_limit(
     module_limiter = rate_limit_module.limiter
     original_storage = module_limiter._storage
     original_inner = module_limiter._limiter.storage
+    original_storage_dead = module_limiter._storage_dead
     module_limiter._storage = storage
     module_limiter._limiter.storage = storage
+    module_limiter._storage_dead = False
     try:
         first_app = _transcribe_probe_app()
         second_app = _transcribe_probe_app()
@@ -131,6 +133,7 @@ async def test_two_apps_on_shared_storage_refuse_transcription_over_limit(
     finally:
         module_limiter._storage = original_storage
         module_limiter._limiter.storage = original_inner
+        module_limiter._storage_dead = original_storage_dead
     # then
     assert all(status == 200 for status in statuses)
     assert refused.status_code == 429

@@ -311,6 +311,10 @@ jobs:
             ${{ matrix.path }}/pyproject.toml
             ${{ matrix.path }}/*requirements*.txt
 
+      - name: Install ffmpeg (ascend-audio-scribe)
+        if: matrix.service == 'ascend-audio-scribe'
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends ffmpeg
+
       - name: Install ascend-python-common from the folder
         if: matrix.language == 'python'
         working-directory: ${{ matrix.path }}
