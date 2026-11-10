@@ -21,7 +21,6 @@ graph TB
 
     subgraph "Search Infrastructure"
         SearXNG["SearXNG<br/>:9020"]
-        FlareSolverr["FlareSolverr<br/>:8191"]
     end
 
     subgraph "LLM Providers"
@@ -41,7 +40,6 @@ graph TB
     AscendAiAgent --> LMStudio
     AscendAiAgent --> CloudAPIs
     WebHunter --> SearXNG
-    WebHunter --> FlareSolverr
     Memory --> Qdrant
 ```
 

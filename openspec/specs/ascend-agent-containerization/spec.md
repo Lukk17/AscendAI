@@ -5,6 +5,7 @@
 ascend-agent ships as a reproducible container image and runs as a service in the monorepo compose stack, so a single compose bring-up starts the whole platform including the gateway rather than leaving the gateway to be started by hand on the host. The capability covers the multi-stage build and its JRE-only non-root runtime, the container healthcheck, the compose service entry, container-mode parity through the `docker` Spring profile, provider API keys arriving as runtime environment from a developer-local `.env` instead of being baked into the image, reaching host-only prerequisites over `host.docker.internal`, and the pruned build context.
 
 ## Requirements
+
 ### Requirement: ascend-agent ships a multi-stage Dockerfile
 
 `apps/ascend-agent/Dockerfile` SHALL define a two-stage build. The `builder` stage SHALL use `eclipse-temurin:21-jdk-alpine` and produce a Spring Boot fat jar via `./gradlew --no-daemon bootJar -x test`. The runtime stage SHALL use `eclipse-temurin:21-jre-alpine`, copy the bootJar from the builder, run as a non-root user, expose port `9917`, and use `ENTRYPOINT ["java","-jar","/app/app.jar"]` in exec form so Linux signals propagate to the JVM.
@@ -121,19 +122,25 @@ Provider API keys are runtime-only. The `ascend-agent` compose entry SHALL pass 
 
 ### Requirement: A `.env.example` documents the secrets compose consumes
 
-The repository SHALL ship a committed `.env.example` file at the monorepo root, next to `compose.yaml`. The file SHALL list every `${KEY}` variable referenced by `compose.yaml` and `compose.ascend-web-hunter.yaml` with empty values (all are secrets), and SHALL include a one-line comment above each variable explaining its purpose and which service consumes it. The actual `.env` file SHALL be excluded by `.gitignore` so it is never committed.
+The repository SHALL ship a committed `.env.example` file at the monorepo root, next to `compose.yaml`. The file SHALL list every secret that `compose.yaml` and `compose.ascend-web-hunter.yaml` reference, with an empty value, and every other variable they reference that has no default. A variable that has a default SHALL get no new line in `.env.example` and SHALL have its row in the configuration reference instead (`docs/CONFIGURATION.md` or the service's own reference, owner rule 98 of 2026-10-08), except a new variable of the scrapper stack, which also follows that stack's sync rule. Lines that `.env.example` already holds stay. The file SHALL include a one-line comment above each variable explaining its purpose and which service consumes it. The actual `.env` file SHALL be excluded by `.gitignore` so it is never committed. The old name `MCP_ALLOWED_HOSTS` SHALL NOT appear in `.env.example` or in either compose file, because it was renamed to `ALLOWED_PRIVATE_HOSTS` (owner answer 68.2 of 2026-10-04) and every Python service refuses to start while it is set (owner answer 72.3 of 2026-10-06).
 
 #### Scenario: `.env.example` is committed and complete
 
 - **WHEN** a reviewer opens `.env.example`
-- **THEN** every `${KEY}` reference present in `compose.yaml` or `compose.ascend-web-hunter.yaml` appears in `.env.example` on its own line
-- **AND** every variable has an empty value (no leaked secret)
+- **THEN** every `${KEY}` reference present in `compose.yaml` or `compose.ascend-web-hunter.yaml` appears in `.env.example` on its own line or has its row in the configuration reference
+- **AND** every secret appears in `.env.example` with an empty value (no leaked secret)
 - **AND** a one-line comment above each variable identifies the consuming service
 
 #### Scenario: `.env` is gitignored
 
 - **WHEN** a developer creates a local `.env` and runs `git status`
 - **THEN** `.env` does NOT appear in the list of tracked or untracked files (it is ignored by `.gitignore`)
+
+#### Scenario: The old allow list name is gone
+
+- **WHEN** a reviewer searches `.env.example`, `compose.yaml` and `compose.ascend-web-hunter.yaml` for `MCP_ALLOWED_HOSTS`
+- **THEN** none of them is found
+- **AND** the `ascend-ocr` and `ascend-audio-scribe` services set `ALLOWED_PRIVATE_HOSTS` instead
 
 ### Requirement: Container reaches host-only services via `host.docker.internal`
 
@@ -158,6 +165,7 @@ The `ascend-agent` Compose service SHALL declare `extra_hosts: ["host.docker.int
 - **WHEN** the host runs LM Studio on port 1234
 - **AND** the developer sends a prompt with `provider=lmstudio`
 - **THEN** ascend-agent forwards the request to the host LM Studio successfully and returns a 200 response
+
 ### Requirement: Build context is pruned via `.dockerignore`
 
 `apps/ascend-agent/.dockerignore` SHALL exclude build artifacts (`build/`, `.gradle/`), IDE files (`.idea/`, `.vscode/`, `*.iml`), logs, OS metadata, documentation (`docs/`, `e2e/`, `README.md`, `AGENTS.md`), and any local secret files (`.env`, `.env.local`, `.env.*.local`) from the Docker build context, so the image is small, builds are fast, and host-only artifacts cannot leak into image layers.
@@ -167,4 +175,3 @@ The `ascend-agent` Compose service SHALL declare `extra_hosts: ["host.docker.int
 - **WHEN** the Docker daemon prepares the build context for `docker build ./apps/ascend-agent`
 - **THEN** the context tarball does NOT contain `apps/ascend-agent/build/`, `apps/ascend-agent/.gradle/`, any `.iml` file, any `.idea/` directory, or any `.env*` file
 - **AND** the build context size is under 50 MB on a clean checkout
-

@@ -23,9 +23,9 @@ Copy this file to `../runs/<UTC-timestamp>_7-ready-endpoint-tasks.md` before sta
 
 - [ ] HTTP 200
 - [ ] Body `status` equals `"ready"`
-- [ ] Body `engine_warm` equals `true`
-- [ ] Body `accepting_work` is `true`
-- [ ] Body `jobs_queued` is `0` and `jobs_running` is `0` on an idle service
+- [ ] `checks.engine.status` equals `"ok"` and `checks.engine` reports `warm` true
+- [ ] `checks.worker_pool.status` equals `"ok"` and `checks.worker_pool` reports `accepting_work` true
+- [ ] `checks.jobs.status` equals `"ok"`, and on an idle service it reports zero `queued` and zero `running`
 - [ ] Body has no `queue_depth` key
 - [ ] Body `version` is a non-empty string
 

@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+COPY --from=ascend-python-common . /opt/ascend-python-common
+RUN python3.11 -m pip install --no-cache-dir /opt/ascend-python-common
+
 COPY pyproject.toml .
 COPY src/ src/
 RUN python3.11 -m pip install --no-cache-dir --upgrade pip && \

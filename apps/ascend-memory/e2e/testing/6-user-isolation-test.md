@@ -28,7 +28,7 @@ Check the AscendMemory server is reachable and ready.
 curl -fsS http://localhost:7020/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-memory` and a non-empty `version`.
 
 Check Qdrant is reachable.
 

@@ -1,157 +1,141 @@
-import logging
+from typing import Any
 
 import httpx
-from fastapi import Request, status
-from fastapi.responses import JSONResponse
+from ascend_python_common.errors import INTERNAL, VALIDATION, ErrorRegistry, ProblemCode
+from ascend_python_common.uri_guard import UnsafeUriError
+from pydantic import ValidationError
+from pydantic_core import ErrorDetails
 
-from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.api.exceptions import (
+    ExtractionFailedError,
+    ExtractionNotConfiguredError,
+    FormatCombinationError,
+    HumanInterventionRequiredException,
+    NoCookiesForDomainError,
+    NoVNCFlowBusyException,
+    NoVNCFlowNotFoundError,
+    ScreenshotUnavailableError,
+    TierDisabledError,
+)
 from src.config.blocklist_loader import BlocklistRefreshThrottledError, BlocklistValidationError
+from src.config.config import settings
+from src.crawl.models import InvalidTenantError, JobNotFoundError
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
+from src.session.profile import InvalidProfileError
 
-logger = logging.getLogger(__name__)
-
-
-PROBLEM_JSON = "application/problem+json"
-_PROBLEM_TYPE_BASE = "https://ascend.ai/errors"
-
-# Suggested wait before a caller retries a busy NoVNC flow. Not the flow's own
-# timeout (up to 10 minutes): a short, fixed poll interval so a rejected caller
-# gets a fast, actionable answer instead of an opaque long wait.
-_NOVNC_BUSY_RETRY_AFTER_SECONDS = 30
-
-
-async def httpx_exception_handler(request: Request, exc: httpx.HTTPError) -> JSONResponse:
-    """
-    Global handler for HTTPX errors (external API failures).
-    Returns 503 with an RFC 7807 problem document. The upstream exception
-    detail is logged server-side, never echoed to the caller (the original
-    `str(exc)` payload leaked upstream URLs and DNS / TLS error strings).
-    """
-    logger.error(f"External Service Error during {request.method} {request.url}: {exc}")
-
-    return JSONResponse(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        media_type=PROBLEM_JSON,
-        content={
-            "type": f"{_PROBLEM_TYPE_BASE}/external-service-unavailable",
-            "title": "External Service Unavailable",
-            "status": status.HTTP_503_SERVICE_UNAVAILABLE,
-            "detail": "An upstream dependency failed to respond.",
-            "instance": str(request.url.path),
-        },
-    )
+EXTERNAL_SERVICE_UNAVAILABLE = ProblemCode("external_service_unavailable", 503)
+BLOCKLIST_REFRESH_INVALID = ProblemCode("blocklist_refresh_invalid", 502)
+BLOCKLIST_REFRESH_THROTTLED = ProblemCode("blocklist_refresh_throttled", 429)
+HUMAN_INTERVENTION_REQUIRED = ProblemCode("human_intervention_required", 428)
+NOVNC_BUSY = ProblemCode("novnc_busy", 409)
+UNSAFE_URI = ProblemCode("unsafe_uri", 400)
+JOB_NOT_FOUND = ProblemCode("job_not_found", 404)
+FLOW_NOT_FOUND = ProblemCode("flow_not_found", 404)
+INVALID_TENANT = ProblemCode("invalid_tenant", 400)
+TIER_DISABLED = ProblemCode("tier_disabled", 409)
+INVALID_PROFILE = ProblemCode("invalid_profile", 400)
+NO_COOKIES_FOR_DOMAIN = ProblemCode("no_cookies_for_domain", 400)
+EXTRACTION_NOT_CONFIGURED = ProblemCode("extraction_not_configured", 400)
+SCREENSHOT_UNAVAILABLE = ProblemCode("screenshot_unavailable", 400)
+BAD_FORMAT_COMBINATION = ProblemCode("bad_request", 400)
+EXTRACTION_FAILED = ProblemCode("extraction_failed", 502)
 
 
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """
-    Catch-all handler for unhandled exceptions.
-    Returns 500 with an RFC 7807 problem document. The exception is logged
-    with full traceback server-side; the response body never carries internal
-    detail.
-    """
-    logger.exception(f"Unhandled Exception during {request.method} {request.url}: {exc}")
-
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        media_type=PROBLEM_JSON,
-        content={
-            "type": f"{_PROBLEM_TYPE_BASE}/internal",
-            "title": "Internal Server Error",
-            "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "instance": str(request.url.path),
-        },
-    )
+def _human_detail(exc: BaseException) -> str:
+    assert isinstance(exc, HumanInterventionRequiredException)
+    HUMAN_INTERVENTION_TOTAL.labels(
+        intervention_type=exc.intervention_type, joined=str(exc.joined).lower()
+    ).inc()
+    return exc.message
 
 
-async def human_intervention_exception_handler(
-    request: Request, exc: HumanInterventionRequiredException
-) -> JSONResponse:
-    """
-    Returns 428 Precondition Required when a manual Captcha or Login is triggered.
-    """
-    HUMAN_INTERVENTION_TOTAL.labels(intervention_type=exc.intervention_type).inc()
-    logger.warning(
-        f"428 Precondition Required triggered on {request.method} {request.url}: type={exc.intervention_type}"
-    )
-
-    # Intentionally NOT RFC 7807 here: the human-intervention response is an
-    # established contract documented in ADR-003. The MCP tool docstring tells
-    # agents to surface `vnc_url` and `intervention_type` by name; changing the
-    # field shape would break every downstream agent.
-    return JSONResponse(
-        status_code=status.HTTP_428_PRECONDITION_REQUIRED,
-        content={
-            "status": "human_intervention_required",
-            "intervention_type": exc.intervention_type,
-            "vnc_url": exc.vnc_url,
-            "message": exc.message,
-        },
-    )
+def _human_extensions(exc: BaseException) -> dict[str, Any] | None:
+    assert isinstance(exc, HumanInterventionRequiredException)
+    return {
+        "intervention_type": exc.intervention_type,
+        "vnc_url": exc.vnc_url,
+        "flow_id": exc.flow_id,
+        "joined": exc.joined,
+        "window": exc.window,
+    }
 
 
-async def novnc_flow_busy_exception_handler(request: Request, exc: NoVNCFlowBusyException) -> JSONResponse:
-    """
-    Returns 409 Conflict when a NoVNC intervention is requested while another
-    one already holds the single shared browser/display/CDP port.
-    """
+def _novnc_detail(exc: BaseException) -> str:
+    assert isinstance(exc, NoVNCFlowBusyException)
     NOVNC_FLOW_BUSY_TOTAL.inc()
-    logger.info(
-        f"409 Conflict on {request.method} {request.url}: NoVNC busy with "
-        f"{exc.holder_url} (profile={exc.holder_profile})"
+    return exc.message
+
+
+def _novnc_extensions(exc: BaseException) -> dict[str, Any] | None:
+    assert isinstance(exc, NoVNCFlowBusyException)
+    return {
+        "holder_url": exc.holder_url,
+        "holder_profile": exc.holder_profile,
+        "active_flows": exc.active_flows,
+        "max_concurrent_flows": exc.max_concurrent_flows,
+        "flows": exc.flows,
+    }
+
+
+def _validation_error_text(error: ErrorDetails) -> str:
+    location = ".".join(str(part) for part in error["loc"])
+
+    return f"{location}: {error['msg']}" if location else error["msg"]
+
+
+def _validation_detail(exc: BaseException) -> str:
+    assert isinstance(exc, ValidationError)
+    errors = exc.errors(include_url=False, include_context=False, include_input=False)
+
+    return "; ".join(_validation_error_text(error) for error in errors)
+
+
+def _throttle_retry_after(exc: BaseException) -> dict[str, str] | None:
+    assert isinstance(exc, BlocklistRefreshThrottledError)
+    return {"Retry-After": str(max(1, int(exc.retry_after_seconds) + 1))}
+
+
+def build_error_registry() -> ErrorRegistry:
+    registry = ErrorRegistry(internal_code=INTERNAL)
+    registry.register(UnsafeUriError, UNSAFE_URI, str)
+    registry.register(JobNotFoundError, JOB_NOT_FOUND, str)
+    registry.register(NoVNCFlowNotFoundError, FLOW_NOT_FOUND, str)
+    registry.register(InvalidTenantError, INVALID_TENANT, str)
+    registry.register(TierDisabledError, TIER_DISABLED, str)
+    registry.register(InvalidProfileError, INVALID_PROFILE, str)
+    registry.register(NoCookiesForDomainError, NO_COOKIES_FOR_DOMAIN, str)
+    registry.register(ExtractionNotConfiguredError, EXTRACTION_NOT_CONFIGURED, str)
+    registry.register(ScreenshotUnavailableError, SCREENSHOT_UNAVAILABLE, str)
+    registry.register(FormatCombinationError, BAD_FORMAT_COMBINATION, str)
+    registry.register(ExtractionFailedError, EXTRACTION_FAILED, str, expected=True)
+    registry.register(ValidationError, VALIDATION, _validation_detail)
+    registry.register(ValueError, VALIDATION, str)
+    registry.register(
+        httpx.HTTPError,
+        EXTERNAL_SERVICE_UNAVAILABLE,
+        "An upstream dependency failed to respond.",
     )
-
-    return JSONResponse(
-        status_code=status.HTTP_409_CONFLICT,
-        headers={"Retry-After": str(_NOVNC_BUSY_RETRY_AFTER_SECONDS)},
-        content={
-            "status": "novnc_busy",
-            "message": exc.message,
-            "holder_url": exc.holder_url,
-            "holder_profile": exc.holder_profile,
-        },
+    registry.register(BlocklistValidationError, BLOCKLIST_REFRESH_INVALID, str)
+    registry.register(
+        BlocklistRefreshThrottledError,
+        BLOCKLIST_REFRESH_THROTTLED,
+        str,
+        headers=_throttle_retry_after,
     )
-
-
-async def blocklist_validation_error_handler(request: Request, exc: BlocklistValidationError) -> JSONResponse:
-    """
-    Returns 502 when a blocklist refresh downloaded content that parsed to zero
-    usable rules. The previously loaded blocklist stays active; this only
-    reports that the refresh itself did not take effect.
-    """
-    logger.error(f"Blocklist refresh validation failed during {request.method} {request.url}: {exc}")
-
-    return JSONResponse(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        media_type=PROBLEM_JSON,
-        content={
-            "type": f"{_PROBLEM_TYPE_BASE}/blocklist-refresh-invalid",
-            "title": "Blocklist Refresh Invalid",
-            "status": status.HTTP_502_BAD_GATEWAY,
-            "detail": str(exc),
-            "instance": str(request.url.path),
-        },
+    registry.register(
+        HumanInterventionRequiredException,
+        HUMAN_INTERVENTION_REQUIRED,
+        _human_detail,
+        extensions=_human_extensions,
     )
-
-
-async def blocklist_refresh_throttled_handler(
-    request: Request, exc: BlocklistRefreshThrottledError
-) -> JSONResponse:
-    """
-    Returns 429 when a blocklist refresh is requested again before the
-    configured cooldown has elapsed since the last attempt.
-    """
-    retry_after = max(1, int(exc.retry_after_seconds) + 1)
-    logger.info(f"Blocklist refresh throttled on {request.method} {request.url}: retry after {retry_after}s")
-
-    return JSONResponse(
-        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-        media_type=PROBLEM_JSON,
-        headers={"Retry-After": str(retry_after)},
-        content={
-            "type": f"{_PROBLEM_TYPE_BASE}/blocklist-refresh-throttled",
-            "title": "Blocklist Refresh Throttled",
-            "status": status.HTTP_429_TOO_MANY_REQUESTS,
-            "detail": str(exc),
-            "instance": str(request.url.path),
-        },
+    registry.register(
+        NoVNCFlowBusyException,
+        NOVNC_BUSY,
+        _novnc_detail,
+        headers={"Retry-After": str(settings.NOVNC_BUSY_RETRY_AFTER_SECONDS)},
+        extensions=_novnc_extensions,
     )
+    return registry
+
+
+error_registry = build_error_registry()

@@ -4,8 +4,8 @@
 
 - `GET /api/v1/web/search` with a blank `query` parameter (`query=   `) returns HTTP 400 and a JSON body whose
   `detail` field describes the empty-query failure.
-- `GET /api/v1/web/search` with a missing `query` parameter (`query` omitted entirely) returns HTTP 422 - FastAPI's
-  default validation error for a missing required query-string parameter.
+- `GET /api/v1/web/search` with a missing `query` parameter (`query` omitted entirely) returns HTTP 400 with an
+  RFC 7807 body (`code` equal to `"validation"`, `errors` array with an entry whose `field` is `"query"`).
 - `GET /api/v1/web/search` with a `query` longer than 500 characters returns HTTP 400 and the `detail` field
   mentions the maximum-length constraint.
 - All three rejections short-circuit inside the FastAPI route before any SearXNG call is made - **no outbound
@@ -24,10 +24,10 @@ Expect a version string. If the command is not found, install it with `npm insta
 Check the ascend-web-hunter server is reachable.
 
 ```bash
-curl -fsS http://localhost:7021/health
+curl -fsS http://127.0.0.1:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`.
 
 ## Reset state
 
@@ -58,9 +58,9 @@ bru run "web-hunter/testing/search-overlong-query.yml" --env ascend-local
 The three calls return:
 
 - `search-blank-query.yml` - HTTP 400. The JSON body has a `detail` field equal to `"query must not be empty"`.
-- `search-missing-query.yml` - HTTP 422 (FastAPI default for a missing required query parameter). The JSON body
-  has a top-level `detail` array; at least one entry has `type` equal to `"missing"` and `loc` containing
-  `"query"`.
+- `search-missing-query.yml` - HTTP 400 (RFC 7807 validation error for a missing required query parameter).
+  The JSON body has `code` equal to `"validation"` and an `errors` array; at least one entry has `field`
+  equal to `"query"`.
 - `search-overlong-query.yml` - HTTP 400. The JSON body's `detail` field contains the substring
   `"query exceeds maximum length"`.
 
@@ -71,3 +71,12 @@ PASS.
 ## Fixtures
 
 None.
+
+## Concurrency
+
+Writes no `session:*`, tier-memory, crawl or recipe key and never reaches SearXNG. Each of its three calls counts
+against the caller's rate limit window of `/api/v1/web/search`, the window spec 2
+([2-search-happy-path-test.md](2-search-happy-path-test.md)) deletes in its reset. Neither spec asserts on the count,
+so the two still run side by side. Safe beside every other spec.
+
+- Serial: false

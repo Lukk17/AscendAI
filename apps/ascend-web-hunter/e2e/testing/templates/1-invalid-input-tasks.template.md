@@ -2,14 +2,14 @@
 
 Spec: [../1-invalid-input-test.md](../1-invalid-input-test.md)
 
-Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before starting a run. Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
+Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before starting a run. For a repeated run of the same spec in the same sweep, which shares the sweep's timestamp, add `-rerun<N>` before `.md` (`-rerun2` for the second run, `-rerun3` for the third). Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
 
 ## Tasks
 
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 
 ### Reset state
 
@@ -18,13 +18,13 @@ Copy this file to `../runs/<UTC-timestamp>_1-invalid-input-tasks.md` before star
 ### Run
 
 - [ ] Send `search-blank-query.yml` via `bru run` and wait for HTTP 400
-- [ ] Send `search-missing-query.yml` via `bru run` and wait for HTTP 422
+- [ ] Send `search-missing-query.yml` via `bru run` and wait for HTTP 400
 - [ ] Send `search-overlong-query.yml` via `bru run` and wait for HTTP 400
 
 ### Expected
 
 - [ ] `search-blank-query.yml`: HTTP 400; body `detail` equals `"query must not be empty"`
-- [ ] `search-missing-query.yml`: HTTP 422; body `detail` array contains an entry with `type="missing"` and `loc` referencing `"query"`
+- [ ] `search-missing-query.yml`: HTTP 400; body `code` equals `"validation"` and the `errors` array contains an entry with `field` equal to `"query"`
 - [ ] `search-overlong-query.yml`: HTTP 400; body `detail` contains the substring `"query exceeds maximum length"`
 - [ ] Per-call duration < 2 s (proxy for "validator short-circuited; no SearXNG call")
 

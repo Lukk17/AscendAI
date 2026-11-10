@@ -11,9 +11,10 @@ http:
     # example.net is IANA-reserved for documentation/testing. Test 8 is the only
     # other spec that touches this domain, and only its default-profile key, and
     # only transiently. SessionManager.establish forwards the "e2e-establish"
-    # profile all the way to the capture path, so the record this call produces
-    # lands under session:example.net:e2e-establish, the key spec 10's reset and
-    # cleanup commands target.
+    # profile all the way to the capture path, so a record this call wrongly
+    # produced would land under session:example.net:e2e-establish, the key spec
+    # 10 asserts absent. A login flow saves only after a real login, and
+    # example.net never shows one.
     data: |-
       {
         "url": "https://example.net",
@@ -31,8 +32,18 @@ runtime:
         test("response contract: login_required, echoed target, non-empty vnc_url", function () {
             const b = res.getBody();
             expect(b.status).to.equal("login_required");
+            expect(b.intervention_type).to.equal("login");
             expect(b.target).to.equal("https://example.net/");
             expect(b.vnc_url).to.be.a("string").and.not.empty;
+        });
+        test("flow contract: non-empty flow_id, fresh flow, window geometry", function () {
+            const b = res.getBody();
+            expect(b.flow_id).to.be.a("string").and.not.empty;
+            expect(b.joined).to.equal(false);
+            expect(b.window).to.be.an("object");
+            for (const field of ["slot", "x", "y", "width", "height"]) {
+                expect(b.window[field]).to.be.a("number");
+            }
         });
 
 settings:

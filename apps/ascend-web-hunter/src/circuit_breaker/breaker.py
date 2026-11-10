@@ -86,5 +86,4 @@ class CircuitBreaker:
 
 
 # Module-level singletons, one per guarded dependency.
-flaresolverr_breaker = CircuitBreaker("flaresolverr")
 searxng_breaker = CircuitBreaker("searxng")

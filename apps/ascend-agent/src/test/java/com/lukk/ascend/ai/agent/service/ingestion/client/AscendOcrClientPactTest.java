@@ -105,6 +105,11 @@ class AscendOcrClientPactTest {
     private static final String PART_FILE = "file";
     private static final String PART_LANG = "lang";
 
+    private static final String PROBLEM_JSON = "application/problem+json";
+    private static final String PROBLEM_JSON_PATTERN = "application/problem\\+json.*";
+    private static final String TRACE_ID_PATTERN = "[0-9a-f]{32}";
+    private static final String TRACE_ID_EXAMPLE = "4bf92f3577b34da6a3ce929d0e0e4736";
+
     private final List<HttpMethod> sentMethods = new ArrayList<>();
     private final S3Client s3Client = mock(S3Client.class);
 
@@ -134,9 +139,14 @@ class AscendOcrClientPactTest {
                 .willRespondWith()
                 .status(503)
                 .matchHeader(HttpHeaders.RETRY_AFTER, RETRY_AFTER_PATTERN, "1")
-                .body(new PactDslJsonBody()
-                        .stringValue("code", "QUEUE_FULL")
-                        .stringType("detail", "Queue is full, retry later"))
+                .matchHeader(HttpHeaders.CONTENT_TYPE, PROBLEM_JSON_PATTERN, PROBLEM_JSON)
+                .body(problemBody(
+                        "https://ascend.ai/errors/queue-full",
+                        "Service Unavailable",
+                        503,
+                        "Queue is full, retry later",
+                        JOBS_PATH,
+                        "QUEUE_FULL"))
                 .toPact(V4Pact.class);
     }
 
@@ -148,7 +158,14 @@ class AscendOcrClientPactTest {
                 .body(textUpload())
                 .willRespondWith()
                 .status(400)
-                .body(new PactDslJsonBody().stringValue("code", "UNSUPPORTED_FILE_TYPE"))
+                .matchHeader(HttpHeaders.CONTENT_TYPE, PROBLEM_JSON_PATTERN, PROBLEM_JSON)
+                .body(problemBody(
+                        "https://ascend.ai/errors/unsupported-file-type",
+                        "Bad Request",
+                        400,
+                        "Unsupported file type",
+                        JOBS_PATH,
+                        "UNSUPPORTED_FILE_TYPE"))
                 .toPact(V4Pact.class);
     }
 
@@ -161,7 +178,14 @@ class AscendOcrClientPactTest {
                 .body(pngUpload(LANG_UNSUPPORTED))
                 .willRespondWith()
                 .status(400)
-                .body(new PactDslJsonBody().stringValue("code", "UNSUPPORTED_LANGUAGE"))
+                .matchHeader(HttpHeaders.CONTENT_TYPE, PROBLEM_JSON_PATTERN, PROBLEM_JSON)
+                .body(problemBody(
+                        "https://ascend.ai/errors/unsupported-language",
+                        "Bad Request",
+                        400,
+                        "Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan",
+                        JOBS_PATH,
+                        "UNSUPPORTED_LANGUAGE"))
                 .toPact(V4Pact.class);
     }
 
@@ -243,7 +267,14 @@ class AscendOcrClientPactTest {
                 .method(HttpMethod.GET.name())
                 .willRespondWith()
                 .status(404)
-                .body(new PactDslJsonBody().stringValue("code", "JOB_NOT_FOUND"))
+                .matchHeader(HttpHeaders.CONTENT_TYPE, PROBLEM_JSON_PATTERN, PROBLEM_JSON)
+                .body(problemBody(
+                        "https://ascend.ai/errors/job-not-found",
+                        "Not Found",
+                        404,
+                        "Job identifier is unknown or expired",
+                        JOB_PATH,
+                        "JOB_NOT_FOUND"))
                 .toPact(V4Pact.class);
     }
 
@@ -574,6 +605,18 @@ class AscendOcrClientPactTest {
         params.put(PARAM_ERROR_CODE, errorCode);
 
         return params;
+    }
+
+    private static PactDslJsonBody problemBody(
+            String type, String title, int status, String detail, String instance, String code) {
+        return new PactDslJsonBody()
+                .stringValue("type", type)
+                .stringValue("title", title)
+                .numberValue("status", status)
+                .stringType("detail", detail)
+                .stringType("instance", instance)
+                .stringValue("code", code)
+                .stringMatcher("traceId", TRACE_ID_PATTERN, TRACE_ID_EXAMPLE);
     }
 
     private static MultipartEntityBuilder pngUpload(String lang) {

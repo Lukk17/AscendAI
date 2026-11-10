@@ -1,0 +1,49 @@
+info:
+  name: read-blocked-name
+  type: http
+  seq: 113
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    data: |-
+      {
+          "url": "http://{{fake_site_blocked_url}}:7031/article",
+          "include_links": false,
+          "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 400", function () {
+            expect(res.getStatus()).to.equal(400);
+        });
+        test("Content-Type is application/problem+json", function () {
+            expect(res.getHeader("content-type")).to.match(/^application\/problem\+json/);
+        });
+        test("code is unsafe_uri", function () {
+            expect(res.getBody().code).to.equal("unsafe_uri");
+        });
+        test("type follows the problem code", function () {
+            expect(res.getBody().type).to.equal("https://ascend.ai/errors/unsafe-uri");
+        });
+        test("status equals the HTTP status", function () {
+            expect(res.getBody().status).to.equal(400);
+        });
+        test("instance is present", function () {
+            expect(res.getBody().instance).to.be.a("string").and.not.empty;
+        });
+        test("traceId is 32 lower case hex characters", function () {
+            expect(res.getBody().traceId).to.match(/^[0-9a-f]{32}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

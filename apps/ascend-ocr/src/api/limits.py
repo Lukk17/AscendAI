@@ -82,7 +82,8 @@ def enforce_source_pixel_ceiling(pixels: int) -> None:
     """
     if pixels > settings.OCR_MAX_SOURCE_PIXELS:
         raise FileSizeExceededError(
-            f"Image frame has {pixels} pixels, exceeding the source pixel ceiling of {settings.OCR_MAX_SOURCE_PIXELS}"
+            f"Image frame has {pixels} pixels, exceeding the source pixel ceiling of "
+            f"{settings.OCR_MAX_SOURCE_PIXELS}"
         )
 
 

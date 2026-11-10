@@ -1,150 +1,215 @@
+import asyncio
 import logging
-import os
-from contextlib import AsyncExitStack, asynccontextmanager
+from functools import partial
+from typing import TYPE_CHECKING
 
-import httpx
+import redis.asyncio as redis
 import uvicorn
-from fastapi import FastAPI
-from prometheus_fastapi_instrumentator import Instrumentator
+from ascend_python_common.app import ServiceDefinition, create_service_app
 
-from src.api.exception_handlers import (
-    blocklist_refresh_throttled_handler,
-    blocklist_validation_error_handler,
-    global_exception_handler,
-    httpx_exception_handler,
-    human_intervention_exception_handler,
-    novnc_flow_busy_exception_handler,
-)
-from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.api import readiness as readiness_module
+from src.api.exception_handlers import error_registry
 from src.api.mcp.mcp_server import mcp
 from src.api.mcp.mcp_server import search_client as mcp_search_client
-from src.api.readiness import readiness_router
 from src.api.rest.blocklist_endpoints import blocklist_router
-from src.api.rest.rest_endpoints import rest_router, rest_router_v2
+from src.api.rest.crawl_endpoints import crawl_router
+from src.api.rest.rest_endpoints import rest_router, rest_router_v2, rest_session_router
 from src.api.rest.rest_endpoints import search_client as rest_search_client
-from src.config.blocklist_loader import (
-    BlocklistRefreshThrottledError,
-    BlocklistValidationError,
-    blocklist_loader,
-)
+from src.config.blocklist_loader import blocklist_loader
 from src.config.config import settings
-from src.config.logging_config import get_uvicorn_log_config, setup_logging
-from src.config.startup_banner import log_startup_banner
-from src.observability.request_context import RequestIdMiddleware
+from src.config.startup_banner import build_service_banner
+from src.crawl.worker import Worker
+from src.reader.browser_guard import browser_tunnel
+from src.reader.cache_purge import run_subscriber
+from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.document_router import close_document_router
+from src.reader.novnc.flow_registry import novnc_flow_registry
+from src.reader.web_reader import clear_all_caches, purge_domain_everywhere
 from src.runtime.browser_pool import browser_pool
 
-setup_logging()
+if TYPE_CHECKING:
+    from ascend_python_common.readiness import ProbeResult
+    from fastapi import FastAPI
+
 logger = logging.getLogger("uvicorn")
+_TRAFILATURA_NO_TEXT_MESSAGE = "discarding data: %s"
 
 
-def _configure_otel() -> None:
-    """Activate OTel auto-instrumentation when OTEL_EXPORTER_OTLP_ENDPOINT is set.
-
-    A no-op when the env var is absent so local development is unaffected.
-    """
-    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if not endpoint:
-        return
-
-    from opentelemetry import trace
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
-    service_name = os.getenv("OTEL_SERVICE_NAME", "ascend-web-hunter")
-    resource = Resource.create({"service.name": service_name})
-    provider = TracerProvider(resource=resource)
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
-    trace.set_tracer_provider(provider)
-    FastAPIInstrumentor().instrument()
-    logger.info("OTel tracing enabled → %s", endpoint)
+class _TrafilaturaNoTextFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.msg != _TRAFILATURA_NO_TEXT_MESSAGE
 
 
-def create_app() -> FastAPI:
-    _configure_otel()
+logging.getLogger("trafilatura.core").addFilter(_TrafilaturaNoTextFilter())
 
-    mcp_asgi_app = mcp.http_app()
+REST_ROUTERS = (rest_router, rest_router_v2, rest_session_router, blocklist_router, crawl_router)
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
-        setup_logging()
-        # The blocklist is already loaded by the time this runs: url_validator.py's
-        # module-level singleton loads it from disk at import time, well before
-        # create_app() is even called. This just confirms the invariant held and
-        # fails fast if it somehow did not.
+
+async def _novnc_sweep_loop() -> None:
+    """Periodically reclaim expired local flows. A failing sweep is logged
+    and the loop continues: the sweeper must never raise out of itself."""
+    while True:
+        await asyncio.sleep(settings.NOVNC_FLOW_SWEEP_INTERVAL_SECONDS)
+        try:
+            await novnc_flow_registry.sweep()
+        except Exception as exc:
+            logger.warning("shutdown: NoVNC sweep failed: %s", exc)
+
+
+class _ProcessPurgeReader:
+    """PurgeReader over every live WebReader of this process."""
+
+    @staticmethod
+    def clear_cache() -> int:
+        return clear_all_caches()
+
+    @staticmethod
+    def clear_cache_for_domain(domain: str) -> int:
+        return purge_domain_everywhere(domain)
+
+
+class _ServiceLifespan:
+    def __init__(self) -> None:
+        self._novnc_sweeper: asyncio.Task[None] | None = None
+        self._purge_subscriber: asyncio.Task[None] | None = None
+        self._purge_stop = asyncio.Event()
+        self._crawl_stop = asyncio.Event()
+        self._crawl_tasks: list[asyncio.Task[None]] = []
+        self._crawl_redis: redis.Redis | None = None
+        self._result_expiry: asyncio.Task[None] | None = None
+
+    def _build_crawl_worker(self) -> Worker:
+        self._crawl_redis = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        return Worker(self._crawl_redis)
+
+    async def _start_result_expiry(self, worker: Worker) -> None:
+        self._result_expiry = asyncio.create_task(worker.apply_result_expiry())
+        await asyncio.wait({self._result_expiry}, timeout=settings.STARTUP_PROBE_TIMEOUT_SECONDS)
+
+    async def __aenter__(self) -> None:
         if blocklist_loader.state is None:
             logger.critical("Startup Warning: Blocklist was not loaded")
             raise RuntimeError("Blocklist was not loaded before startup")
         rule_count = blocklist_loader.state.rule_count
-        logger.info(f"Blocklist ready: {rule_count} rules from {blocklist_loader.blocklist_path}")
-
+        logger.info("Blocklist ready: %s rules from %s", rule_count, blocklist_loader.blocklist_path)
+        await browser_tunnel.start()
         await browser_pool.start()
+        self._novnc_sweeper = asyncio.create_task(_novnc_sweep_loop())
+        self._purge_stop = asyncio.Event()
+        self._purge_subscriber = asyncio.create_task(
+            run_subscriber(
+                _ProcessPurgeReader(),
+                lambda: cookie_manager.redis_client,
+                self._purge_stop,
+            )
+        )
+        worker = self._build_crawl_worker()
+        await self._start_result_expiry(worker)
+        self._crawl_stop = asyncio.Event()
+        self._crawl_tasks = [
+            asyncio.create_task(worker.run_forever(self._crawl_stop))
+            for _ in range(settings.CRAWL_WORKER_CONCURRENCY)
+        ]
 
-        async with AsyncExitStack() as stack:
-            await stack.enter_async_context(mcp_asgi_app.router.lifespan_context(app))
-            await log_startup_banner()
+    async def __aexit__(self, *exc_info: object) -> None:
+        if self._crawl_tasks:
+            self._crawl_stop.set()
+            for task in self._crawl_tasks:
+                task.cancel()
+            await asyncio.gather(*self._crawl_tasks, return_exceptions=True)
+            self._crawl_tasks = []
+        if self._result_expiry is not None:
+            self._result_expiry.cancel()
+            await asyncio.gather(self._result_expiry, return_exceptions=True)
+            self._result_expiry = None
+        if self._crawl_redis is not None:
             try:
-                yield
+                await self._crawl_redis.aclose()
+            except Exception as exc:
+                logger.warning("shutdown: failed to close crawl Redis: %s", exc)
             finally:
-                await browser_pool.stop()
-                try:
-                    await rest_search_client.aclose()
-                except Exception as e:
-                    logger.warning(f"shutdown: failed to close REST SearxngClient: {e}")
-                try:
-                    await mcp_search_client.aclose()
-                except Exception as e:
-                    logger.warning(f"shutdown: failed to close MCP SearxngClient: {e}")
+                self._crawl_redis = None
+        if self._purge_subscriber is not None:
+            self._purge_stop.set()
+            self._purge_subscriber.cancel()
+            await asyncio.gather(self._purge_subscriber, return_exceptions=True)
+            self._purge_subscriber = None
+        if self._novnc_sweeper is not None:
+            self._novnc_sweeper.cancel()
+            await asyncio.gather(self._novnc_sweeper, return_exceptions=True)
+            self._novnc_sweeper = None
+        try:
+            await novnc_flow_registry.shutdown()
+        except Exception as exc:
+            logger.warning("shutdown: failed to stop NoVNC flows: %s", exc)
+        try:
+            await browser_pool.stop()
+        except Exception as exc:
+            logger.warning("shutdown: failed to stop browser pool: %s", exc)
+        try:
+            await browser_tunnel.stop()
+        except Exception as exc:
+            logger.warning("shutdown: failed to stop browser tunnel: %s", exc)
+        await self._close_outbound_clients()
 
-    app = FastAPI(title="ascend-web-hunter", lifespan=lifespan)
-    app.add_middleware(RequestIdMiddleware)
+    @staticmethod
+    async def _close_outbound_clients() -> None:
+        try:
+            await rest_search_client.aclose()
+        except Exception as exc:
+            logger.warning("shutdown: failed to close REST SearxngClient: %s", exc)
+        try:
+            await mcp_search_client.aclose()
+        except Exception as exc:
+            logger.warning("shutdown: failed to close MCP SearxngClient: %s", exc)
+        try:
+            await close_document_router()
+        except Exception as exc:
+            logger.warning("shutdown: failed to close the document router: %s", exc)
 
-    # Starlette's add_exception_handler signature is variant on the exception type and
-    # mypy can't see that httpx.HTTPError / HumanInterventionRequiredException are
-    # legal narrowings of Exception. Both handlers exist for exactly these subclasses.
-    app.add_exception_handler(httpx.HTTPError, httpx_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(
-        HumanInterventionRequiredException,
-        human_intervention_exception_handler,  # type: ignore[arg-type]
+
+def service_lifespan() -> _ServiceLifespan:
+    return _ServiceLifespan()
+
+
+async def _redis_probe() -> "ProbeResult":
+    return await readiness_module.probe_redis()
+
+
+async def _searxng_probe() -> "ProbeResult":
+    return await readiness_module.probe_searxng()
+
+
+def _searxng_breaker_probe() -> "ProbeResult":
+    return readiness_module.probe_searxng_breaker()
+
+
+def _service_definition() -> ServiceDefinition:
+    return ServiceDefinition(
+        name="ascend-web-hunter",
+        distribution="ascend-web-hunter",
+        settings=settings,
+        mcp=mcp,
+        routers=REST_ROUTERS,
+        error_registry=error_registry,
+        probes={
+            "redis": _redis_probe,
+            "searxng": _searxng_probe,
+            "searxng_breaker": _searxng_breaker_probe,
+        },
+        lifespan=service_lifespan(),
+        startup_banner=partial(build_service_banner, REST_ROUTERS),
+        rate_limit_storage_uri=settings.REDIS_URL,
     )
-    app.add_exception_handler(
-        NoVNCFlowBusyException,
-        novnc_flow_busy_exception_handler,  # type: ignore[arg-type]
-    )
-    app.add_exception_handler(
-        BlocklistValidationError,
-        blocklist_validation_error_handler,  # type: ignore[arg-type]
-    )
-    app.add_exception_handler(
-        BlocklistRefreshThrottledError,
-        blocklist_refresh_throttled_handler,  # type: ignore[arg-type]
-    )
-    app.add_exception_handler(Exception, global_exception_handler)
-
-    app.include_router(rest_router)
-    app.include_router(rest_router_v2)
-    app.include_router(blocklist_router)
-    app.include_router(readiness_router)
-
-    Instrumentator(
-        should_group_status_codes=False,
-        excluded_handlers=["/metrics", "/health", "/ready"],
-    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
-
-    @app.get("/health", tags=["health"])
-    def health_check() -> dict[str, str]:
-        return {"status": "ok"}
-
-    # Mount must be last to avoid capturing specific routes
-    app.mount("/", mcp_asgi_app)
-
-    return app
 
 
-# Global instance for uvicorn
-app = create_app()
+def create_app() -> "FastAPI":
+    return create_service_app(_service_definition())
+
+
+definition = _service_definition()
+
+app = create_service_app(definition)
 
 if __name__ == "__main__":  # pragma: no cover
     import asyncio
@@ -157,5 +222,4 @@ if __name__ == "__main__":  # pragma: no cover
         "src.main:app",
         host=settings.API_HOST,
         port=settings.API_PORT,
-        log_config=get_uvicorn_log_config(),
     )

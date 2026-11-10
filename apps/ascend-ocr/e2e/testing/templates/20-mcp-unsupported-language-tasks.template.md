@@ -10,7 +10,7 @@ Copy this file to `../runs/<UTC-timestamp>_20-mcp-unsupported-language-tasks.md`
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
-- [ ] `/ready` reports `jobs_queued` 0 and `jobs_running` 0
+- [ ] `/ready` reports `checks.jobs.queued` 0 and `checks.jobs.running` 0
 
 ### Reset state
 
@@ -18,7 +18,7 @@ Copy this file to `../runs/<UTC-timestamp>_20-mcp-unsupported-language-tasks.md`
 
 ### Run
 
-- [ ] Step 1: `initialize` handshake returns an `mcp-session-id` header
+- [ ] Step 1: `initialize` handshake returns HTTP 200 with no `mcp-session-id` header (stateless service)
 - [ ] Step 1: `notifications/initialized` sent with `ocr/testing/mcp-initialized.yml` and that session id, HTTP 202 with an empty body
 - [ ] Step 2: send `ocr/testing/mcp-unsupported-language.yml` with that session id
 - [ ] Step 3: send `ocr/testing/ocr-jobs-list-empty.yml`

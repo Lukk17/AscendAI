@@ -11,8 +11,20 @@ invoked, so a single deployment can serve `provider=lmstudio`, `provider=openai`
 | Variable                 | Default                                                            | Purpose                                                                  |
 | :----------------------- | :----------------------------------------------------------------- | :----------------------------------------------------------------------- |
 | `API_HOST`               | `0.0.0.0`                                                          | Bind address.                                                            |
-| `API_PORT`               | `7020`                                                             | Service port.                                                            |
+| `API_PORT`               | `7020`                                                             | Service port. Compose reads it as `MEMORY_API_PORT`.                     |
+| `MEMORY_HOST_PORT`       | `7020`                                                             | Host port of the service. Added by `add-ascend-python-common`.           |
 | `LOG_LEVEL`              | `INFO`                                                             | Log level.                                                               |
+| `LOG_FORMAT`             | `json`                                                             | `json` for log sinks, `color` for local terminal output.                 |
+| `OTEL_SERVICE_NAME`      | `ascend-memory`                                                    | Service name carried on every exported span. Fixed in `compose.yaml`.    |
+| `OTEL_RESOURCE_ATTRIBUTES` | unset                                                            | Not set in compose. The library puts the installed package version on every exported span as `service.version`, and a `service.version` given here is ignored. |
+| `RATE_LIMIT_DEFAULT`     | `6000/minute`                                                      | Flood-protection rate limit for REST routes and MCP tools. Compose reads it as `MEMORY_RATE_LIMIT_DEFAULT`. Added by `add-ascend-python-common`. |
+| `REDIS_URL`              | `redis://127.0.0.1:6379/0`                                         | Shared storage for the rate limit windows, one budget per caller under the key prefix `ascend-memory`. Added by `add-ascend-python-common`. |
+| `READINESS_PROBE_TIMEOUT_SECONDS` | `3`                                                     | Budget of each readiness probe. Added by `add-ascend-python-common`.     |
+| `STARTUP_PROBE_TIMEOUT_SECONDS` | `2`                                                       | Time each startup banner check may take. Added by `add-ascend-python-common`. |
+| `SECURITY_HSTS_MAX_AGE_SECONDS` | `63072000`                                                | `max-age` of the `strict-transport-security` response header. Added by `add-ascend-python-common`. |
+| `OTEL_SDK_DISABLED`      | `false`                                                            | OpenTelemetry's standard switch, `true` turns the SDK off. Added by `add-ascend-python-common`. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset                                                           | OTLP trace export endpoint, export whenever it is set. Added by `add-observability`. |
+| `MCP_ALLOWED_HOST_HEADERS` | `ascend-memory,localhost,127.0.0.1`                              | Host names the `/mcp` endpoint accepts in the `Host` header (inbound). Compose reads it as `MEMORY_MCP_ALLOWED_HOST_HEADERS`. This service has no `ALLOWED_PRIVATE_HOSTS` (it fetches no caller URI). Added by `add-python-runtime-upgrades`. |
 
 ---
 
@@ -40,7 +52,7 @@ scope.
 
 | Variable                 | Default                                                            | Purpose                                                                  |
 | :----------------------- | :----------------------------------------------------------------- | :----------------------------------------------------------------------- |
-| `QDRANT_HOST`            | `localhost`                                                        | Use `host.docker.internal` from inside Docker, or a managed Qdrant host. |
+| `QDRANT_HOST`            | `localhost`                                                        | Use `host.docker.internal` from inside Docker only together with the host gateway mapping (`extra_hosts` in compose, `--add-host=host.docker.internal:host-gateway` on `docker run`), see [Reaching the host from a container](../../../docs/DEPLOYMENT.md#reaching-the-host-from-a-container), or a managed Qdrant host. |
 | `QDRANT_PORT`            | `6333`                                                             | Qdrant port.                                                             |
 
 ---

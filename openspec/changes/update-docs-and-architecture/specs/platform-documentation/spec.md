@@ -2,11 +2,11 @@
 
 ### Requirement: Architecture docs and diagrams reflect the shipped topology
 
-The monorepo architecture documents (`docs/architecture/`) and the agent internal architecture documents (`apps/ascend-agent/docs/architecture/`) SHALL depict the end-state topology: the edge gateway as the only public surface, Keycloak as the identity provider on its own host address, the tenant boundary across every data plane, the connector and crawl paths into RAG, the OCR job API with its result store, and the observability services. Diagrams SHALL be Mermaid text and SHALL match the shipped compose services and endpoint set. The monorepo diagrams SHALL be `diagrams/system-overview.md`, `diagrams/prompt-flow.md` and `diagrams/document-ingestion-flow.md`.
+The monorepo architecture documents (`docs/architecture/`) and the agent internal architecture documents (`apps/ascend-agent/docs/architecture/`) SHALL depict the end-state topology: the edge gateway as the only public surface, Keycloak as the identity provider on its own host address, the tenant boundary across every data plane, the connector and crawl paths into RAG, the OCR job API with its result store, and the observability services. Diagrams SHALL be Mermaid text and SHALL match the shipped compose services and endpoint set, with every service named with its deployment module. The monorepo diagrams SHALL be `diagrams/system-overview.md`, `diagrams/prompt-flow.md` and `diagrams/document-ingestion-flow.md`.
 
 #### Scenario: Container view shows the gateway and identity provider
 
-- **WHEN** `docs/architecture/diagrams/system-overview.md` is compared with `docker compose config --services`
+- **WHEN** `docs/architecture/diagrams/system-overview.md` is compared with `docker compose config --services` run with `COMPOSE_PROFILES` set to the `personal` preset
 - **THEN** it shows the gateway as the only public entry point and Keycloak on its own host address
 - **AND** no other service is shown as publicly reachable
 
@@ -42,6 +42,7 @@ The root `README.md` SHALL follow the documentation standard and SHALL carry a d
 - **WHEN** a link checker runs over the root `README.md`
 - **THEN** every link resolves
 - **AND** every `docs/*.md` file and `deploy/README.md` appear in the map
+- **AND** the map links `docs/MODULES.md`
 
 #### Scenario: Counts live in badges
 
@@ -59,12 +60,13 @@ The agent build SHALL export the OpenAPI document that springdoc generates to `d
 
 ### Requirement: AGENTS.md and the Bruno collection match the shipped surface
 
-The root and per-module `AGENTS.md` SHALL match the shipped endpoints, roles, ports, compose services and capability matrix. The Bruno collection SHALL hold a request for every path in `docs/api/openapi.json`.
+The root and per-module `AGENTS.md` SHALL match the shipped endpoints, roles, ports, compose services and capability matrix, and every compose service table SHALL name the deployment module of each service, or "core" for an always-on service. The Bruno collection SHALL hold a request for every path in `docs/api/openapi.json`.
 
 #### Scenario: AGENTS.md matches compose
 
-- **WHEN** the compose tables in the root `AGENTS.md` are compared with `docker compose config`
-- **THEN** the services and port bindings match, including the gateway and the loopback-bound ports
+- **WHEN** the compose tables in the root `AGENTS.md` are compared with `docker compose config` run with `COMPOSE_PROFILES` set to the `personal` preset
+- **THEN** the services, their profiles and port bindings match, including the gateway and the loopback-bound ports
+- **AND** every service row names its switchable module, its companion parent module, or "core" for a service with no profile
 
 #### Scenario: Bruno covers every path
 
@@ -79,3 +81,24 @@ Where a consolidated change has not shipped, the documentation SHALL describe wh
 
 - **WHEN** a documented feature depends on a change that is not implemented
 - **THEN** the documentation marks it pending with the change name
+
+### Requirement: The end-to-end documentation lists every spec
+
+`docs/E2E_RUN_SCENARIOS.md`, every app suite README under `apps/*/e2e/` and the platform suite README `e2e/platform/README.md` SHALL list every numbered end-to-end spec on disk with its class, every count in them SHALL equal the number of spec files, every Bruno request a spec names SHALL exist in the collection, and the scenario document SHALL keep the rule that the owner is asked which scenario or service suite to run before any run. Every app suite README SHALL state that a numbered spec is immutable only during a sweep and between the runs of one sweep, and that a change to the feature it covers updates the spec and its template in place, keeping its number.
+
+#### Scenario: Scenario counts match the files
+
+- **WHEN** the spec files under `apps/*/e2e/testing/` and `e2e/platform/testing/` are counted per suite
+- **THEN** each count equals the count `docs/E2E_RUN_SCENARIOS.md` gives for that suite
+- **AND** every spec file appears in its suite README
+
+#### Scenario: Immutable means within a sweep
+
+- **WHEN** a reader looks up the word "immutable" in an app suite README
+- **THEN** the README says a spec is not edited during a sweep or between its runs
+- **AND** that a changed feature updates its existing spec in place, and a new spec is written only when no existing spec can be updated
+
+#### Scenario: Every named Bruno request exists
+
+- **WHEN** the `bru run` paths named in the numbered specs are compared with the request files of `docs/api/request/AscendAI/`
+- **THEN** every named path has a request file

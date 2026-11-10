@@ -16,12 +16,11 @@ graph TB
         REST["REST surface<br/>GET /api/v1/web/search<br/>POST /api/v2/web/read"]
         MCP["MCP surface<br/>POST /mcp<br/>(web_search, web_read tools)"]
         WR["WebReader<br/>(strategy orchestrator)"]
-        Guard["SSRF guard<br/>(is_safe_external_url)"]
+        Guard["SSRF guard<br/>(check_fetch_uri, shared library)"]
         Validator["ContentValidator"]
         subgraph "Strategy chain"
             S1["1-beautifulsoup<br/>(curl_cffi + BS4)"]
             S2["2-trafilatura<br/>(curl_cffi + trafilatura)"]
-            S3["3-flaresolverr<br/>(FlareSolverr proxy)"]
             S4["4-playwright_stealth<br/>(Chromium + stealth)"]
             S5["5-crawlee_adaptive<br/>(AdaptivePlaywrightCrawler)"]
             S6["6-novnc<br/>(human intervention)"]
@@ -32,7 +31,6 @@ graph TB
 
     subgraph "External services (ascend-scrapper network)"
         SearXNG["SearXNG<br/>(:9020)"]
-        FlareSolverr["FlareSolverr<br/>(:8191)"]
         Ngrok["Ngrok tunnel"]
     end
 
@@ -46,7 +44,6 @@ graph TB
     Guard --> WR
     WR --> S1
     WR --> S2
-    WR --> S3
     WR --> S4
     WR --> S5
     WR --> S6
@@ -54,14 +51,12 @@ graph TB
     REST --> SearxClient
     MCP --> SearxClient
     SearxClient -->|"GET /search?format=html"| SearXNG
-    S3 -->|"POST {cmd:request.get}"| FlareSolverr
     S1 -->|"HTTP GET"| TargetSite
     S2 -->|"HTTP GET"| TargetSite
     S4 -->|"Chromium navigate"| TargetSite
     S5 -->|"Chromium navigate"| TargetSite
     S1 --> CookieMgr
     S2 --> CookieMgr
-    S3 --> CookieMgr
     S6 --> CookieMgr
     CookieMgr -->|"SETEX / GET"| Redis
     S6 -->|"428 + VNC URL"| Human
@@ -85,11 +80,10 @@ sequenceDiagram
 
     participant Agent as ascend-agent :9917
     participant MCP as web_read (mcp_server.py)
-    participant Guard as is_safe_external_url
+    participant Guard as check_fetch_uri
     participant WR as WebReader
     participant S1 as 1-beautifulsoup
     participant S2 as 2-trafilatura
-    participant S3 as 3-flaresolverr
     participant S4 as 4-playwright_stealth
     participant S5 as 5-crawlee_adaptive
     participant S6 as 6-novnc
@@ -98,8 +92,8 @@ sequenceDiagram
     participant Ngrok as Ngrok API
 
     Agent->>MCP: tools/call web_read(url="https://target.com/article")
-    MCP->>Guard: is_safe_external_url("https://target.com/article")
-    Guard-->>MCP: True (public IP)
+    MCP->>Guard: check_fetch_uri("https://target.com/article")
+    Guard-->>MCP: FetchTarget (public addresses)
     MCP->>WR: read(url)
 
     note over WR,CV: Happy path - strategy 1 succeeds
@@ -122,10 +116,10 @@ sequenceDiagram
     Ngrok-->>S6: {tunnels:[{public_url:"https://abc.ngrok.io"}]}
     S6->>S6: spawn _monitor_for_cookies task (background)
     S6-->>WR: raises HumanInterventionRequiredException(vnc_url)
-    WR-->>Agent: 428 {status:"human_intervention_required", vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true"}
+    WR-->>Agent: 428 problem body {code:"human_intervention_required", intervention_type:..., vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true&v=0.0.15"}
 ```
 
 When strategy 1 or 2 return empty string without raising (not a detected block, just no content), the chain
-continues to strategy 3 (FlareSolverr) and then strategies 4, 5, 6. `ChallengeDetectedException` is a hard
-short-circuit that skips directly to strategy 6; ordinary strategy failures (empty string returned) proceed
+continues to strategy 4 (Playwright) and then strategies 5, 6. `ChallengeDetectedException` falls through to the
+next tier; ordinary strategy failures (empty string returned) proceed
 sequentially. See [ADR-001](../decisions/ADR-001-multi-tier-extraction-strategy.md).

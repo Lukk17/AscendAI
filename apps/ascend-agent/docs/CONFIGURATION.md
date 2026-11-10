@@ -54,11 +54,30 @@ time via the `model` form field; these are the shipped defaults.
 | `MINIMAX_ENABLED`            | No                 | Enable MiniMax provider (default `true`).                                                    |
 | `MINIMAX_API_KEY`            | If MiniMax enabled | MiniMax API key.                                                                             |
 | `OPENAI_MODEL`               | No                 | Override default OpenAI model (default `gpt-4o`).                                            |
+| `OPENAI_EXTRACTION_MODEL`    | No                 | Memory extraction model for OpenAI (default `gpt-4o-mini`).                                  |
 | `GEMINI_MODEL`               | No                 | Override default Gemini model (default `gemini-flash-latest`).                               |
+| `GEMINI_EXTRACTION_MODEL`    | No                 | Memory extraction model for Gemini (default `gemini-flash-lite-latest`).                     |
 | `ANTHROPIC_MODEL`            | No                 | Override default Anthropic model (default `claude-sonnet-4-5`).                              |
+| `ANTHROPIC_EXTRACTION_MODEL` | No                 | Memory extraction model for Anthropic (default `claude-3-5-haiku-20241022`).                 |
 | `MINIMAX_MODEL`              | No                 | Override default MiniMax model (default `MiniMax-M2.7`).                                     |
+| `MINIMAX_EXTRACTION_MODEL`   | No                 | Memory extraction model for MiniMax (default `MiniMax-M2.7`).                                |
+| `MODEL_PROVIDER`             | No                 | Default chat provider (default `lmstudio`).                                                  |
 | `LMSTUDIO_MODEL`             | No                 | Override default LM Studio model (default `meta-llama-3.1-8b-instruct`).                     |
 | `EMBEDDING_PROVIDER`         | No                 | Embedding provider: `lmstudio` (default), `openai`, or `gemini`.                             |
+| `SECURITY_ENABLED`           | No                 | Basic-auth toggle (default `false`, so local runs need no auth headers).                     |
+| `SECURITY_USERNAME`          | No                 | Basic-auth username (default `admin`).                                                       |
+| `SECURITY_PASSWORD`          | No                 | Basic-auth password (default `admin`).                                                       |
+| `MANAGEMENT_OTLP_TRACING_ENDPOINT` | No           | OTLP trace export endpoint (default `http://otel-collector:4318/v1/traces`). Added by `add-observability`. |
+| `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | No   | Trace sampling probability (default `1.0`). Added by `add-observability`.                    |
+| `AGENT_HOST_PORT`            | No                 | Published host port (default `9917`). Added by `add-observability`.                          |
+| `SPRING_PROFILES_ACTIVE`     | No                 | Spring profile that activates the container-mode overrides. Compose sets `docker`.           |
+| `APP_MEMORY_CHATHISTORY_REDIS_ENABLED` | No       | Chat-history Redis backend toggle (default `true`).                                          |
+| `APP_MEMORY_CHATHISTORY_POSTGRES_ENABLED` | No    | Chat-history Postgres backend toggle (default `true`).                                       |
+| `APP_MEMORY_CHATHISTORY_COMPACTION_ENABLED` | No | Async summarisation of older chat turns (default `true`).                                    |
+| `OTEL_SERVICE_NAME`          | No                 | Service name carried on every exported span. Fixed in `compose.yaml` as `ascend-agent`.      |
+| `OTEL_RESOURCE_ATTRIBUTES`   | No                 | Resource attributes carried on every exported span. Fixed in `compose.yaml` as `service.version=0.1.3`. |
+| `OBJECT_STORE_S3_ENDPOINT`   | No                 | Object-store address the container reaches, bound to `app.s3.endpoint` by the `docker` profile (default `http://host.docker.internal:9070`). Shared with ascend-ocr and ascend-web-hunter in `compose.yaml`. |
+| `OBJECT_STORE_S3_PUBLIC_ENDPOINT` | No            | Object-store address a caller on the host reaches, bound to `app.s3.public-endpoint` by the `docker` profile and to `app.s3.endpoint` on a host run (default `http://localhost:9070`). Shared with ascend-ocr in `compose.yaml`. |
 
 ---
 
@@ -165,9 +184,10 @@ Boot env-var binding (uppercase, dots and dashes to underscores).
 
 - **`server.port`** (`9917`). Public REST port.
 - **`app.embedding.default-provider`**. Active embedding backend (mirrors `EMBEDDING_PROVIDER`).
-- **`app.s3.endpoint`** (`http://localhost:9070`). Object-store endpoint for ingestion.
+- **`app.s3.endpoint`** (`http://localhost:9070`). Object-store endpoint for ingestion. Read from `OBJECT_STORE_S3_PUBLIC_ENDPOINT` on a host
+  run and from `OBJECT_STORE_S3_ENDPOINT` under the `docker` profile.
 - **`app.s3.public-endpoint`**. Host-reachable object-store URL used in presigned `sources[].downloadUrl` payloads. In
-  Docker, override to `http://host.docker.internal:9070`.
+  Docker it is read from `OBJECT_STORE_S3_PUBLIC_ENDPOINT` (default `http://localhost:9070`).
 - **`app.s3.bucket`** (`knowledge-base`). Ingestion bucket. Auto-created at startup if missing.
 - **`spring.datasource.url`**. Postgres connection for the metadata store.
 - **`app.rag.enabled`**. Toggle the retrieval-gated soft-RAG path.

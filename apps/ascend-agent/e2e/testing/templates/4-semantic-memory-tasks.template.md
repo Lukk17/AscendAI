@@ -10,7 +10,7 @@ Copy this file to `runs/<UTC-timestamp>_4-semantic-memory-tasks.md` before start
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ai-agent `/actuator/health` returns HTTP 200 with `{"status":"UP"}`
-- [ ] AscendMemory `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] AscendMemory `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-memory` and a non-empty `version`
 - [ ] Qdrant `/healthz` returns HTTP 200
 - [ ] Redis responds to `PING` with `PONG`
 - [ ] Postgres responds to `SELECT 1` with a row

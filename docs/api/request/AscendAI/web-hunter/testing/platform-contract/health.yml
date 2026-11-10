@@ -1,0 +1,33 @@
+info:
+  name: health
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/health"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("status is ok", function () {
+            expect(res.getBody().status).to.equal("ok");
+        });
+        test("service is ascend-web-hunter", function () {
+            expect(res.getBody().service).to.equal("ascend-web-hunter");
+        });
+        test("version is a non-empty string", function () {
+            expect(res.getBody().version).to.be.a("string").and.not.empty;
+            bru.setVar("pcHealthVersion", res.getBody().version);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

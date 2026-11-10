@@ -1,16 +1,17 @@
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from urllib.parse import urlparse
+
+from ascend_python_common.settings import CsvTuple, RateLimit, ServiceSettings
+from pydantic import Field, field_validator, model_validator
+
+from src.session.profile_pattern import PROFILE_PATTERN, is_valid_profile
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
+class Settings(ServiceSettings):
+    API_PORT: int = Field(default=7021, ge=1, le=65535, description="Port for the FastAPI/MCP server")
+    MCP_ALLOWED_HOST_HEADERS: CsvTuple = Field(
+        default=("ascend-web-hunter", "localhost", "127.0.0.1"),
+        description="Host names the /mcp endpoint accepts in the Host header",
     )
-
-    API_PORT: int = Field(default=7021, description="Port for the FastAPI/MCP server")
-    API_HOST: str = Field(default="0.0.0.0", description="Host to bind the server to")
 
     # Default to localhost:9020 for local development (accessing host machine port).
     # Docker Compose overrides this to http://searxng:8080 (internal container communication).
@@ -56,9 +57,22 @@ class Settings(BaseSettings):
         description="Minimum word count for valid content",
     )
 
-    LOG_LEVEL: str = Field(
-        default="INFO",
-        description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
+    RATE_LIMIT_DEFAULT: RateLimit = Field(
+        default="1200/minute",
+        description="Default rate limit for REST routes and MCP tools",
+    )
+
+    ALLOWED_PRIVATE_HOSTS: CsvTuple = Field(
+        default=(),
+        description=(
+            "Hosts the URI fetch guard may reach even at a private address. "
+            "Leave empty, only an e2e sweep sets it."
+        ),
+    )
+    FETCH_MAX_REDIRECT_HOPS: int = Field(
+        default=10,
+        ge=0,
+        description="Redirect hops the URI fetch guard follows.",
     )
 
     USER_AGENTS_PATH: str = Field(
@@ -95,6 +109,62 @@ class Settings(BaseSettings):
         default=5.0,
         description="Poll interval in seconds for the NoVNC cookie-sync background monitor",
     )
+    NOVNC_MAX_CONCURRENT_FLOWS: int = Field(
+        default=4,
+        ge=1,
+        description=(
+            "Maximum concurrent human-intervention windows per container. A per container "
+            "memory constraint as much as a display one: each flow runs its own headful "
+            "Chromium. A request past the cap answers 409."
+        ),
+    )
+    NOVNC_DISPLAY_SIZE: str = Field(
+        default="1920x1080",
+        description=(
+            "Size of the shared Xvfb display as <width>x<height>. Xvfb and the service read "
+            "the same variable; the Dockerfile also sets it for a container started without compose."
+        ),
+    )
+    NOVNC_WINDOW_WIDTH_PX: int = Field(
+        default=1280,
+        ge=1,
+        description="Width in pixels of each intervention window. Wide enough for a reCAPTCHA image grid.",
+    )
+    NOVNC_WINDOW_HEIGHT_PX: int = Field(
+        default=800,
+        ge=1,
+        description="Height in pixels of each intervention window.",
+    )
+    NOVNC_WINDOW_CASCADE_OFFSET_PX: int = Field(
+        default=48,
+        ge=1,
+        description="Cascade step in pixels between intervention windows. Wider than a fluxbox title bar.",
+    )
+    NOVNC_FLOW_LEASE_GRACE_SECONDS: float = Field(
+        default=30.0,
+        gt=0,
+        description="Teardown grace added on top of NOVNC_TIMEOUT_SECONDS before a held flow is reclaimed.",
+    )
+    NOVNC_FLOW_SWEEP_INTERVAL_SECONDS: float = Field(
+        default=30.0,
+        gt=0,
+        description="Interval in seconds between lease-sweeper runs. One lease grace period.",
+    )
+    NOVNC_FLOW_CANCEL_GRACE_SECONDS: float = Field(
+        default=10.0,
+        gt=0,
+        description=(
+            "Bounds reclamation, shutdown and a window close. "
+            "A browser that has not closed in this time will not."
+        ),
+    )
+    NOVNC_BUSY_RETRY_AFTER_SECONDS: int = Field(
+        default=30,
+        ge=1,
+        description=(
+            "Short actionable poll interval answered in the 409 Retry-After header, not the flow timeout."
+        ),
+    )
     PLAYWRIGHT_HEADLESS: bool = Field(
         default=False,
         description=(
@@ -116,6 +186,14 @@ class Settings(BaseSettings):
         default=1500,
         description="Pixels to scroll per step when loading dynamic content",
     )
+    NETWORKIDLE_POLL_MS: int = Field(
+        default=1000,
+        description="Page-quiet poll interval in milliseconds for browser tiers.",
+    )
+    SCROLL_PAUSE_MS: int = Field(
+        default=200,
+        description="Pause in milliseconds between two scroll steps.",
+    )
 
     MIN_FLESCH_SCORE: float = Field(default=20.0, description="Minimum Flesch reading ease score")
     MIN_TTR: float = Field(default=0.1, description="Minimum Type-Token Ratio for repetition check")
@@ -132,9 +210,9 @@ class Settings(BaseSettings):
         description="Keywords indicating extraction failure",
     )
 
-    FLARESOLVERR_URL: str = Field(
-        default="http://localhost:8191/v1",
-        description="URL for FlareSolverr instance",
+    CAMOUFOX_ENABLED: bool = Field(
+        default=True,
+        description="Route reads through the 4b-camoufox tier. Disable on hosts with little memory.",
     )
     SELENIUM_BROWSER_CDP_URL: str = Field(
         default="ws://localhost:4444/playwright",
@@ -147,6 +225,14 @@ class Settings(BaseSettings):
     PUBLIC_VNC_URL: str = Field(
         default="http://localhost:7900",
         description="Public Internet-facing VNC URL (can be Ngrok api string)",
+    )
+    NOVNC_PUBLIC_URL: str | None = Field(
+        default=None,
+        description=(
+            "One base address shared by every ascend-web-hunter container, the address of the "
+            "web-hunter edge proxy, an absolute http or https URL with no path. Unset keeps "
+            "today's PUBLIC_VNC_URL resolution and the one Ngrok tunnel, which serve one container."
+        ),
     )
     REDIS_URL: str = Field(
         default="redis://127.0.0.1:6379/0",
@@ -166,24 +252,126 @@ class Settings(BaseSettings):
         default="default",
         description="Profile label used when no profile is specified per-request",
     )
+    TIER_MEMORY_TTL_SECONDS: int = Field(
+        default=86400,
+        ge=60,
+        description="TTL in seconds for the per-domain tier memory.",
+    )
 
     # Challenge detection
     CHALLENGE_DETECTION_MAX_BYTES: int = Field(
         default=50_000,
+        ge=1,
         description=(
-            "Prefix length scanned by ChallengeDetector. Pages larger than this "
-            "were previously skipped entirely; now we scan only the prefix."
+            "Prefix length scanned by the vendor, structure and phrase families. "
+            "Only the first bytes of a page are read for those signals."
         ),
     )
     CHALLENGE_WALL_MAX_BYTES: int = Field(
         default=50_000,
+        ge=1,
         description=(
-            "Max page size for a weak marker (an embedded Turnstile widget or a "
-            "cf_clearance token) to count as a block. A real page can host a Turnstile "
-            "widget while serving full content (e.g. nowsecure.nl), so these only signal "
-            "a challenge wall on an interstitial-sized page. Strong markers (Ray ID, "
-            "interstitial phrases, third-party captcha scripts) fire regardless of size."
+            "Page size under which a 403, 429 or 503 body counts as small, and under "
+            "which the word floor is computed. Larger pages pass the word floor automatically."
         ),
+    )
+
+    # Challenge scoring: tuning values
+    CHALLENGE_SCORE_THRESHOLD: int = Field(
+        default=100,
+        ge=1,
+        le=10_000,
+        description="Score at or above which a page is a wall. No non-definitive signal reaches it alone.",
+    )
+    CHALLENGE_RICH_CONTENT_WORDS: int = Field(
+        default=150,
+        ge=1,
+        description="Extracted words at or above which the rich-content guard fires.",
+    )
+    CHALLENGE_FORM_DOMINANCE_RATIO: float = Field(
+        default=0.6,
+        gt=0,
+        le=1.0,
+        description="Share of visible text inside forms at or above which form dominance fires.",
+    )
+    CHALLENGE_MIN_WORDS_PER_KB: float = Field(
+        default=2.0,
+        gt=0,
+        description="Extracted words per kilobyte of HTML under which thin text fires.",
+    )
+    CHALLENGE_THIN_LINK_COUNT: int = Field(
+        default=5,
+        ge=0,
+        description="Fewer anchors with href than this fires few links.",
+    )
+    CHALLENGE_RICH_LINK_COUNT: int = Field(
+        default=20,
+        ge=0,
+        description="At least this many anchors with href fires the many-links guard.",
+    )
+    CHALLENGE_SHAPE_MAX_BYTES: int = Field(
+        default=500_000,
+        ge=1,
+        description="Bounds the extraction the shape family uses. Larger pages contribute no shape signal.",
+    )
+
+    # Challenge scoring: per-signal weights
+    CHALLENGE_WEIGHT_DEFINITIVE_HEADER: int = Field(
+        default=200, ge=-1_000, le=1_000, description="Weight of the definitive_header signal."
+    )
+    CHALLENGE_WEIGHT_INTERSTITIAL_STRUCTURE: int = Field(
+        default=80, ge=-1_000, le=1_000, description="Weight of the interstitial_structure signal."
+    )
+    CHALLENGE_WEIGHT_VENDOR_SCRIPT: int = Field(
+        default=60, ge=-1_000, le=1_000, description="Weight of the vendor_script signal."
+    )
+    CHALLENGE_WEIGHT_VENDOR_PRESENCE: int = Field(
+        default=30, ge=-1_000, le=1_000, description="Weight of the vendor_presence signal."
+    )
+    CHALLENGE_WEIGHT_STATUS_EMPTY_BODY: int = Field(
+        default=200, ge=-1_000, le=1_000, description="Weight of the status_empty_body signal."
+    )
+    CHALLENGE_WEIGHT_STATUS_SMALL_BODY: int = Field(
+        default=50, ge=-1_000, le=1_000, description="Weight of the status_small_body signal."
+    )
+    CHALLENGE_WEIGHT_STATUS_LARGE_BODY: int = Field(
+        default=20, ge=-1_000, le=1_000, description="Weight of the status_large_body signal."
+    )
+    CHALLENGE_WEIGHT_CAPTCHA_INPUT: int = Field(
+        default=50, ge=-1_000, le=1_000, description="Weight of the captcha_input signal."
+    )
+    CHALLENGE_WEIGHT_CAPTCHA_ELEMENT: int = Field(
+        default=40, ge=-1_000, le=1_000, description="Weight of the captcha_element signal."
+    )
+    CHALLENGE_WEIGHT_FORM_DOMINANCE: int = Field(
+        default=40, ge=-1_000, le=1_000, description="Weight of the form_dominance signal."
+    )
+    CHALLENGE_WEIGHT_SCRIPT_ONLY_BODY: int = Field(
+        default=40, ge=-1_000, le=1_000, description="Weight of the script_only_body signal."
+    )
+    CHALLENGE_WEIGHT_THIN_TEXT: int = Field(
+        default=20, ge=-1_000, le=1_000, description="Weight of the thin_text signal."
+    )
+    CHALLENGE_WEIGHT_FEW_LINKS: int = Field(
+        default=20, ge=-1_000, le=1_000, description="Weight of the few_links signal."
+    )
+    CHALLENGE_WEIGHT_NO_ARTICLE: int = Field(
+        default=20, ge=-1_000, le=1_000, description="Weight of the no_article signal."
+    )
+    CHALLENGE_WEIGHT_RICH_CONTENT: int = Field(
+        default=-70, ge=-1_000, le=1_000, description="Weight of the rich_content guard signal."
+    )
+    CHALLENGE_WEIGHT_MANY_LINKS: int = Field(
+        default=-20, ge=-1_000, le=1_000, description="Weight of the many_links guard signal."
+    )
+    CHALLENGE_WEIGHT_SERVED_PAGE: int = Field(
+        default=-30, ge=-1_000, le=1_000, description="Weight of the served_page guard signal."
+    )
+    CHALLENGE_WEIGHT_PHRASE_TITLE: int = Field(
+        default=60, ge=-1_000, le=1_000, description="Weight of the phrase_title signal."
+    )
+    CHALLENGE_WEIGHT_PHRASE_BODY: int = Field(
+        default=30, ge=-1_000, le=1_000, description="Weight of the phrase_body signal."
     )
 
     # Crawlee storage root (outside src/ to avoid committing runtime state)
@@ -200,7 +388,7 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Group 4 - Anti-bot evasion: proxy seam (off by default)
+    # Anti-bot evasion: proxy seam (off by default)
     PROXY_URL: str = Field(
         default="",
         description=(
@@ -209,33 +397,300 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Group 5 - Extraction quality: readability fallback threshold
-    READABILITY_FALLBACK_MIN_CHARS: int = Field(
-        default=200,
-        description=(
-            "Minimum character count of trafilatura output below which the readability-lxml "
-            "fallback is attempted.  The higher-scoring result (by character count) is returned."
-        ),
-    )
-    CONTENT_RECALL_FALLBACK_RATIO: float = Field(
-        default=0.75,
-        ge=0.0,
-        le=1.0,
-        description=(
-            "Ratio of trafilatura's precision-mode output length to the page's plain text length "
-            "(BeautifulSoup get_text after noise tags are removed) below which a second trafilatura "
-            "pass runs with favor_recall=True. The longer of the two passes is returned. 0 never runs "
-            "the recall pass, 1 always runs it."
-        ),
-    )
-
-    # Group 7 - Caching: read-result cache TTL
+    # Caching: read-result cache TTL
     READ_CACHE_TTL_SECONDS: int = Field(
         default=300,
         description="TTL in seconds for the read-result cache-aside entries (default 5 min).",
     )
+    READ_CACHE_PURGE_RECONNECT_SECONDS: float = Field(
+        default=5.0,
+        gt=0,
+        description="Wait in seconds between two connection attempts of the read cache purge subscriber.",
+    )
 
-    # Group 7 - Observability: per-domain metric label cardinality cap
+    # Schema extraction, recipes and document routing
+    EXTRACTION_SCHEMA_MAX_BYTES: int = Field(
+        default=16384,
+        ge=1,
+        description="Maximum size in bytes of the caller-supplied extraction schema.",
+    )
+    EXTRACTION_LLM_BASE_URL: str = Field(
+        default="",
+        description=(
+            "Base URL of the OpenAI-compatible endpoint schema extraction calls. "
+            "Empty turns the schema format off."
+        ),
+    )
+    EXTRACTION_LLM_MODEL: str = Field(
+        default="",
+        description="Model name sent to the extraction endpoint.",
+    )
+    EXTRACTION_LLM_API_KEY: str = Field(
+        default="",
+        description=(
+            "API key for the extraction endpoint, read from the repository .env file only. Empty when unset."
+        ),
+    )
+    EXTRACTION_LLM_MAX_INPUT_CHARS: int = Field(
+        default=60000,
+        ge=1,
+        description=(
+            "Characters of the cleaned page markup sent to the extraction endpoint before the cap cuts them."
+        ),
+    )
+    EXTRACTION_LLM_TIMEOUT_SECONDS: float = Field(
+        default=60.0,
+        gt=0,
+        description="Timeout in seconds for one extraction model call.",
+    )
+    RECIPE_TTL_SECONDS: int = Field(
+        default=604800,
+        ge=60,
+        description="TTL in seconds for a stored extraction recipe.",
+    )
+    RECIPE_SELECTOR_MAX_CHARS: int = Field(
+        default=512,
+        ge=1,
+        description="Maximum characters of one stored CSS selector.",
+    )
+    DOCUMENT_MAX_BYTES: int = Field(
+        default=52428800,
+        ge=1,
+        description="Maximum bytes fetched for one routed PDF, image or audio file.",
+    )
+    DOCUMENT_FETCH_TIMEOUT_SECONDS: float = Field(
+        default=300.0,
+        gt=0,
+        description="Longest time one routed PDF, image or audio download may take, redirects included.",
+    )
+    BROWSER_RESPONSE_MAX_BYTES: int = Field(
+        default=52428800,
+        ge=1,
+        description=(
+            "Maximum bytes the browser tunnel carries from a site on one connection. A connection that "
+            "goes past it is closed."
+        ),
+    )
+    BROWSER_TUNNEL_CONNECT_TIMEOUT_SECONDS: float = Field(
+        default=10.0,
+        gt=0,
+        description="Longest wait for a browser request head and for one connection of the browser tunnel.",
+    )
+    BROWSER_TUNNEL_MAX_CONNECTIONS: int = Field(
+        default=256,
+        ge=1,
+        description="Most connections the browser tunnel carries at once. A connection above it answers 503.",
+    )
+    BROWSER_TUNNEL_IDLE_TIMEOUT_SECONDS: float = Field(
+        default=60.0,
+        gt=0,
+        description="Longest time a browser tunnel connection may carry no bytes in either direction.",
+    )
+    READ_RESPONSE_MAX_BYTES: int = Field(
+        default=52428800,
+        ge=1,
+        description=(
+            "Maximum bytes of one page answer the fast read tiers take, the compressed bytes and the "
+            "inflated bytes alike. A larger answer ends that tier as a failure."
+        ),
+    )
+    DOCLING_SERVE_URL: str = Field(
+        default="http://docling-serve:5001",
+        description=(
+            "Base URL of the docling-serve document conversion service. Empty turns the PDF route off."
+        ),
+    )
+    ASCEND_OCR_URL: str = Field(
+        default="http://ascend-ocr:7022",
+        description="Base URL of the ascend-ocr service. Empty turns the image route off.",
+    )
+    OCR_ROUTE_TIMEOUT_SECONDS: float = Field(
+        default=300.0,
+        gt=0,
+        description="Timeout in seconds polling one ascend-ocr job.",
+    )
+    OCR_DELETE_DRAIN_SECONDS: float = Field(
+        default=5.0,
+        gt=0,
+        description=(
+            "Seconds shutdown waits for the background ascend-ocr job deletes before it cancels them."
+        ),
+    )
+    AUDIO_SCRIBE_URL: str = Field(
+        default="http://ascend-audio-scribe:7017",
+        description="Base URL of the ascend-audio-scribe service. Empty turns the audio route off.",
+    )
+
+    # Crawl jobs
+    CRAWL_MAX_SEEDS: int = Field(
+        default=20,
+        ge=1,
+        description="Most seeds in one crawl request.",
+    )
+    CRAWL_MAX_PATTERNS: int = Field(
+        default=50,
+        ge=1,
+        description="Most include patterns and most exclude patterns in one crawl request.",
+    )
+    CRAWL_MAX_DEPTH: int = Field(
+        default=5,
+        ge=0,
+        description="Largest `max_depth` a crawl request may ask for.",
+    )
+    CRAWL_DEFAULT_DEPTH: int = Field(
+        default=2,
+        ge=0,
+        description="`max_depth` when the request has none, refused at startup above `CRAWL_MAX_DEPTH`.",
+    )
+    CRAWL_MAX_PAGES: int = Field(
+        default=10000,
+        ge=1,
+        description="Largest `page_budget` a crawl request may ask for.",
+    )
+    CRAWL_DEFAULT_PAGE_BUDGET: int = Field(
+        default=100,
+        ge=1,
+        description="`page_budget` when the request has none, refused at startup above `CRAWL_MAX_PAGES`.",
+    )
+    CRAWL_RESULT_S3_BUCKET: str = Field(
+        default="web-hunter-crawls",
+        description="Bucket of the crawl results.",
+    )
+    CRAWL_RESULT_S3_PREFIX: str = Field(
+        default="crawl-results/",
+        description="Key prefix of the crawl results after the tenant prefix.",
+    )
+    CRAWL_JOB_RETENTION_SECONDS: int = Field(
+        default=604800,
+        ge=60,
+        description="Lifetime of job records, results, frontier keys and recrawl state.",
+    )
+    CRAWL_DOMAIN_CONCURRENCY: int = Field(
+        default=2,
+        ge=1,
+        description="Pages of one domain read at once, all instances together.",
+    )
+    CRAWL_DEFAULT_DELAY_SECONDS: float = Field(
+        default=1.0,
+        ge=0,
+        description="Least time between two fetches of one domain.",
+    )
+    CRAWL_PROXY_URL: str = Field(
+        default="",
+        description="Customer proxy for crawl fetches only. Empty turns it off.",
+    )
+    CRAWL_CLAIM_LEASE_SECONDS: int = Field(
+        default=120,
+        ge=1,
+        description="Lifetime of a page claim.",
+    )
+    CRAWL_CLAIM_MAX_EXPIRIES: int = Field(
+        default=2,
+        ge=1,
+        description="Claim expiries after which a URL counts as failed.",
+    )
+    CRAWL_WORKER_CONCURRENCY: int = Field(
+        default=4,
+        ge=1,
+        description="Crawl worker tasks each instance starts.",
+    )
+    CRAWL_WORKER_IDLE_SECONDS: float = Field(
+        default=1.0,
+        gt=0,
+        description="Wait of a worker that found nothing to claim.",
+    )
+    CRAWL_POLL_AFTER_SECONDS: int = Field(
+        default=5,
+        ge=1,
+        description="The `poll_after_seconds` hint of a crawl submission.",
+    )
+    CRAWL_SITEMAP_MAX_DOCUMENTS: int = Field(
+        default=50,
+        ge=1,
+        description="Most sitemap files one instance fetches per job, sitemap indexes included.",
+    )
+    CRAWL_SITEMAP_MAX_BYTES: int = Field(
+        default=52428800,
+        ge=1,
+        description=(
+            "Most bytes read from one sitemap file, before and after gzip inflation, "
+            "a larger file is skipped."
+        ),
+    )
+    CRAWL_ROBOTS_MAX_BYTES: int = Field(
+        default=512000,
+        ge=512000,
+        description=(
+            "Most bytes read from one robots.txt, at least the 500 KiB RFC 9309 requires, "
+            "the rest of a larger file is ignored."
+        ),
+    )
+    CRAWL_ROBOTS_MAX_RULES: int = Field(
+        default=1000000,
+        ge=1,
+        description=(
+            "Most rule objects one robots.txt may expand to, counted as the rule sets of its "
+            "user-agent lines times the rules of its other lines. "
+            "A file above it disallows every page of its origin."
+        ),
+    )
+    CRAWL_ROBOTS_CACHE_MAX_ORIGINS: int = Field(
+        default=256,
+        ge=1,
+        description="Most parsed robots.txt files one instance keeps. The least recently used is evicted.",
+    )
+    CRAWL_ROBOTS_CACHE_MAX_RULES: int = Field(
+        default=2000000,
+        ge=1,
+        description=(
+            "Most rule objects the parsed robots.txt files of one instance may hold together. "
+            "The least recently used files are evicted until the total is back under it. "
+            "A value below CRAWL_ROBOTS_MAX_RULES is refused at startup."
+        ),
+    )
+    CRAWL_ROBOTS_SKIP_FACTOR: int = Field(
+        default=10,
+        ge=1,
+        description=(
+            "A job ends once its pages skipped for robots.txt reach page_budget times this number, "
+            "so a page full of disallowed links cannot keep a job running for hours."
+        ),
+    )
+    CRAWL_ROBOTS_TIMEOUT_SECONDS: float = Field(
+        default=30.0,
+        gt=0,
+        description="Longest wait for one robots.txt. A file that takes longer counts as unreachable.",
+    )
+    CRAWL_SITEMAP_TIMEOUT_SECONDS: float = Field(
+        default=60.0,
+        gt=0,
+        description=(
+            "Longest sitemap work of one page, refused at startup at or above `CRAWL_CLAIM_LEASE_SECONDS`."
+        ),
+    )
+    CRAWL_MAX_DELAY_SECONDS: float = Field(
+        default=60.0,
+        gt=0,
+        description="Largest `Crawl-delay` a robots.txt can ask for. A larger value is cut to this.",
+    )
+    OBJECT_STORE_S3_ENDPOINT: str = Field(
+        default="http://localhost:9070",
+        description="Address of the S3-compatible store.",
+    )
+    OBJECT_STORE_S3_PUBLIC_ENDPOINT: str = Field(
+        default="http://localhost:9070",
+        description="The address ascend-ocr signs its result addresses with.",
+    )
+    OBJECT_STORE_S3_ACCESS_KEY: str = Field(
+        default="",
+        description="Access key of the store.",
+    )
+    OBJECT_STORE_S3_SECRET_KEY: str = Field(
+        default="",
+        description="Secret key of the store.",
+    )
+
+    # Observability: per-domain metric label cardinality cap
     DOMAIN_METRIC_CARDINALITY_CAP: int = Field(
         default=50,
         description=(
@@ -244,7 +699,7 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Group 7 - Circuit breaker thresholds
+    # Circuit breaker thresholds
     BREAKER_FAILURE_THRESHOLD: int = Field(
         default=3,
         description="Consecutive failures before a circuit breaker opens.",
@@ -253,6 +708,113 @@ class Settings(BaseSettings):
         default=60.0,
         description="Seconds after which an open breaker moves to half-open and allows one probe.",
     )
+
+    @model_validator(mode="after")
+    def _validate_novnc_display_size(self) -> "Settings":
+        parts = self.NOVNC_DISPLAY_SIZE.split("x")
+        if len(parts) != 2 or not all(part.isdigit() for part in parts):
+            raise ValueError(
+                f"NOVNC_DISPLAY_SIZE {self.NOVNC_DISPLAY_SIZE!r} must read <width>x<height>, e.g. '1920x1080'"
+            )
+        width, height = int(parts[0]), int(parts[1])
+        if width < self.NOVNC_WINDOW_WIDTH_PX:
+            raise ValueError(
+                f"NOVNC_DISPLAY_SIZE {self.NOVNC_DISPLAY_SIZE!r} is smaller than "
+                f"NOVNC_WINDOW_WIDTH_PX ({self.NOVNC_WINDOW_WIDTH_PX}) on the x axis"
+            )
+        if height < self.NOVNC_WINDOW_HEIGHT_PX:
+            raise ValueError(
+                f"NOVNC_DISPLAY_SIZE {self.NOVNC_DISPLAY_SIZE!r} is smaller than "
+                f"NOVNC_WINDOW_HEIGHT_PX ({self.NOVNC_WINDOW_HEIGHT_PX}) on the y axis"
+            )
+        return self
+
+    @field_validator("NOVNC_PUBLIC_URL")
+    @classmethod
+    def _validate_novnc_public_url(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return None
+        parsed = urlparse(value)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc or parsed.path != "":
+            raise ValueError(
+                f"NOVNC_PUBLIC_URL must be an absolute http or https URL with no path, got {value!r}"
+            )
+        return value
+
+    @field_validator("SESSION_DEFAULT_PROFILE")
+    @classmethod
+    def _validate_session_default_profile(cls, value: str) -> str:
+        if not is_valid_profile(value):
+            raise ValueError(f"SESSION_DEFAULT_PROFILE must match {PROFILE_PATTERN}, got {value!r}")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_challenge_weights(self) -> "Settings":
+        if self.CHALLENGE_WALL_MAX_BYTES > self.CHALLENGE_SHAPE_MAX_BYTES:
+            raise ValueError("CHALLENGE_WALL_MAX_BYTES must not exceed CHALLENGE_SHAPE_MAX_BYTES")
+        if self.CHALLENGE_THIN_LINK_COUNT > self.CHALLENGE_RICH_LINK_COUNT:
+            raise ValueError("CHALLENGE_THIN_LINK_COUNT must not exceed CHALLENGE_RICH_LINK_COUNT")
+        if self.CHALLENGE_WEIGHT_RICH_CONTENT > 0:
+            raise ValueError("CHALLENGE_WEIGHT_RICH_CONTENT must not be positive")
+        if self.CHALLENGE_WEIGHT_MANY_LINKS > 0:
+            raise ValueError("CHALLENGE_WEIGHT_MANY_LINKS must not be positive")
+        if self.CHALLENGE_WEIGHT_SERVED_PAGE > 0:
+            raise ValueError("CHALLENGE_WEIGHT_SERVED_PAGE must not be positive")
+        negative_guards = {
+            "CHALLENGE_WEIGHT_RICH_CONTENT",
+            "CHALLENGE_WEIGHT_MANY_LINKS",
+            "CHALLENGE_WEIGHT_SERVED_PAGE",
+        }
+        allowed_single = {
+            "CHALLENGE_WEIGHT_DEFINITIVE_HEADER",
+            "CHALLENGE_WEIGHT_STATUS_EMPTY_BODY",
+        }
+        weight_names = (
+            "CHALLENGE_WEIGHT_DEFINITIVE_HEADER",
+            "CHALLENGE_WEIGHT_INTERSTITIAL_STRUCTURE",
+            "CHALLENGE_WEIGHT_VENDOR_SCRIPT",
+            "CHALLENGE_WEIGHT_VENDOR_PRESENCE",
+            "CHALLENGE_WEIGHT_STATUS_EMPTY_BODY",
+            "CHALLENGE_WEIGHT_STATUS_SMALL_BODY",
+            "CHALLENGE_WEIGHT_STATUS_LARGE_BODY",
+            "CHALLENGE_WEIGHT_CAPTCHA_INPUT",
+            "CHALLENGE_WEIGHT_CAPTCHA_ELEMENT",
+            "CHALLENGE_WEIGHT_FORM_DOMINANCE",
+            "CHALLENGE_WEIGHT_SCRIPT_ONLY_BODY",
+            "CHALLENGE_WEIGHT_THIN_TEXT",
+            "CHALLENGE_WEIGHT_FEW_LINKS",
+            "CHALLENGE_WEIGHT_NO_ARTICLE",
+            "CHALLENGE_WEIGHT_RICH_CONTENT",
+            "CHALLENGE_WEIGHT_MANY_LINKS",
+            "CHALLENGE_WEIGHT_SERVED_PAGE",
+            "CHALLENGE_WEIGHT_PHRASE_TITLE",
+            "CHALLENGE_WEIGHT_PHRASE_BODY",
+        )
+        for name in weight_names:
+            if name in negative_guards or name in allowed_single:
+                continue
+            value = getattr(self, name)
+            if value < 0:
+                raise ValueError(f"{name} must not be negative")
+        for name in weight_names:
+            if name in allowed_single:
+                continue
+            value = getattr(self, name)
+            if value >= self.CHALLENGE_SCORE_THRESHOLD:
+                raise ValueError(f"{name} must stay below CHALLENGE_SCORE_THRESHOLD")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_crawl_defaults(self) -> "Settings":
+        if self.CRAWL_DEFAULT_DEPTH > self.CRAWL_MAX_DEPTH:
+            raise ValueError("CRAWL_DEFAULT_DEPTH must not exceed CRAWL_MAX_DEPTH")
+        if self.CRAWL_DEFAULT_PAGE_BUDGET > self.CRAWL_MAX_PAGES:
+            raise ValueError("CRAWL_DEFAULT_PAGE_BUDGET must not exceed CRAWL_MAX_PAGES")
+        if self.CRAWL_ROBOTS_CACHE_MAX_RULES < self.CRAWL_ROBOTS_MAX_RULES:
+            raise ValueError("CRAWL_ROBOTS_CACHE_MAX_RULES must not be below CRAWL_ROBOTS_MAX_RULES")
+        if self.CRAWL_SITEMAP_TIMEOUT_SECONDS >= self.CRAWL_CLAIM_LEASE_SECONDS:
+            raise ValueError("CRAWL_SITEMAP_TIMEOUT_SECONDS must stay below CRAWL_CLAIM_LEASE_SECONDS")
+        return self
 
 
 settings = Settings()

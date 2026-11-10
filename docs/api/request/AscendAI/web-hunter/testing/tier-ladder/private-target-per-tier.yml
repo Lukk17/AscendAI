@@ -1,0 +1,42 @@
+info:
+  name: private-target-per-tier
+  type: http
+  seq: 50
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Blocked-name article read with the tier from --env-var tier. Every tier
+    # must refuse before any fetch, so the fake site request log stays empty.
+    data: |-
+      {
+        "url": "http://e2e-fake-site-blocked:7031/article",
+        "include_links": false,
+        "heavy_mode": false,
+        "tier": "{{tier}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 400", function () {
+            expect(res.getStatus()).to.equal(400);
+        });
+        test("blocked target refused with unsafe_uri problem body", function () {
+            const b = res.getBody();
+            expect(b.code).to.equal("unsafe_uri");
+            expect(b.status).to.equal(400);
+            expect(b.type).to.be.a("string").and.not.empty;
+            expect(b.instance).to.be.a("string").and.not.empty;
+            expect(b.traceId).to.match(/^[0-9a-f]{32}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

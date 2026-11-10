@@ -1,0 +1,54 @@
+info:
+  name: mcp-refusal
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7020/mcp"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json, text/event-stream
+    - name: Mcp-Session-Id
+      value: "{{mcp_session_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "tools/call",
+        "params": {
+          "name": "memory_insert",
+          "arguments": {
+            "user_id": "e2e-platform-contract",
+            "provider": "openai",
+            "text": ""
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("an empty text is refused with validation", function () {
+            const sseBody = res.getBody();
+            const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
+            const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
+            expect(envelope.result.isError).to.equal(true);
+            const textEntry = envelope.result.content.find(function (entry) { return entry.type === "text"; });
+            expect(textEntry.text.indexOf("validation: ")).to.equal(0);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

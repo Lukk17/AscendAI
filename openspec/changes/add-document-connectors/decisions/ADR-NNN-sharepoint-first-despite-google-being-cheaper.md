@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-09-04. Amended 2026-09-05, see Amendment below. Accepted when the OpenSpec change `add-document-connectors` lands. This file is the draft that moves into `apps/ascend-agent/docs/architecture/decisions/` on archive, taking the next free number at that time.
+Proposed, 2026-09-04. Amended 2026-09-05 and corrected 2026-10-04, see the two sections below. Accepted when the OpenSpec change `add-document-connectors` lands. This file is the draft that moves into `apps/ascend-agent/docs/architecture/decisions/` on archive, taking the next free number at that time.
 
 ## Amendment, 2026-09-05
 
@@ -13,6 +13,12 @@ What changed is the counter-argument's status. Access-list capture is deferred u
 The comparison is not withdrawn, and it is the whole point of keeping this record. It becomes live again the day capture returns, and it will argue then exactly what it argues now. A future reader re-opening the ordering should find this analysis rather than rediscover it, and should not read the deferral as evidence that the difference between the two sources was overstated.
 
 One consequence of the amendment is worth naming, because it is the opposite of the trade-off recorded below. The complexity this record apologises for, the `container-first-permission-capture` record and the separate permission budget existing to serve a constraint the second connector will not have, is not being paid in this version at all. It is deferred with the capture work. So the first connector is no longer the expensive one, and the argument that the harder capture path should shape the abstraction is an argument about a future version rather than about the code this change ships.
+
+## Correction, 2026-10-04 (owner decision 65.8)
+
+The claim this record was built on is wrong for shared drives. The Drive v3 reference for the File resource says of `permissions[]`: "Output only. The full list of permissions for the file. This is only available if the requesting user can share the file. Not populated for items in shared drives." (https://developers.google.com/workspace/drive/api/reference/rest/v3/files, read on 2026-10-04). A company keeps its documents in shared drives, so for those files the change feed does not hand back permissions inline, and a connector needs one `permissions.list` call per file, the same per-item cost Microsoft Graph has. Google Drive is therefore not cheaper to make permission-correct for the files a company connector would read. Both sources need per-item permission requests, so the machinery of the `container-first-permission-capture` record serves both, and the comparison below is kept only as the history of a mistaken premise.
+
+The decision is unchanged and now has no counter-argument: SharePoint stays first because the customers are on Microsoft. The title keeps its slug so links stay valid. The Context and Consequences below describe the reasoning as it stood on 2026-09-04 and 2026-09-05, and every statement in them that Google Drive returns permissions inline or needs little of the per-item machinery is superseded by this correction.
 
 ## Context
 
@@ -54,4 +60,4 @@ The harder capture path is also the one that should shape the abstraction. An `A
 
 - the `container-first-permission-capture` record, which exists because of the difference this record describes
 - Design decision D17
-- `add-document-connectors` design, Open Question 6, which flags that the Google Drive inline-permissions claim underpinning this record was not verified against the `changes.list` reference and must be before a Google connector is planned
+- `add-document-connectors` design, Open Question 4, closed by owner decision 65.8 of 2026-10-04 with the correction above

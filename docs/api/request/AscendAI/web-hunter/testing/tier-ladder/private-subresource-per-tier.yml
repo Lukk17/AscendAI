@@ -1,0 +1,39 @@
+info:
+  name: private-subresource-per-tier
+  type: http
+  seq: 53
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Allowed page loading an image from the blocked name. Browser tiers
+    # contain the subresource and still return the QUARRY-THRUSH canary.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/private-image",
+        "include_links": false,
+        "heavy_mode": false,
+        "tier": "{{tier}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("contained subresource still serves the page canary", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("success");
+            expect(b.content).to.include("QUARRY-THRUSH");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

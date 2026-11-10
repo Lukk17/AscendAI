@@ -28,7 +28,7 @@ runtime:
             expect(res.getStatus()).to.equal(428);
         });
         test("blocked: human intervention required", function () {
-            expect(res.getBody().status).to.equal("human_intervention_required");
+            expect(res.getBody().code).to.equal("human_intervention_required");
         });
         test("blocked: a vnc_url is returned for the human to solve", function () {
             expect(res.getBody().vnc_url).to.be.a("string").and.not.empty;

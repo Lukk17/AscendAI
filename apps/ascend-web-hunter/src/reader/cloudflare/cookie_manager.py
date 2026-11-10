@@ -12,29 +12,80 @@ from src.observability.metrics import REDIS_OPS_TOTAL
 
 logger = logging.getLogger(__name__)
 
-# suffix_list_urls=() disables remote PSL fetches and falls back to the bundled
-# snapshot. cache_dir=None means in-memory only so we don't write to a default
-# platform-dependent directory.
 _TLD_EXTRACT = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
 
-# `produced_by` values written by every code path that saves a session, and read back
-# by WebReader to decide whether a stored clearance can be replayed by the tier that
-# earned it. The FlareSolverr and NoVNC values match the WebReader strategy names so a
-# stored producer can be looked up directly as a strategy key.
-PRODUCED_BY_FLARESOLVERR = "3-flaresolverr"
+PRODUCED_BY_PLAYWRIGHT = "4-playwright_stealth"
+PRODUCED_BY_PATCHRIGHT = "4a-patchright"
+PRODUCED_BY_CAMOUFOX = "4b-camoufox"
 PRODUCED_BY_NOVNC = "6-novnc"
 PRODUCED_BY_LOGIN_SEED = "login-seed"
+PRODUCED_BY_IMPORT = "import"
 
-# Reported for a still-valid entry that predates the produced_by field, or whose
-# caller omitted it. Distinct from None, which means no valid stored session exists
-# at all; both cases end up routed the same way (browser tiers first), but only one
-# of them actually has cookies worth replaying.
 PRODUCED_BY_UNKNOWN = "unknown"
 
+_LOGIN_PRODUCERS = frozenset({PRODUCED_BY_IMPORT, PRODUCED_BY_LOGIN_SEED})
 
-def _is_waf_cookie(name: str) -> bool:
+SiteEntry = tuple[str, str, str, str]
+
+
+def is_waf_cookie(name: str) -> bool:
     """Return True for known short-lived WAF-clearance cookie names."""
     return name in {"cf_clearance", "__cf_bm", "_cfuvid"}
+
+
+_TRACKING_NAMES = frozenset(
+    {
+        "_ga",
+        "_gid",
+        "_gat",
+        "_fbp",
+        "_fbc",
+        "_clck",
+        "_clsk",
+        "OptanonConsent",
+        "OptanonAlertBoxClosed",
+        "CookieConsent",
+        "euconsent-v2",
+        "cookieyes-consent",
+        "ajs_anonymous_id",
+    }
+)
+
+_TRACKING_NAME_PREFIXES = ("_ga_", "_gat_", "_gcl_", "_hj", "__utm", "_pk_", "_uet", "amplitude_")
+
+
+def is_tracking_entry(name: str) -> bool:
+    """Return True for a known analytics or consent cookie or localStorage key."""
+    return name in _TRACKING_NAMES or name.startswith(_TRACKING_NAME_PREFIXES)
+
+
+def belongs_to_site(address: str, site: str) -> bool:
+    """True when *address*, a host, cookie domain or origin, sits on the registrable domain *site*."""
+    return bool(site) and CookieManager.registrable_domain(address.lstrip(".")) == site
+
+
+def is_login_state_name(name: str) -> bool:
+    return bool(name) and not is_waf_cookie(name) and not is_tracking_entry(name)
+
+
+def site_local_storage_entries(storage_state: dict[str, Any], site: str) -> set[SiteEntry]:
+    """The localStorage entries the site set on its own origins, minus known analytics or consent keys."""
+    entries: set[SiteEntry] = set()
+    for origin in storage_state.get("origins", []):
+        address = str(origin.get("origin", ""))
+        if not belongs_to_site(address, site):
+            continue
+        for item in origin.get("localStorage", []):
+            name = str(item.get("name", ""))
+            if is_login_state_name(name):
+                entries.add(("localStorage", address, name, str(item.get("value", ""))))
+
+    return entries
+
+
+def holds_login_state(storage_state: dict[str, Any], site: str) -> bool:
+    """True when *storage_state* carries a cookie or a localStorage entry the site set itself."""
+    return bool(storage_state.get("cookies")) or bool(site_local_storage_entries(storage_state, site))
 
 
 def _split_storage_state(
@@ -44,8 +95,8 @@ def _split_storage_state(
     all_cookies: list[dict[str, Any]] = storage_state.get("cookies", [])
     origins: list[dict[str, Any]] = storage_state.get("origins", [])
 
-    auth_cookies = [c for c in all_cookies if not _is_waf_cookie(c.get("name", ""))]
-    waf_cookies = [c for c in all_cookies if _is_waf_cookie(c.get("name", ""))]
+    auth_cookies = [c for c in all_cookies if not is_waf_cookie(c.get("name", ""))]
+    waf_cookies = [c for c in all_cookies if is_waf_cookie(c.get("name", ""))]
 
     auth_state: dict[str, Any] = {"cookies": auth_cookies, "origins": origins}
     waf_state: dict[str, Any] = {"cookies": waf_cookies, "origins": []}
@@ -72,6 +123,15 @@ def _merge_storage_states(
 def _extract_flat_cookies(storage_state: dict[str, Any]) -> dict[str, str]:
     """Return a name→value dict from a storage_state for use in HTTP headers."""
     return {c["name"]: c["value"] for c in storage_state.get("cookies", []) if "name" in c and "value" in c}
+
+
+def _cookie_identity(cookie: dict[str, Any]) -> tuple[str, str, str]:
+    """Name, domain and path: what makes two Playwright cookies the same cookie."""
+    return (
+        str(cookie.get("name", "")),
+        str(cookie.get("domain", "")).lstrip(".").lower(),
+        str(cookie.get("path", "/")),
+    )
 
 
 def _hard_cookie_expiries(cookies: list[dict[str, Any]]) -> list[float]:
@@ -126,9 +186,10 @@ class CookieManager:
     def registrable_domain(url: str) -> str:
         """Return the registrable domain a session record for *url* is keyed by."""
         parsed = urlparse(url)
-        host = parsed.netloc or urlparse(f"//{url}", scheme="http").netloc or url.split("/", 1)[0]
-        host = host.lower().split(":", 1)[0]
-        if not host or "/" in host:
+        if not parsed.netloc:
+            parsed = urlparse(f"//{url}", scheme="http")
+        host = parsed.hostname or ""
+        if not host:
             return ""
 
         extracted = _TLD_EXTRACT(host)
@@ -142,7 +203,7 @@ class CookieManager:
         return f"session:{domain}:{profile}"
 
     @staticmethod
-    def _auth_ttl_remaining_from_entry(auth_entry: dict[str, Any]) -> float:
+    def _auth_ttl_remaining_from_entry(auth_entry: dict[str, Any], site: str) -> float:
         """Seconds remaining before *auth_entry* stops authenticating.
 
         Governed by whichever runs out first: the sliding SESSION_AUTH_TTL_SECONDS
@@ -162,18 +223,24 @@ class CookieManager:
         opposite failure this fix exists to close: reporting a dead session
         as active.
 
-        An entry with no cookies at all reports 0 regardless of the ceiling:
-        the ceiling is a trust boundary for cookies that exist, not a reason
-        to treat an empty jar as an authenticated session on its own.
+        An entry holding only localStorage the site set on its own origins (a
+        site that keeps its login in browser storage and sets no cookie) has no
+        hard expiry either and also falls back to the ceiling alone.
+
+        An entry with neither a cookie nor such a localStorage entry reports 0
+        regardless of the ceiling: the ceiling is a trust boundary for login
+        state that exists, not a reason to treat an empty jar as an
+        authenticated session on its own.
         """
         saved_at = float(auth_entry.get("saved_at", 0) or 0)
         now = time.time()
         ceiling_remaining = settings.SESSION_AUTH_TTL_SECONDS - (now - saved_at)
 
-        cookies = auth_entry.get("storage_state", {}).get("cookies", [])
-        if not cookies:
+        storage_state = auth_entry.get("storage_state", {})
+        if not holds_login_state(storage_state, site):
             return 0.0
 
+        cookies = storage_state.get("cookies", [])
         hard_expiries = _hard_cookie_expiries(cookies)
         if not hard_expiries:
             return max(ceiling_remaining, 0.0)
@@ -213,7 +280,7 @@ class CookieManager:
         auth_state: dict[str, Any] | None = None
         waf_state: dict[str, Any] | None = None
 
-        if auth_entry and self._auth_ttl_remaining_from_entry(auth_entry) > 0:
+        if auth_entry and self._auth_ttl_remaining_from_entry(auth_entry, domain) > 0:
             auth_state = auth_entry.get("storage_state")
         if self._waf_entry_is_valid(waf_entry):
             waf_state = waf_entry.get("storage_state")
@@ -248,7 +315,7 @@ class CookieManager:
             return waf_entry.get("produced_by") or PRODUCED_BY_UNKNOWN
 
         auth_entry = record.get("auth")
-        if auth_entry and self._auth_ttl_remaining_from_entry(auth_entry) > 0:
+        if auth_entry and self._auth_ttl_remaining_from_entry(auth_entry, domain) > 0:
             return auth_entry.get("produced_by") or PRODUCED_BY_UNKNOWN
 
         return None
@@ -291,12 +358,17 @@ class CookieManager:
         user_agent: str,
         profile: str | None = None,
         produced_by: str | None = None,
+        *,
+        replaces_login: bool = False,
     ) -> None:
         """Persist a full Playwright storage_state, split into auth/WAF sub-records.
 
         `produced_by` names the tier that captured *storage_state* (see the
         `PRODUCED_BY_*` constants), so a later read can decide whether the stored
-        clearance can be replayed by the tier that earned it.
+        clearance can be replayed by the tier that earned it. A capture that
+        drops an auth cookie of a valid stored login keeps that login, unless
+        `replaces_login` says a new login was completed. The saved auth entry is
+        a login when `replaces_login` is set or it carries a valid stored login forward.
         """
         domain = self.registrable_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
@@ -308,12 +380,22 @@ class CookieManager:
         if existing:
             record = dict(existing)
 
-        record["auth"] = {
-            "storage_state": auth_state,
-            "user_agent": user_agent,
-            "saved_at": now,
-            "produced_by": produced_by,
-        }
+        stored_auth = record.get("auth")
+        if replaces_login or not self._drops_valid_login(stored_auth, auth_state, domain):
+            record["auth"] = {
+                "storage_state": auth_state,
+                "user_agent": user_agent,
+                "saved_at": now,
+                "produced_by": produced_by,
+                "is_login": replaces_login or self._is_valid_login_entry(stored_auth, domain),
+            }
+        else:
+            logger.info(
+                "[CookieManager] Kept the stored login for %s (profile=%s): "
+                "the capture lacks its auth cookies or its localStorage login",
+                domain,
+                effective_profile,
+            )
         if waf_state["cookies"]:
             record["waf"] = {
                 "storage_state": waf_state,
@@ -323,6 +405,51 @@ class CookieManager:
             }
 
         await self._save_record(domain, effective_profile, record)
+
+    @classmethod
+    def _is_valid_login_entry(cls, auth_entry: dict[str, Any] | None, site: str) -> bool:
+        """True when *auth_entry* still authenticates and a login, an import or a login seed saved it."""
+        if not auth_entry or cls._auth_ttl_remaining_from_entry(auth_entry, site) <= 0:
+            return False
+
+        return bool(auth_entry.get("is_login")) or auth_entry.get("produced_by") in _LOGIN_PRODUCERS
+
+    async def has_valid_login(
+        self,
+        url: str,
+        profile: str | None = None,
+    ) -> bool:
+        """Return whether the stored auth entry is a valid login, not a challenge solve's capture."""
+        domain = self.registrable_domain(url)
+        effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
+        record = await self._load_record(domain, effective_profile)
+        if record is None:
+            return False
+
+        return self._is_valid_login_entry(record.get("auth"), domain)
+
+    @classmethod
+    def _drops_valid_login(
+        cls, auth_entry: dict[str, Any] | None, auth_state: dict[str, Any], site: str
+    ) -> bool:
+        """True when *auth_entry* is a valid login and *auth_state* lacks one
+        of its live auth cookies or one of the site's own localStorage keys."""
+        if not auth_entry or cls._auth_ttl_remaining_from_entry(auth_entry, site) <= 0:
+            return False
+        now = time.time()
+        stored_state = auth_entry.get("storage_state", {})
+        required = {
+            _cookie_identity(cookie)
+            for cookie in stored_state.get("cookies", [])
+            if not isinstance(cookie.get("expires"), int | float)
+            or cookie["expires"] <= 0
+            or cookie["expires"] > now
+        }
+        captured = {_cookie_identity(cookie) for cookie in auth_state.get("cookies", [])}
+        required_keys = {entry[:3] for entry in site_local_storage_entries(stored_state, site)}
+        captured_keys = {entry[:3] for entry in site_local_storage_entries(auth_state, site)}
+
+        return not (required <= captured and required_keys <= captured_keys)
 
     async def slide_auth_ttl(
         self,
@@ -339,7 +466,7 @@ class CookieManager:
         record["auth"]["saved_at"] = time.time()
         await self._save_record(domain, effective_profile, record)
 
-    async def has_auth_cookies(
+    async def has_auth_state(
         self,
         url: str,
         profile: str | None = None,
@@ -348,8 +475,10 @@ class CookieManager:
 
         Deliberately ignores the TTL: this answers "is there a session to
         validate", which is the question the read path asks before it decides
-        whether an expired session is worth reporting. A record holding only
-        WAF clearance answers False, because nobody logged in to expire.
+        whether an expired session is worth reporting. The auth entry counts
+        when it holds a cookie or a localStorage entry the site set on its own
+        origins. A record holding only WAF clearance answers False, because
+        nobody logged in to expire.
         """
         domain = self.registrable_domain(url)
         effective_profile = profile or settings.SESSION_DEFAULT_PROFILE
@@ -358,9 +487,8 @@ class CookieManager:
             return False
 
         auth_entry: dict[str, Any] = record.get("auth") or {}
-        cookies: list[dict[str, Any]] = auth_entry.get("storage_state", {}).get("cookies", [])
 
-        return bool(cookies)
+        return holds_login_state(auth_entry.get("storage_state", {}), domain)
 
     async def has_session_record(
         self,
@@ -369,7 +497,7 @@ class CookieManager:
     ) -> bool:
         """Return whether anything at all is stored for this domain/profile.
 
-        Wider than `has_auth_cookies`: a record holding only WAF clearance, or an
+        Wider than `has_auth_state`: a record holding only WAF clearance, or an
         auth entry whose jar is empty, still answers True. This is the question
         that tells a session which expired apart from one that was never
         established.
@@ -405,7 +533,7 @@ class CookieManager:
         url: str,
         profile: str | None = None,
     ) -> float:
-        """Return seconds remaining before the stored auth cookies stop
+        """Return seconds remaining before the stored login state stops
         authenticating, or 0 if expired/absent. See
         `_auth_ttl_remaining_from_entry` for how cookie expiry and the
         configured ceiling combine.
@@ -416,12 +544,8 @@ class CookieManager:
         if record is None or "auth" not in record:
             return 0.0
 
-        return self._auth_ttl_remaining_from_entry(record["auth"])
+        return self._auth_ttl_remaining_from_entry(record["auth"], domain)
 
-    # ---------------------------------------------------------------------------
-    # Legacy compatibility: still used by FlareSolverrStrategy which receives a
-    # flat cookie dict + user_agent from FlareSolverr's response.
-    # ---------------------------------------------------------------------------
     async def save_flat_cookies(
         self,
         url: str,
@@ -540,10 +664,10 @@ class CookieManager:
     ) -> None:
         if self.redis_client:
             try:
-                await self.redis_client.setex(
+                await self.redis_client.set(
                     self._redis_key(domain, profile),
-                    settings.SESSION_AUTH_TTL_SECONDS,
                     json.dumps(record),
+                    ex=settings.SESSION_AUTH_TTL_SECONDS,
                 )
                 REDIS_OPS_TOTAL.labels(op="set", result="success").inc()
                 logger.info("[CookieManager] Saved session to Redis for %s", domain)

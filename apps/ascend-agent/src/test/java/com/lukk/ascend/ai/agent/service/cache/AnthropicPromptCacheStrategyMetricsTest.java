@@ -66,8 +66,8 @@ class AnthropicPromptCacheStrategyMetricsTest {
     }
 
     @Test
-    @DisplayName("recordOutcome registers prompt_cache.tokens.total counter with provider=anthropic tag")
-    void recordOutcome_RegistersTokensTotalCounter() {
+    @DisplayName("recordOutcome grows gen_ai input usage by the stub prompt tokens")
+    void recordOutcome_RegistersGenAiInputUsage() {
         // given
         MeterRegistry registry = new SimpleMeterRegistry();
         AnthropicPromptCacheStrategy strategy = new AnthropicPromptCacheStrategy(registry);
@@ -82,10 +82,11 @@ class AnthropicPromptCacheStrategyMetricsTest {
         strategy.recordOutcome("user", response);
 
         // then
-        Counter counter = registry.find("prompt_cache.tokens.total")
-                .tag("provider", "anthropic")
+        Counter counter = registry.find("gen_ai.client.token.usage")
+                .tag("gen_ai_system", "anthropic")
+                .tag("gen_ai_token_type", "input")
                 .counter();
         assertThat(counter).isNotNull();
-        assertThat(counter.count()).isGreaterThanOrEqualTo(0.0);
+        assertThat(counter.count()).isEqualTo(512.0);
     }
 }

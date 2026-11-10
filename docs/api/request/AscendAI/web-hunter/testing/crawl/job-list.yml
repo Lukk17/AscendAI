@@ -1,0 +1,34 @@
+info:
+  name: job-list
+  type: http
+  seq: 32
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/crawl/jobs"
+  headers:
+    - name: X-Ascend-Tenant
+      value: "{{tenant}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("list answers the jobs array", function () {
+            const b = res.getBody();
+            expect(b.jobs).to.be.an("array");
+            b.jobs.forEach(function (job) {
+                expect(job.job_id).to.be.a("string").and.not.empty;
+                expect(["waiting", "running", "succeeded", "failed", "cancelled"]).to.include(job.state);
+            });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

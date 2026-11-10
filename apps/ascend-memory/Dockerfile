@@ -22,8 +22,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 COPY pyproject.toml ./
 COPY src/ src/
+COPY --from=ascend-python-common . /opt/ascend-python-common
 
 RUN pip install --upgrade pip \
+    && pip install /opt/ascend-python-common \
     && pip install .
 
 

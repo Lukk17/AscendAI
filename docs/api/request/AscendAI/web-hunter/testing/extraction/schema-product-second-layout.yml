@@ -1,0 +1,50 @@
+info:
+  name: schema-product-second-layout
+  type: http
+  seq: 31
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Same schema as schema-product.yml, read after POST /__state switches
+    # /product to layout 2. The stored recipe no longer replays, so the
+    # service deletes it and the model answers again.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/product",
+        "include_links": false,
+        "heavy_mode": false,
+        "output_format": "schema",
+        "extraction_schema": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "price": {"type": "number"}
+          },
+          "required": ["name", "price"]
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("after the drift the model answers the canary values again", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("success");
+            expect(b.recipe).to.equal("model");
+            expect(b.content.name).to.equal("Brassbound Meridian Astrolabe");
+            expect(b.content.price).to.equal(847.25);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

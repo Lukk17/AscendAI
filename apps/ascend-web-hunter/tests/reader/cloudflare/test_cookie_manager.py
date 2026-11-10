@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src.config.config import settings
 from src.reader.cloudflare.cookie_manager import CookieManager
 
 
@@ -15,7 +16,7 @@ def _fresh_manager() -> CookieManager:
 
 
 @pytest.mark.asyncio
-async def test_cookie_manager_save_and_get_via_memory():
+async def test_cookie_manager_save_and_get_via_memory() -> None:
     # given
     manager = _fresh_manager()
     url = "https://www.linkedin.com/jobs"
@@ -30,7 +31,7 @@ async def test_cookie_manager_save_and_get_via_memory():
 
 
 @pytest.mark.asyncio
-async def test_apex_extraction_treats_cctlds_separately():
+async def test_apex_extraction_treats_cctlds_separately() -> None:
     # given
     manager = _fresh_manager()
     await manager.save_session_data("https://attacker.co.uk/path", {"k": "atk"}, "UA")
@@ -49,7 +50,7 @@ async def test_apex_extraction_treats_cctlds_separately():
 
 
 @pytest.mark.asyncio
-async def test_get_domain_strips_subdomain_and_port():
+async def test_get_domain_strips_subdomain_and_port() -> None:
     # given
     manager = _fresh_manager()
     await manager.save_session_data("https://www.example.com:8443/path", {"k": "v"}, "UA")
@@ -63,7 +64,7 @@ async def test_get_domain_strips_subdomain_and_port():
 
 
 @pytest.mark.asyncio
-async def test_redis_get_returns_parsed_payload():
+async def test_redis_get_returns_parsed_payload() -> None:
     # given
     manager = _fresh_manager()
     mock_redis = AsyncMock()
@@ -93,7 +94,7 @@ async def test_redis_get_returns_parsed_payload():
 
 
 @pytest.mark.asyncio
-async def test_redis_get_miss_falls_through_to_memory():
+async def test_redis_get_miss_falls_through_to_memory() -> None:
     # given
     manager = _fresh_manager()
     mock_redis = AsyncMock()
@@ -122,7 +123,7 @@ async def test_redis_get_miss_falls_through_to_memory():
 
 
 @pytest.mark.asyncio
-async def test_redis_get_error_falls_back_to_memory():
+async def test_redis_get_error_falls_back_to_memory() -> None:
     # given
     manager = _fresh_manager()
     mock_redis = AsyncMock()
@@ -151,26 +152,27 @@ async def test_redis_get_error_falls_back_to_memory():
 
 
 @pytest.mark.asyncio
-async def test_save_via_redis_success():
+async def test_save_via_redis_success() -> None:
     # given
     manager = _fresh_manager()
     mock_redis = AsyncMock()
-    mock_redis.setex = AsyncMock()
+    mock_redis.set = AsyncMock()
     manager.redis_client = mock_redis
 
     # when
     await manager.save_session_data("https://example.com", {"k": "v"}, "UA")
 
     # then
-    mock_redis.setex.assert_awaited_once()
+    mock_redis.set.assert_awaited_once()
+    assert mock_redis.set.await_args.kwargs["ex"] == settings.SESSION_AUTH_TTL_SECONDS
 
 
 @pytest.mark.asyncio
-async def test_save_via_redis_error_falls_back_to_memory():
+async def test_save_via_redis_error_falls_back_to_memory() -> None:
     # given
     manager = _fresh_manager()
     mock_redis = AsyncMock()
-    mock_redis.setex = AsyncMock(side_effect=RuntimeError("down"))
+    mock_redis.set = AsyncMock(side_effect=RuntimeError("down"))
     manager.redis_client = mock_redis
 
     # when
@@ -184,7 +186,7 @@ async def test_save_via_redis_error_falls_back_to_memory():
 
 
 @pytest.mark.asyncio
-async def test_init_with_no_redis_url_leaves_client_none():
+async def test_init_with_no_redis_url_leaves_client_none() -> None:
     # given
     CookieManager._instance = None
 
@@ -197,7 +199,7 @@ async def test_init_with_no_redis_url_leaves_client_none():
 
 
 @pytest.mark.asyncio
-async def test_init_with_redis_failure_keeps_initialized():
+async def test_init_with_redis_failure_keeps_initialized() -> None:
     # given
     CookieManager._instance = None
 
@@ -213,7 +215,7 @@ async def test_init_with_redis_failure_keeps_initialized():
 
 
 @pytest.mark.asyncio
-async def test_init_reentry_returns_existing_singleton():
+async def test_init_reentry_returns_existing_singleton() -> None:
     # when
     manager_a = _fresh_manager()
 
@@ -223,7 +225,7 @@ async def test_init_reentry_returns_existing_singleton():
 
 
 @pytest.mark.asyncio
-async def test_get_domain_handles_bare_host_without_scheme():
+async def test_get_domain_handles_bare_host_without_scheme() -> None:
     # given
     import time
 
@@ -248,7 +250,7 @@ async def test_get_domain_handles_bare_host_without_scheme():
 
 
 @pytest.mark.asyncio
-async def test_get_domain_returns_empty_for_empty_url():
+async def test_get_domain_returns_empty_for_empty_url() -> None:
     # given
     import time
 
@@ -273,7 +275,7 @@ async def test_get_domain_returns_empty_for_empty_url():
 
 
 @pytest.mark.asyncio
-async def test_get_domain_returns_host_when_no_psl_suffix():
+async def test_get_domain_returns_host_when_no_psl_suffix() -> None:
     """tldextract cannot recognise non-PSL hosts (intranet, localhost). The fallback
     is to keep the host as-is so internal addresses still get a unique key."""
     # given
@@ -300,7 +302,7 @@ async def test_get_domain_returns_host_when_no_psl_suffix():
 
 
 @pytest.mark.asyncio
-async def test_clear_session_removes_memory_record_and_reports_existed():
+async def test_clear_session_removes_memory_record_and_reports_existed() -> None:
     # given
     manager = _fresh_manager()
     await manager.save_session_data("https://example.com", {"k": "v"}, "UA")
@@ -316,7 +318,7 @@ async def test_clear_session_removes_memory_record_and_reports_existed():
 
 
 @pytest.mark.asyncio
-async def test_clear_session_is_idempotent_when_nothing_stored():
+async def test_clear_session_is_idempotent_when_nothing_stored() -> None:
     # given
     manager = _fresh_manager()
 
@@ -328,7 +330,7 @@ async def test_clear_session_is_idempotent_when_nothing_stored():
 
 
 @pytest.mark.asyncio
-async def test_clear_session_deletes_via_redis():
+async def test_clear_session_deletes_via_redis() -> None:
     # given
     manager = _fresh_manager()
     mock_redis = AsyncMock()
@@ -344,7 +346,7 @@ async def test_clear_session_deletes_via_redis():
 
 
 @pytest.mark.asyncio
-async def test_clear_session_redis_error_falls_back_to_memory_result():
+async def test_clear_session_redis_error_falls_back_to_memory_result() -> None:
     # given
     manager = _fresh_manager()
     await manager.save_session_data("https://example.com", {"k": "v"}, "UA")
@@ -360,7 +362,7 @@ async def test_clear_session_redis_error_falls_back_to_memory_result():
 
 
 @pytest.mark.asyncio
-async def test_schemeless_url_resolves_to_same_apex_as_scheme_qualified():
+async def test_schemeless_url_resolves_to_same_apex_as_scheme_qualified() -> None:
     """Security: `evil.com/path` (no scheme) must produce the same key as
     `https://evil.com/path` - otherwise an attacker can poison a parallel bucket
     with a literal `evil.com/path` key that the legitimate `evil.com` lookup
@@ -375,3 +377,34 @@ async def test_schemeless_url_resolves_to_same_apex_as_scheme_qualified():
     # then
     assert data is not None
     assert data["cookies"]["k"] == "v"
+
+
+@pytest.mark.asyncio
+async def test_a_session_address_whose_user_info_looks_like_a_port_is_keyed_by_its_real_host() -> None:
+    # given
+    manager = _fresh_manager()
+    mock_redis = AsyncMock()
+    mock_redis.delete = AsyncMock(return_value=1)
+    manager.redis_client = mock_redis
+
+    # when
+    await manager.clear_session("https://x.com:443@y.com/")
+
+    # then
+    assert CookieManager.registrable_domain("https://x.com:443@y.com/") == "y.com"
+    mock_redis.delete.assert_awaited_once_with("session:y.com:default")
+
+
+@pytest.mark.parametrize(
+    ("address", "domain"),
+    [
+        ("https://WWW.Example.COM:8443/path", "example.com"),
+        ("www.shop-site.com", "shop-site.com"),
+        ("example.com:8080/path", "example.com"),
+        ("", ""),
+        ("/relative/path", ""),
+    ],
+)
+def test_registrable_domain_reads_the_host_of_full_and_bare_addresses(address: str, domain: str) -> None:
+    # when / then
+    assert CookieManager.registrable_domain(address) == domain

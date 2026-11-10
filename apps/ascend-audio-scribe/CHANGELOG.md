@@ -8,6 +8,50 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `pyproject.toml` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.9.5] - <release date>
+
+### Changed
+- The service follows the shared library version set through `ascend-python-common==2.0.0`
+  (FastAPI 0.147.0, Starlette 1.9.0, uvicorn 0.54.0, FastMCP 4.1.1, MCP SDK 2.3.0,
+  httpx2 2.14.0). The service's own `fastapi`, `fastmcp`, `uvicorn` and `httpx2` pins are gone.
+- The MCP server reports the service name and version in `initialize`.
+- The `/mcp` endpoint accepts only allowed `Host` headers (`ascend-audio-scribe,localhost,127.0.0.1`)
+  and no `Origin` header; a refused `Host` answers 421, a refused `Origin` answers 403.
+- Every exported span carries the installed package version as `service.version`, read by the shared
+  library. `compose.yaml` no longer sets `OTEL_RESOURCE_ATTRIBUTES` by hand, so the two cannot drift.
+
+## [0.9.4] - <release date>
+
+### Changed
+- The service is built on `ascend-python-common==1.0.0` via `create_service_app`: shared problem bodies, settings
+  base, logging, request correlation, tracing, readiness aggregation, rate limiting, security headers, URI fetch
+  guard, and the startup banner frame. `Settings` subclasses `ServiceSettings` with `McpFetchSettings`; the error
+  registry maps `ValueError` to `validation`, `FileSizeExceededError` to `file_too_large`, `UpstreamProviderError`
+  to `upstream_provider`, and everything else to `internal`.
+- REST errors are problem bodies (`application/problem+json`) with `code` and `traceId`. Request validation
+  failures answer `400` with code `validation` and an `errors` array sorted by `field` (was FastAPI's default
+  unprocessable-content envelope). Unknown paths answer a problem `404` and wrong methods a problem `405` with `Allow`. Unexpected
+  failures answer `500` with code `internal` and a fixed generic detail.
+- MCP refusals are tool errors whose text starts with `<code>: ` (`validation: `, `file_too_large: `,
+  `upstream_provider: `, `internal: `). The previous result objects with a `status` key are gone.
+- `/health` answers `{"status": "ok", "service": "ascend-audio-scribe", "version": ...}`. `/ready` aggregates the
+  `ffmpeg` and `tempdir` probes (3 s budget each, run at once) and answers `200` `{"status": "ready", ...}` or `503`
+  `{"status": "not-ready", ...}`.
+- Logging comes from the library: `LOG_LEVEL` is honoured, `LOG_FORMAT` selects `json` or `color`, lines start
+  with `[ascend-audio-scribe]`. `src/config/logging_config.py`, `src/observability/request_context.py`, and the
+  `log_config` argument of `uvicorn.run` are deleted.
+- `RATE_LIMIT_DEFAULT` defaults to `600/minute` and `RATE_LIMIT_TRANSCRIBE` to `60/minute` on the four
+  transcription routes and tools; `/health`, `/ready`, `/metrics`, and `tools/list` are never limited.
+- `API_PORT` (default `7017`) is the only port setting. Downloads go through the library guard with redirect
+  re-checking and address pinning; `file://` stays jailed to `MCP_FILE_URI_ROOT`.
+- The allow list setting is now `ALLOWED_PRIVATE_HOSTS`, renamed on 2026-10-04 (owner answer 68.2, see ADR-001);
+  the service refuses to start while the old name is set.
+- Docs updated: `AGENTS.md`, `README.md`, ADR-001, ADR-002, and e2e spec 1 with its template now assert the `400`
+  problem body.
+
+### Fixed
+- The `audio_uri_docker` Bruno variable carries the container-reachable object store address, the unused `audio_uri` is gone, and the README names Bruno instead of Postman. `fix-linux-docker-host-access`.
+
 ## [0.9.3] - 2026-10-01
 
 ### Changed

@@ -111,7 +111,7 @@ conversations actually accumulate knowledge.
   Docling / Unstructured and indexes them automatically.
 - **Hybrid chat history.** Redis for the active context window, PostgreSQL for durable long-term archives and
   analytics.
-- **Privacy-respecting web.** SearXNG meta-search plus FlareSolverr for Cloudflare-protected pages, all self-hosted.
+- **Privacy-respecting web.** SearXNG meta-search plus patched-browser tiers (Patchright, Camoufox) for Cloudflare-protected pages, all self-hosted.
 
 ---
 
@@ -218,6 +218,7 @@ Two architecture entry points, depending on what you're after.
 | **[AscendMemory](apps/ascend-memory/AGENTS.md)**             | Python / FastAPI       | 7020 | Semantic memory (Mem0 + Qdrant)                     |
 | **[ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md)** | Java / Spring Boot     | 9998 | Weather data MCP server                             |
 | **[ascend-ocr](apps/ascend-ocr/AGENTS.md)**                 | Python / FastMCP       | 7022 | OCR service                                         |
+| **[ascend-python-common](libs/ascend-python-common/README.md)** | Python shared library (no service, no image) | - | Shared platform code (errors, settings, logging, tracing, rate limiting) for the four Python services |
 
 #### Request flow
 
@@ -386,7 +387,6 @@ the actual transport ascend-ai-agent uses today. The other surface is available 
 | Service                 | Port    | Default credentials | Role                                                        |
 | :---------------------- | :------ | :------------------ | :---------------------------------------------------------- |
 | **SearXNG**             | `9020` (loopback) | `SEARXNG_SECRET`  | Privacy-respecting meta-search; backend for ascend-web-hunter.|
-| **FlareSolverr**        | `8191` (loopback) | (none)            | Cloudflare bypass proxy used by ascend-web-hunter.            |
 | **ngrok (web-hunter)**  | (none)  | `NGROK_AUTHTOKEN`   | Public tunnel to ascend-web-hunter's NoVNC for remote CAPTCHA intervention. |
 | **Docling Serve**       | `5001`  | (none)              | PDF / DOCX to structured JSON (used by ingestion pipeline). |
 | **Unstructured API**    | `9080`  | (none)              | Generic document parsing fallback for ingestion.            |
@@ -399,10 +399,9 @@ Full setup and usage in [infra/observability/README.md](infra/observability/READ
 | :------------------ | :-------------- | :------------ | :------------------------------------------------------------------ |
 | **Grafana**         | `7078` → `3000` | Browser UI    | Dashboards + Explore. Anonymous `Viewer`; `admin` / `admin` to edit.|
 | **Prometheus**      | `7077` → `9090` | Browser UI    | Scrapes metrics from the 6 services and Qdrant.                     |
-| **Loki**            | `3100`          | Internal only | Log store; receives logs from Vector.                              |
+| **Loki**            | `3100`          | Internal only | Log store; receives logs from the OTel Collector.                   |
 | **Tempo**           | (none)          | Internal only | Trace store; receives traces from the OTel Collector.              |
-| **Vector**          | (none)          | Internal only | Tails the 6 app containers' Docker logs and ships them to Loki.    |
-| **OTel Collector**  | (none)          | Internal only | Receives OTLP traces from the services and exports them to Tempo.  |
+| **OTel Collector**  | (none)          | Internal only | Receives OTLP traces from the services and exports them to Tempo; tails the 6 app containers' Docker logs and ships them to Loki.  |
 
 #### External prerequisites (not in compose, managed / cloud in production)
 
@@ -426,13 +425,14 @@ Canonical index. Every doc the repo ships, in one place.
 | [apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md](apps/ascend-agent/docs/architecture/arc42/01-introduction-and-goals.md) | Arc42 for the agent internals.                                  |
 | [docs/architecture/permission-aware-retrieval.md](docs/architecture/permission-aware-retrieval.md)                     | How document access lists reach chunks and get enforced inside the vector search. |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)                                                                              | Docker Compose recipes, image publishing, prod notes.                 |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md)                                                                        | Every setting of every service, with links to the per-service references of ascend-agent, ascend-memory, ascend-ocr and ascend-web-hunter. |
 | [apps/ascend-web-hunter/deploy-standalone/README.md](apps/ascend-web-hunter/deploy-standalone/README.md)                                                  | Copy-and-run bundle for the web-search stack on a host of its own.    |
 | [.github/workflows/README.md](.github/workflows/README.md)                                                            | CI and release workflows, image naming, registries, package visibility. |
 | [contracts/README.md](contracts/README.md)                                                                            | Agent to OCR Pact contract: who writes it, who verifies it, how to regenerate it. |
 | [docs/INGESTION.md](docs/INGESTION.md)                                                                                | Upload flows for the RAG pipeline.                                    |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                                                                    | Qdrant / object store / PostgreSQL / Redis reset recipes.             |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)                                                                        | Metrics, logs, traces - what is collected, dashboards, how to instrument. |
-| [infra/observability/README.md](infra/observability/README.md)                                                       | Observability stack services (Grafana / Prometheus / Loki / Tempo / Vector / OTel), pipeline, and how to view logs. |
+| [infra/observability/README.md](infra/observability/README.md)                                                       | Observability stack services (Grafana / Prometheus / Loki / Tempo / OTel), pipeline, and how to view logs. |
 | [docs/AGENT_TOOLING.md](docs/AGENT_TOOLING.md)                                                                        | Agent-standards import, OpenSpec workflow.                            |
 | [docs/AGENTS-UPDATE.md](docs/AGENTS-UPDATE.md)                                                                        | Per-OS selective refresh of skills, subagents, and shipped docs.      |
 | [docs/MCP_SETUP.md](docs/MCP_SETUP.md)                                                                                | How to configure the MCP servers wired into agent sessions.           |

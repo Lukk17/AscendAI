@@ -22,13 +22,16 @@ sequenceDiagram
     Lifespan->>Lifespan: log_startup_banner()
     Lifespan-->>Uvicorn: yield (service ready)
     Docker->>Uvicorn: GET /health
-    Uvicorn-->>Docker: 200 {"status":"ok"}
+    Uvicorn-->>Docker: 200 {"status":"ok","service":"ascend-web-hunter","version":"..."}
 ```
 
 The blocklist load is a hard failure only in the packaging-defect sense: if the vendored file is missing or fails
 to parse, `blocklist_loader.load_rules()` raises during module import and the process never reaches
 `create_app()`. In normal operation this cannot depend on any external host - the file ships in the image, and
-nothing downloads at startup. There is no `/ready` endpoint separate from `/health`; liveness is the only probe.
+nothing downloads at startup. `/health` is liveness and touches no dependency. `/ready` aggregates the `redis`,
+`searxng` and `searxng_breaker` probes. The startup banner also probes the `/health` of docling-serve, ascend-ocr
+and ascend-audio-scribe, as a warning only. Those three stay out of `/ready`, because each document route is
+optional and must not make the service not ready.
 
 ---
 
@@ -56,15 +59,15 @@ sequenceDiagram
 sequenceDiagram
     participant Agent as ascend-ai-agent :9917
     participant MCP as web_read tool
-    participant Guard as is_safe_external_url
+    participant Guard as check_fetch_uri
     participant WR as WebReader
     participant BS as BeautifulSoupStrategy
     participant CV as ContentValidator
     participant Redis as Redis :6379
 
     Agent->>MCP: tools/call web_read(url="https://example.com/article")
-    MCP->>Guard: is_safe_external_url("https://example.com/article")
-    Guard-->>MCP: True
+    MCP->>Guard: check_fetch_uri("https://example.com/article")
+    Guard-->>MCP: FetchTarget
     MCP->>WR: read(url)
     WR->>BS: extract(url)
     BS->>Redis: get_session_data("example.com") → None
@@ -78,32 +81,27 @@ sequenceDiagram
 
 ---
 
-### Extraction escalation - Cloudflare block → FlareSolverr
+### Extraction escalation - Cloudflare block falls through to the browser tiers
 
 ```mermaid
 sequenceDiagram
     participant WR as WebReader
     participant BS as BeautifulSoupStrategy
     participant TR as TrafilaturaStrategy
-    participant FS as FlareSolverrStrategy
-    participant FlareSolverr as FlareSolverr :8191
+    participant PW as PlaywrightStrategy
     participant Redis as Redis :6379
     participant CV as ContentValidator
 
     WR->>BS: extract(url)
     BS->>BS: ChallengeDetector.is_blocked → raises ChallengeDetectedException
-    BS-->>WR: ChallengeDetectedException propagates
-    WR->>WR: short-circuit to 6-novnc
-    note over WR: ChallengeDetectedException skips straight to NoVNC,<br/>not to FlareSolverr. FlareSolverr runs only when<br/>BeautifulSoup returns empty without raising.
+    BS-->>WR: ChallengeDetectedException falls through
     WR->>TR: extract(url)
     TR-->>WR: "" (empty - blocked but no exception)
-    WR->>FS: extract(url)
-    FS->>FlareSolverr: POST {cmd:"request.get", url:...}
-    FlareSolverr-->>FS: {status:"ok", solution:{response:html, cookies:[...]}}
-    FS->>Redis: save_session_data(url, {cf_clearance:...}, user_agent)
-    FS-->>WR: extracted text
+    WR->>PW: extract(url)
+    PW->>Redis: save_storage_state(url, {cf_clearance:...}, user_agent)
+    PW-->>WR: extracted text
     WR->>CV: validate(text) → True
-    WR-->>caller: {content, status="success", mode="3-flaresolverr"}
+    WR-->>caller: {content, status="success", mode="4-playwright_stealth"}
 ```
 
 ---
@@ -124,7 +122,7 @@ sequenceDiagram
     NoVNC->>NoVNC: spawn _monitor_for_cookies task (background)
     NoVNC-->>WR: raises HumanInterventionRequiredException(vnc_url)
     WR-->>Handler: exception propagates
-    Handler-->>Agent: 428 {status:"human_intervention_required", vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true"}
+    Handler-->>Agent: 428 problem body {code:"human_intervention_required", intervention_type:..., vnc_url:"https://abc.ngrok.io/vnc.html?autoconnect=true&v=0.0.15"}
 ```
 
 ---

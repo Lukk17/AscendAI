@@ -2,8 +2,8 @@
 
 ## What this verifies
 
-- `POST /v1/ocr/jobs` without the required `file` multipart part is rejected with HTTP 422 by FastAPI's request
-  validation, before any record is written and before anything is queued.
+- `POST /v1/ocr/jobs` without the required `file` multipart part is rejected with HTTP 400 and the `validation`
+  code, before any record is written and before anything is queued.
 - No job identifier is issued for a refused submission.
 - A submission with `lang=korean`, a language the service no longer reads, is refused at the request boundary with
   HTTP 400 and the `UNSUPPORTED_LANGUAGE` code, with no job identifier and no `Location` header.
@@ -33,7 +33,7 @@ Check nothing is in flight, because step 3 asserts an empty listing.
 curl -fsS http://localhost:7022/ready
 ```
 
-Expect `"jobs_queued":0` and `"jobs_running":0`. Anything else means an earlier run left work behind: wait for it to
+Expect `"status":"ready"` with `checks.jobs` reporting zero `queued` and zero `running`. Anything else means an earlier run left work behind: wait for it to
 finish or reset per [`../README.md`](../README.md) "Resetting between runs" before starting.
 
 ## Reset state
@@ -68,8 +68,8 @@ bru run "ocr/testing/ocr-jobs-list-empty.yml" --env ascend-local
 
 Step 1:
 
-- HTTP 422.
-- The body carries FastAPI's validation detail, not a job record.
+- HTTP 400.
+- The body is the problem body with `code` `"validation"` and an `errors` array naming the missing `file` field.
 - No `job_id` anywhere in the body.
 
 Step 2:

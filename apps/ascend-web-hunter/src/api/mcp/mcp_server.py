@@ -1,20 +1,62 @@
-from typing import Any
+import logging
+import time
+from importlib.metadata import version as package_version
+from typing import Any, NoReturn
 
-from fastmcp import FastMCP
+from ascend_python_common.errors import INTERNAL, INTERNAL_FIXED_DETAIL, resolve_detail
+from ascend_python_common.uri_guard import check_fetch_uri
+from fastmcp import Context, FastMCP
+from fastmcp.exceptions import ToolError
 
-from src.api.exceptions import HumanInterventionRequiredException, NoVNCFlowBusyException
+from src.api.exception_handlers import error_registry
+from src.api.exceptions import (
+    FormatCombinationError,
+    HumanInterventionRequiredException,
+    NoVNCFlowBusyException,
+)
+from src.config.config import settings
+from src.crawl.job_service import job_service, resolve_tenant
+from src.crawl.models import (
+    CrawlJobList,
+    CrawlJobView,
+    CrawlRequest,
+    CrawlSubmission,
+    JobNotFoundError,
+)
 from src.observability.metrics import HUMAN_INTERVENTION_TOTAL, NOVNC_FLOW_BUSY_TOTAL
+from src.reader.browser_guard import web_hunter_fetch_policy
+from src.reader.cache_purge import publish_purge
 from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.novnc.flow_registry import flow_shape, novnc_flow_registry
 from src.reader.web_reader import OutputFormat, TierName, WebReader
 from src.search.search_client import SearxngClient
+from src.session.profile import Profile, ReadUrl, SessionUrl
 from src.session.session_manager import session_manager
-from src.validator.url_validator import is_safe_external_url
 
-mcp = FastMCP("ascend-web-hunter")
+mcp = FastMCP("ascend-web-hunter", version=package_version("ascend-web-hunter"))
 search_client = SearxngClient()
 web_reader = WebReader()
 
+logger = logging.getLogger(__name__)
+
 MAX_QUERY_LENGTH = 500
+
+
+async def _check_url(operation: str, url: str) -> None:
+    try:
+        await check_fetch_uri(url, web_hunter_fetch_policy())
+    except Exception as exc:
+        _raise_mapped_error(operation, exc)
+
+
+def _raise_mapped_error(operation: str, exc: Exception) -> NoReturn:
+    entry = error_registry.lookup(exc)
+    if entry is not None:
+        raise ToolError(f"{entry.code.code}: {resolve_detail(entry, exc)}") from exc
+
+    logger.exception(f"MCP {operation} failed")
+
+    raise ToolError(f"{INTERNAL.code}: {INTERNAL_FIXED_DETAIL}") from exc
 
 
 @mcp.tool()
@@ -26,27 +68,35 @@ async def web_search(query: str, limit: int = 5) -> list[dict[str, Any]]:
         limit: Max results (default 5).
     """
     if not query or not query.strip():
-        raise ValueError("query must not be empty")
+        _raise_mapped_error("web_search", ValueError("query must not be empty"))
     if len(query) > MAX_QUERY_LENGTH:
-        raise ValueError(f"query exceeds maximum length of {MAX_QUERY_LENGTH} characters")
+        _raise_mapped_error(
+            "web_search", ValueError(f"query exceeds maximum length of {MAX_QUERY_LENGTH} characters")
+        )
 
-    return await search_client.search(query=query, limit=limit)
+    try:
+        return await search_client.search(query=query, limit=limit)
+    except Exception as exc:
+        _raise_mapped_error("web_search", exc)
 
 
 @mcp.tool()
 async def web_read(
-    url: str,
+    url: ReadUrl,
     include_links: bool = False,
     link_filter: str | None = None,
     heavy_mode: bool = False,
-    profile: str | None = None,
+    profile: Profile | None = None,
     output_format: OutputFormat = "text",
     tier: TierName | None = None,
+    extraction_schema: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Read (scrape) the content of a web page.
     IMPORTANT: If the status returned is `human_intervention_required`, display the `vnc_url` to the user
     and ask them to open it in their browser to manually solve the Captcha or log into the required account.
+    Several windows may be open at once: surface the window's `slot` alongside the `vnc_url` so the user
+    opens the window that belongs to this read.
     If the status returned is `session_expired`, the stored login for that site has lapsed: call
     `session_establish` for the same url and profile, then read again.
     Args:
@@ -58,19 +108,23 @@ async def web_read(
         heavy_mode: If True, skips lightweight strategies and jumps straight to advanced browser strategies.
         profile: Optional session profile label (e.g. 'work', 'personal') for multi-account sites.
         output_format: 'text' for the flat content field, 'structured' to also get title, author,
-                       date and sitename. Not available together with include_links.
+                       date and sitename, 'schema' for JSON validated against extraction_schema,
+                       'tables' for HTML tables as rows, 'screenshot' for a base64 PNG.
+                       Every format but 'text' is refused together with include_links.
         tier: Start the extraction chain at this tier ('1-beautifulsoup', '2-trafilatura',
-              '3-flaresolverr', '4-playwright_stealth', '5-crawlee_adaptive', '6-novnc') instead of
+              '4-playwright_stealth', '4a-patchright', '4b-camoufox',
+              '5-crawlee_adaptive', '6-novnc') instead of
               where heavy_mode and the stored session would start it. Escalation continues after it.
+        extraction_schema: JSON Schema the 'schema' output format extracts and validates
+                        against. Required with output_format='schema', ignored otherwise.
     """
-    if not is_safe_external_url(url):
-        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+    await _check_url("web_read", url)
 
-    if include_links and output_format == "structured":
-        raise ValueError(
-            "output_format=structured is not available with include_links: the annotated-links "
-            "response carries the flat content shape plus a link map"
-        )
+    if include_links and output_format != "text":
+        _raise_mapped_error("web_read", FormatCombinationError(output_format))
+
+    if output_format == "schema" and extraction_schema is None:
+        _raise_mapped_error("web_read", ValueError("extraction_schema is required with output_format=schema"))
 
     try:
         if include_links:
@@ -84,15 +138,25 @@ async def web_read(
             )
 
         return await web_reader.read(
-            url, heavy_mode=heavy_mode, profile=profile, output_format=output_format, tier=tier
+            url,
+            heavy_mode=heavy_mode,
+            profile=profile,
+            output_format=output_format,
+            tier=tier,
+            extraction_schema=extraction_schema,
         )
     except HumanInterventionRequiredException as exc:
-        HUMAN_INTERVENTION_TOTAL.labels(intervention_type=exc.intervention_type).inc()
+        HUMAN_INTERVENTION_TOTAL.labels(
+            intervention_type=exc.intervention_type, joined=str(exc.joined).lower()
+        ).inc()
 
         return {
             "status": "human_intervention_required",
             "intervention_type": exc.intervention_type,
             "vnc_url": exc.vnc_url,
+            "flow_id": exc.flow_id,
+            "joined": exc.joined,
+            "window": exc.window,
             "message": exc.message,
         }
     except NoVNCFlowBusyException as exc:
@@ -103,24 +167,35 @@ async def web_read(
             "message": exc.message,
             "holder_url": exc.holder_url,
             "holder_profile": exc.holder_profile,
+            "active_flows": exc.active_flows,
+            "max_concurrent_flows": exc.max_concurrent_flows,
+            "flows": exc.flows,
         }
+    except Exception as exc:
+        _raise_mapped_error("web_read", exc)
 
 
 @mcp.tool()
-async def session_establish(url: str, profile: str | None = None) -> dict[str, Any]:
+async def session_establish(url: SessionUrl, profile: Profile | None = None) -> dict[str, Any]:
     """
-    Proactively open the NoVNC login flow for a site.
+    Proactively open the NoVNC login flow for a site, or join the one already open for it.
     IMPORTANT: When this returns status='human_intervention_required', display the vnc_url to the user
-    and ask them to complete the login in their browser. The session will be captured automatically.
+    and ask them to complete the login in their browser. Several windows may be open at once: surface
+    the window's `slot` alongside the `vnc_url` so the user opens the right one. The session will be
+    captured automatically once the login succeeds.
+    The result carries `intervention_type` ('login', or 'captcha' when an open captcha flow for the
+    site was joined), `vnc_url`, `flow_id`, `joined` (true when an open flow for the same site and
+    profile was joined), `window` (slot, x, y, width, height) and `message`.
+    When every window is in use it returns status='novnc_busy' with `holder_url`, `holder_profile`,
+    `active_flows`, `max_concurrent_flows` and `flows`; try again shortly.
     Args:
         url: The site URL to establish a session for.
         profile: Optional profile label to use (e.g. 'work', 'personal').
     """
-    if not is_safe_external_url(url):
-        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+    await _check_url("session_establish", url)
 
     try:
-        vnc_url = await session_manager.establish(url, profile)
+        established = await session_manager.establish(url, profile)
     except NoVNCFlowBusyException as exc:
         NOVNC_FLOW_BUSY_TOTAL.inc()
 
@@ -129,36 +204,85 @@ async def session_establish(url: str, profile: str | None = None) -> dict[str, A
             "message": exc.message,
             "holder_url": exc.holder_url,
             "holder_profile": exc.holder_profile,
+            "active_flows": exc.active_flows,
+            "max_concurrent_flows": exc.max_concurrent_flows,
+            "flows": exc.flows,
         }
+    except Exception as exc:
+        _raise_mapped_error("session_establish", exc)
 
-    HUMAN_INTERVENTION_TOTAL.labels(intervention_type="login").inc()
     return {
         "status": "human_intervention_required",
-        "intervention_type": "login",
-        "vnc_url": vnc_url,
-        "message": f"Login required. Please visit: {vnc_url}",
+        "intervention_type": established.intervention_type,
+        "vnc_url": established.vnc_url,
+        "message": f"Login required. Please visit: {established.vnc_url}",
+        "flow_id": established.flow_id,
+        "joined": established.joined,
+        "window": established.window,
     }
 
 
 @mcp.tool()
-async def session_status(url: str, profile: str | None = None) -> dict[str, Any]:
+async def session_interventions() -> dict[str, Any]:
+    """
+    List the live human-intervention windows of every container.
+
+    Read-only: each entry carries the window's slot alongside the vnc_url so a
+    human or an agent can tell the windows apart, with the remaining lease.
+    Returns no cookies, storage state or page content.
+    """
+    flows = await novnc_flow_registry.active()
+    now = time.time()
+
+    return {
+        "active_flows": len(flows),
+        "max_concurrent_flows": settings.NOVNC_MAX_CONCURRENT_FLOWS,
+        "flows": [flow_shape(flow, now) for flow in flows],
+    }
+
+
+@mcp.tool()
+async def session_cancel_intervention(flow_id: str) -> dict[str, Any]:
+    """
+    Close one open human-intervention window and free its slot at once.
+
+    Nothing the window holds is saved, and the flow ends with the outcome
+    'cancelled', which session_status shows as its `last_window`. Fails with
+    'flow_not_found' when no open window has this flow_id.
+    Args:
+        flow_id: The flow_id of the window, as session_interventions lists it.
+    """
+    try:
+        await novnc_flow_registry.cancel(flow_id)
+    except Exception as exc:
+        _raise_mapped_error("session_cancel_intervention", exc)
+
+    return {"status": "cancelled", "flow_id": flow_id}
+
+
+@mcp.tool()
+async def session_status(url: SessionUrl, profile: Profile | None = None) -> dict[str, Any]:
     """
     Query the authentication session status for a URL.
     Args:
         url: The site URL to check the session for.
         profile: Optional profile label (e.g. 'work', 'personal').
     Returns status ('active', 'expired', 'none'), remaining auth TTL in seconds,
-    and the timestamp of the last validated session.
+    the timestamp of the last validated session, and `last_window`: how the last
+    intervention window for the site and profile ended (flow_id, intervention_type,
+    outcome, finished_at), or null when none ended within the session lifetime.
     """
-    if not is_safe_external_url(url):
-        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+    await _check_url("session_status", url)
 
-    info = await session_manager.status(url, profile)
+    try:
+        info = await session_manager.status(url, profile)
+    except Exception as exc:
+        _raise_mapped_error("session_status", exc)
     return {"url": url, **info.to_dict()}
 
 
 @mcp.tool()
-async def session_clear(url: str, profile: str | None = None) -> dict[str, Any]:
+async def session_clear(url: SessionUrl, profile: Profile | None = None) -> dict[str, Any]:
     """
     Delete the stored session for a site, including any cached read results
     for that domain. Idempotent: always succeeds, whether or not a session
@@ -167,12 +291,15 @@ async def session_clear(url: str, profile: str | None = None) -> dict[str, Any]:
         url: The site URL whose session should be cleared.
         profile: Optional profile label (e.g. 'work', 'personal').
     """
-    if not is_safe_external_url(url):
-        raise ValueError("URL resolves to a private, loopback, link-local, or otherwise non-routable address")
+    await _check_url("session_clear", url)
 
-    existed = await session_manager.clear(url, profile)
+    try:
+        existed = await session_manager.clear(url, profile)
+    except Exception as exc:
+        _raise_mapped_error("session_clear", exc)
     domain = cookie_manager.registrable_domain(url)
     cleared_cache_entries = web_reader.clear_cache_for_domain(domain)
+    await publish_purge(domain)
 
     return {
         "status": "cleared",
@@ -180,3 +307,115 @@ async def session_clear(url: str, profile: str | None = None) -> dict[str, Any]:
         "existed": existed,
         "cleared_cache_entries": cleared_cache_entries,
     }
+
+
+def _mcp_tenant(ctx: Context | None) -> str:
+    meta = ctx.request_context.meta if ctx is not None and ctx.request_context is not None else None
+    raw = meta.get("ascend.ai/tenant_id") if isinstance(meta, dict) else None
+    return resolve_tenant(raw if isinstance(raw, str) else None)
+
+
+@mcp.tool()
+async def crawl_submit(
+    seeds: list[str],
+    include_patterns: list[str] | None = None,
+    exclude_patterns: list[str] | None = None,
+    max_depth: int | None = None,
+    page_budget: int | None = None,
+    same_domain_only: bool = True,
+    respect_robots: bool = False,
+    output_format: OutputFormat = "text",
+    extraction_schema: dict[str, Any] | None = None,
+    profile: Profile | None = None,
+    ctx: Context | None = None,
+) -> dict[str, Any]:
+    """
+    Crawl a site as one job and poll it: submit seeds, then read the job back
+    with crawl_job_status until it reaches a terminal state. Results land in
+    the object store and are listed by crawl_job_status.
+    Args:
+        seeds: Absolute http or https URLs the crawl starts from.
+        include_patterns: Glob patterns against the URL path; when set, only
+                          matching links are followed.
+        exclude_patterns: Glob patterns against the URL path that are never followed.
+        max_depth: Link depth below the seeds. Defaults to the service setting.
+        page_budget: Most pages the job reads. Defaults to the service setting.
+        same_domain_only: When True, links outside the seeds' domains are dropped.
+        respect_robots: Defaults to False, which ignores robots.txt rules and crawl-delay. When
+                        True, both apply to queued addresses, and a redirect target is not checked
+                        against the rules. Sitemaps named by robots.txt are used either way.
+        output_format: 'text' for the flat content field, 'structured' to also get title, author,
+                       date and sitename, 'schema' for JSON validated against extraction_schema,
+                       'tables' for HTML tables as rows, 'screenshot' for a base64 PNG.
+        extraction_schema: JSON Schema the 'schema' output format extracts and validates
+                        against. Required with output_format='schema', ignored otherwise.
+        profile: Optional session profile label (e.g. 'work', 'personal').
+    """
+    fields: dict[str, Any] = {
+        "seeds": seeds,
+        "include_patterns": include_patterns or [],
+        "exclude_patterns": exclude_patterns or [],
+        "same_domain_only": same_domain_only,
+        "respect_robots": respect_robots,
+        "output_format": output_format,
+        "extraction_schema": extraction_schema,
+        "profile": profile,
+    }
+    if max_depth is not None:
+        fields["max_depth"] = max_depth
+    if page_budget is not None:
+        fields["page_budget"] = page_budget
+    try:
+        record = await job_service.submit_job(_mcp_tenant(ctx), CrawlRequest(**fields))
+    except Exception as exc:
+        _raise_mapped_error("crawl_submit", exc)
+    return CrawlSubmission(
+        job_id=record.job_id,
+        state=record.state,
+        poll_after_seconds=settings.CRAWL_POLL_AFTER_SECONDS,
+    ).model_dump(mode="json")
+
+
+@mcp.tool()
+async def crawl_job_status(job_id: str, ctx: Context | None = None) -> dict[str, Any]:
+    """
+    Read the state, counts and result keys of one crawl job.
+    Args:
+        job_id: The job identifier a crawl_submit answered.
+    """
+    try:
+        record = await job_service.get_job(_mcp_tenant(ctx), job_id)
+    except Exception as exc:
+        _raise_mapped_error("crawl_job_status", exc)
+    if record is None:
+        _raise_mapped_error("crawl_job_status", JobNotFoundError(job_id))
+    return CrawlJobView.from_record(record).model_dump(mode="json")
+
+
+@mcp.tool()
+async def crawl_list_jobs(ctx: Context | None = None) -> dict[str, Any]:
+    """
+    List the retained crawl jobs of the caller's tenant.
+    """
+    try:
+        records = await job_service.list_jobs(_mcp_tenant(ctx))
+    except Exception as exc:
+        _raise_mapped_error("crawl_list_jobs", exc)
+    return CrawlJobList(jobs=[CrawlJobView.from_record(record) for record in records]).model_dump(mode="json")
+
+
+@mcp.tool()
+async def crawl_cancel_job(job_id: str, ctx: Context | None = None) -> dict[str, Any]:
+    """
+    Cancel one crawl job. A waiting or running job moves to cancelled; a job
+    in a terminal state is answered unchanged.
+    Args:
+        job_id: The job identifier a crawl_submit answered.
+    """
+    try:
+        record = await job_service.cancel_job(_mcp_tenant(ctx), job_id)
+    except Exception as exc:
+        _raise_mapped_error("crawl_cancel_job", exc)
+    if record is None:
+        _raise_mapped_error("crawl_cancel_job", JobNotFoundError(job_id))
+    return CrawlJobView.from_record(record).model_dump(mode="json")

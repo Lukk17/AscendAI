@@ -1,0 +1,39 @@
+info:
+  name: tier-memory-second
+  type: http
+  seq: 57
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Same page under a new query string so the read cache cannot answer;
+    # the remembered tier must serve again.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/js-only?second=1",
+        "include_links": false,
+        "heavy_mode": false
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("second read reuses the remembered tier with its canary", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("success");
+            expect(b.content).to.include("NIGHT-HERON");
+            expect(["4-playwright_stealth", "4a-patchright", "4b-camoufox", "5-crawlee_adaptive"]).to.include(b.mode);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

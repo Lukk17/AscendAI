@@ -7,7 +7,8 @@ that are not HTTP statuses at all (see "Amendment" below). Amended again 2026-09
 the catalogue (see "Second amendment" below). Amended a third time 2026-09-25: an expected refusal is logged as one
 warning on both surfaces (see "Third amendment" below). Amended a fourth time 2026-09-25: every MCP request
 is logged under its own correlation id, with a digest of its session in a separate field (see "Fourth amendment"
-below).
+below). Amended a fifth time 2026-10-08: REST refusals are RFC 7807 problem bodies with `code` and `traceId`
+(see "Fifth amendment" below).
 
 ## Context
 
@@ -19,7 +20,7 @@ MCP, by contrast, wraps the call in a JSON-RPC envelope. If the tool raises, Fas
 
 ## Decision
 
-Define a stable error code catalog used by **both** surfaces. Each error code is a stable string that the agent can pattern-match on. The REST response body and the MCP tool response body both carry the same `{"code": "...", "detail": "..."}` shape.
+Define a stable error code catalog used by **both** surfaces. Each error code is a stable string that the agent can pattern-match on. REST refusals are RFC 7807 problem bodies (`application/problem+json`) carrying `code` and `traceId`, and MCP refusals read `CODE: detail` (see "Fifth amendment" below).
 
 ### Catalog
 
@@ -34,7 +35,7 @@ Define a stable error code catalog used by **both** surfaces. Each error code is
 
 ### Implementation
 
-`src/api/exception_handlers.py` defines the exception classes (`OcrProcessingError`, `FileSizeExceededError`, `UnsupportedFileTypeError`, `UnsafeUriError`, `DownloadFailedError`) and registers a FastAPI handler per class that emits the `{"code", "detail"}` body. The MCP tool wrapper raises the same exception classes. FastMCP currently surfaces the exception name + message in the JSON-RPC error frame; downstream agents should pattern-match on the exception name (which equals the code's domain - e.g., `UnsafeUriError` ↔ `UNSAFE_URI`) until FastMCP supports a structured `error.data.code` field natively.
+`src/api/exception_handlers.py` defines the exception classes (`OcrProcessingError`, `FileSizeExceededError`, `UnsupportedFileTypeError`, `UnsafeUriError`, `DownloadFailedError`) and registers them in the service's error registry, which emits the RFC 7807 problem body (see "Fifth amendment" below). The MCP tool wrapper raises the same exception classes. FastMCP currently surfaces the exception name + message in the JSON-RPC error frame; downstream agents should pattern-match on the exception name (which equals the code's domain - e.g., `UnsafeUriError` ↔ `UNSAFE_URI`) until FastMCP supports a structured `error.data.code` field natively.
 
 ### Detail messages are generic and locale-neutral
 
@@ -52,6 +53,9 @@ embedding it in `detail`. This rule was added to the catalog after the design-sy
 2026-05-31.
 
 ### Relation to RFC 7807 Problem Details
+
+Superseded by the fifth amendment below: the service now emits `application/problem+json`. What follows is the
+reasoning that chose the narrower body in the first place.
 
 The `/api-design` skill recommends `application/problem+json` per RFC 7807 with the canonical
 `{type, title, status, detail, instance}` shape. ascend-ocr deliberately deviates from RFC 7807 in favour of a
@@ -102,7 +106,7 @@ emits `application/problem+json` alongside the current shape.
 [ADR-008](ADR-008-every-request-is-a-job.md) made every request a job, which added two failures a caller can meet
 and one distinction this catalogue did not previously have to make.
 
-Two codes join the catalogue, on both surfaces, with the same `{"code": "...", "detail": "..."}` shape as every
+Two codes join the catalogue, on both surfaces, with the same problem-body shape as every
 existing one. Adding a code is non-breaking under [ADR-003](ADR-003-versioning-strategy.md)'s own table.
 
 | Code | REST status | When raised |
@@ -148,7 +152,7 @@ anything is fetched, stored or queued, and no identifier is issued.
 | :--- | :--- | :--- |
 | `UNSUPPORTED_LANGUAGE` | 400 | `POST /v1/ocr/jobs` or `ocr_submit` named a `lang` outside `SUPPORTED_LANGUAGES`. |
 
-The REST body is `{"code": "UNSUPPORTED_LANGUAGE", "detail": "Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan"}` at the shipped defaults. The MCP tool
+The REST body is the problem body with `code` `UNSUPPORTED_LANGUAGE` and the detail `Language is not supported. Supported languages: en, pl, de, fr, es, it, pt, nl, ch, japan` at the shipped defaults. The MCP tool
 error reads `UNSUPPORTED_LANGUAGE: ` followed by the same detail, and `ocr_submit` refuses before it fetches the URI.
 Unlike every other code, the detail is not a fixed phrase: it lists the supported languages, so a caller can correct
 the request without reading the documentation. It is built from configuration alone and never echoes the language
@@ -290,17 +294,9 @@ imported, still uses uvicorn's own format. `LOG_LEVEL` decides which uvicorn lin
 `--log-level` has no effect on them, and neither has `--no-access-log`, because the access logger reaches the root
 handler again once propagation is on.
 
-With tracing on (`OTEL_ENABLED=true`, which `compose.yaml` sets), FastMCP puts the raw id on every server span as the
-attribute `mcp.session.id`. `_configure_provider` in `src/observability/tracing.py` wraps the OTLP exporter in
-`McpSessionDigestSpanExporter`, which passes each span on with the raw id replaced by its digest, so every span that
-leaves the process carries only the digest. It rewrites three attribute keys: `mcp.session.id`, and
-`http.request.header.mcp_session_id` and `http.response.header.mcp_session_id`, which are the keys the installed
-OpenTelemetry ASGI instrumentation 0.63b1 (`normalise_request_header_name` and `normalise_response_header_name` in
-`opentelemetry.util.http`) gives the `mcp-session-id` header when header capture is turned on. Header capture is off
-today, and the two header keys are rewritten so that turning it on cannot leak the id. A captured header is a list of
-values, and each value is replaced by its digest. The rewritten span keeps everything else of the original: its
-events, links, status, resource, instrumentation scope, and the counts of attributes, events and links the SDK
-dropped at its limits. The main process and every OCR worker build their tracer provider through that one function.
+With tracing on (export whenever `OTEL_EXPORTER_OTLP_ENDPOINT` is set), the library drops the attribute
+`mcp.session.id` from every span at span start, so no exported span carries the session id, raw or as a digest.
+The service turns on no capture of the `mcp-session-id` HTTP header.
 
 Which lines carry which fields. In the JSON format every line names both `correlation_id` and `mcp_session_id`.
 `correlation_id` is `-` on a line written outside any request, except uvicorn's `Exception in ASGI application` line,
@@ -321,3 +317,26 @@ names no session.
 `correlation_id` is chosen by the caller whenever the caller sends an acceptable `x-request-id`. Two callers can send
 the same value, and a caller can send a value it read on the response to someone else's request. It is a debugging
 aid for following one request through the log, and it must never be used to decide who did something.
+
+## Fifth amendment (2026-10-08): the platform error body, shared rate limits, and export by endpoint
+
+`add-ascend-python-common` moved the guard rails every Python service shares into `libs/ascend-python-common`.
+Every code and status in the catalogue above is unchanged, and so is what raises it. What changed is the envelope:
+
+- REST refusals are RFC 7807 problem bodies (`application/problem+json`) carrying `type`, `title`, `status`,
+  `detail`, `instance`, `code` and `traceId`. A request that fails validation answers 400 with code `validation`
+  and an `errors` list sorted by `field`, each entry with `field` and `message` and no location prefix. An
+  unknown path answers 404 with code `not_found`, a wrong method 405 with code `method_not_allowed` and an
+  `Allow` header. The "Relation to RFC 7807 Problem Details" section above, which argued for the narrower
+  `{code, detail}` body, is superseded.
+- On MCP the service's `_mcp_error_codes` block is replaced by the library middleware, and a refusal is
+  FastMCP's `ToolError` reading `CODE: detail`, unchanged in what the caller matches on.
+- `RATE_LIMIT_DEFAULT` moves from `60/minute` to `600/minute` and `RATE_LIMIT_OCR` from `20/minute` to
+  `60/minute`. Both are flood protection, not a throughput cap. The windows live in the shared Redis
+  (`REDIS_URL`), so every container of the service draws one caller's REST and MCP calls from one budget under
+  the key prefix `ascend-ocr`.
+- Trace export follows `OTEL_EXPORTER_OTLP_ENDPOINT` whenever it is set, and OpenTelemetry's standard
+  `OTEL_SDK_DISABLED=true` switches the SDK off. There is no service `OTEL_ENABLED` any more.
+- With tracing on, the library drops the attribute `mcp.session.id` from every span at span start, so no
+  exported span carries the session id, raw or as a digest, and the service turns on no capture of the
+  `mcp-session-id` HTTP header.

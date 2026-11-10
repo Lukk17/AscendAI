@@ -18,7 +18,6 @@ public class AnthropicPromptCacheStrategy implements PromptCacheStrategy {
     private static final String PROVIDER = "anthropic";
     private static final String METRIC_TOKENS_READ = "prompt_cache.tokens.read";
     private static final String METRIC_TOKENS_CREATION = "prompt_cache.tokens.creation";
-    private static final String METRIC_TOKENS_TOTAL = "prompt_cache.tokens.total";
 
     private final MeterRegistry meterRegistry;
 
@@ -71,7 +70,6 @@ public class AnthropicPromptCacheStrategy implements PromptCacheStrategy {
 
         Counter.builder(METRIC_TOKENS_READ).tag("provider", PROVIDER).register(meterRegistry).increment(nullToZero(read));
         Counter.builder(METRIC_TOKENS_CREATION).tag("provider", PROVIDER).register(meterRegistry).increment(nullToZero(creation));
-        Counter.builder(METRIC_TOKENS_TOTAL).tag("provider", PROVIDER).register(meterRegistry).increment(prompt);
 
         GenAiTokenUsageRecorder.record(meterRegistry, response, PROVIDER);
     }

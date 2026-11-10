@@ -12,13 +12,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import shutil
 import tempfile
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
 from src.adapters.download_file_manager import (
@@ -29,17 +29,19 @@ from src.adapters.download_file_manager import (
 )
 from src.adapters.file_service import cleanup_temp_file, save_upload_to_temp_async
 from src.api.exception_handlers import UpstreamProviderError
+from src.api.middleware.rate_limit import limiter
 from src.config.config import settings
-from src.observability.metrics import (
-    TRANSCRIPTION_DURATION_SECONDS,
-    TRANSCRIPTION_REQUESTS_TOTAL,
-)
+from src.observability.metrics import record_transcription
 from src.scribe import (
     hf_speech_transcription,
     local_speech_transcription,
     openai_speech_transcription,
 )
-from src.transcription.audacity_parser import extract_tracks_from_aup
+from src.transcription.audacity_parser import (
+    extract_tracks_from_aup,
+    probe_audio_duration_seconds,
+    total_audio_duration_seconds,
+)
 from src.transcription.conversation_merger import transcribe_and_merge_tracks
 
 if TYPE_CHECKING:
@@ -123,11 +125,6 @@ def _file_response(file_path: str, filename: str) -> FileResponse:
     )
 
 
-def _record(provider: str, outcome: str, duration_s: float) -> None:
-    TRANSCRIPTION_REQUESTS_TOTAL.labels(provider=provider, outcome=outcome).inc()
-    TRANSCRIPTION_DURATION_SECONDS.labels(provider=provider, outcome=outcome).observe(duration_s)
-
-
 def _coerce_response_text(response_text: Any) -> str:
     """Backend functions return either `str` (text mode) or `list[dict]`
     (with-timestamps mode). For the file-response path we always store a
@@ -193,20 +190,23 @@ def download_transcript(file_id: str) -> FileResponse:
     file_path = get_transcript_path(file_id)
     if not file_path:
         raise HTTPException(status_code=404, detail="Transcript not found or expired.")
-    return _file_response(file_path, os.path.basename(file_path))
+    return _file_response(file_path, Path(file_path).name)
 
 
 # --- /local --------------------------------------------------------------
 
 
 @rest_router.post("/local", summary="Transcription with a local model", response_model=None)
+@limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
 async def transcribe_local_endpoint(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     model: ModelForm = "Systran/faster-whisper-large-v3",
     language: LanguageForm = None,
     with_timestamps: WithTimestampsForm = False,
     stream: StreamForm = False,
 ) -> FileResponse | StreamingResponse:
+    _ = request
     lang = _resolve_language(language)
 
     if stream:
@@ -217,19 +217,22 @@ async def transcribe_local_endpoint(
 
     started = time.monotonic()
     temp_file_path = ""
+    audio_duration_s: float | None = None
     try:
         temp_file_path = await save_upload_to_temp_async(file)
-        all_segments: list[dict[str, Any]] = []
-        async for segment in local_speech_transcription(
-            audio_file_path=temp_file_path, model_path=model, language=lang
-        ):
-            all_segments.append(segment)
+        audio_duration_s = probe_audio_duration_seconds(temp_file_path)
+        all_segments: list[dict[str, Any]] = [
+            segment
+            async for segment in local_speech_transcription(
+                audio_file_path=temp_file_path, model_path=model, language=lang
+            )
+        ]
         transcript_text = _build_transcript_text(all_segments, with_timestamps)
         _, file_path = store_transcript(transcript_text, TRANSCRIPT_LOCAL_FILENAME)
-        _record(PROVIDER_LOCAL, "success", time.monotonic() - started)
+        record_transcription(PROVIDER_LOCAL, "ok", time.monotonic() - started, audio_duration_s)
         return _file_response(file_path, TRANSCRIPT_LOCAL_FILENAME)
     except Exception:
-        _record(PROVIDER_LOCAL, "error", time.monotonic() - started)
+        record_transcription(PROVIDER_LOCAL, "error", time.monotonic() - started, audio_duration_s)
         raise
     finally:
         # cleanup_temp_file is a no-op on empty/None; no outer guard needed.
@@ -239,8 +242,10 @@ async def transcribe_local_endpoint(
 async def _stream_local(file: UploadFile, model: str, lang: str, with_timestamps: bool) -> AsyncIterator[str]:
     temp_file_path = ""
     started = time.monotonic()
+    audio_duration_s: float | None = None
     try:
         temp_file_path = await save_upload_to_temp_async(file)
+        audio_duration_s = probe_audio_duration_seconds(temp_file_path)
         yield _sse_event({"type": SSE_PROGRESS, "message": "File uploaded, starting local transcription"})
 
         all_segments: list[dict[str, Any]] = []
@@ -260,10 +265,10 @@ async def _stream_local(file: UploadFile, model: str, lang: str, with_timestamps
 
         transcript_text = _build_transcript_text(all_segments, with_timestamps)
         file_id, _ = store_transcript(transcript_text, TRANSCRIPT_LOCAL_FILENAME)
-        _record(PROVIDER_LOCAL, "success", time.monotonic() - started)
+        record_transcription(PROVIDER_LOCAL, "ok", time.monotonic() - started, audio_duration_s)
         yield _sse_event(_complete_event(file_id, PROVIDER_LOCAL, model, lang))
     except Exception as exc:
-        _record(PROVIDER_LOCAL, "error", time.monotonic() - started)
+        record_transcription(PROVIDER_LOCAL, "error", time.monotonic() - started, audio_duration_s)
         logger.exception("SSE local transcription failed")
         yield _sse_event(_error_event(exc))
     finally:
@@ -275,12 +280,15 @@ async def _stream_local(file: UploadFile, model: str, lang: str, with_timestamps
 
 
 @rest_router.post("/openai", summary="Transcription with OpenAI API", response_model=None)
+@limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
 async def transcribe_openai_endpoint(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     model: ModelForm = "whisper-1",
     language: LanguageForm = None,
     stream: StreamForm = False,
 ) -> FileResponse | StreamingResponse:
+    _ = request
     if not settings.OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY is not configured on the server.")
 
@@ -293,8 +301,10 @@ async def transcribe_openai_endpoint(
 
     started = time.monotonic()
     temp_file_path = ""
+    audio_duration_s: float | None = None
     try:
         temp_file_path = await save_upload_to_temp_async(file)
+        audio_duration_s = probe_audio_duration_seconds(temp_file_path)
         response_text = await asyncio.to_thread(
             openai_speech_transcription,
             audio_file_path=temp_file_path,
@@ -303,10 +313,10 @@ async def transcribe_openai_endpoint(
         )
         transcript_text = _coerce_response_text(response_text)
         _, file_path = store_transcript(transcript_text, TRANSCRIPT_OPENAI_FILENAME)
-        _record(PROVIDER_OPENAI, "success", time.monotonic() - started)
+        record_transcription(PROVIDER_OPENAI, "ok", time.monotonic() - started, audio_duration_s)
         return _file_response(file_path, TRANSCRIPT_OPENAI_FILENAME)
     except Exception:
-        _record(PROVIDER_OPENAI, "error", time.monotonic() - started)
+        record_transcription(PROVIDER_OPENAI, "error", time.monotonic() - started, audio_duration_s)
         raise
     finally:
         # cleanup_temp_file is a no-op on empty/None; no outer guard needed.
@@ -329,8 +339,10 @@ def _spawn_threaded_transcription(
 async def _stream_openai(file: UploadFile, model: str, lang: str) -> AsyncIterator[str]:
     temp_file_path = ""
     started = time.monotonic()
+    audio_duration_s: float | None = None
     try:
         temp_file_path = await save_upload_to_temp_async(file)
+        audio_duration_s = probe_audio_duration_seconds(temp_file_path)
         yield _sse_event({"type": SSE_PROGRESS, "message": "File uploaded, starting OpenAI transcription"})
 
         progress_queue = _make_progress_queue()
@@ -347,10 +359,10 @@ async def _stream_openai(file: UploadFile, model: str, lang: str) -> AsyncIterat
         response_text = await task
         transcript_text = _coerce_response_text(response_text)
         file_id, _ = store_transcript(transcript_text, TRANSCRIPT_OPENAI_FILENAME)
-        _record(PROVIDER_OPENAI, "success", time.monotonic() - started)
+        record_transcription(PROVIDER_OPENAI, "ok", time.monotonic() - started, audio_duration_s)
         yield _sse_event(_complete_event(file_id, PROVIDER_OPENAI, model, lang))
     except Exception as exc:
-        _record(PROVIDER_OPENAI, "error", time.monotonic() - started)
+        record_transcription(PROVIDER_OPENAI, "error", time.monotonic() - started, audio_duration_s)
         logger.exception("SSE OpenAI transcription failed")
         yield _sse_event(_error_event(exc))
     finally:
@@ -363,12 +375,15 @@ async def _stream_openai(file: UploadFile, model: str, lang: str) -> AsyncIterat
 
 
 @rest_router.post("/hf", summary="Transcription with Hugging Face provider", response_model=None)
+@limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
 async def transcribe_hf_endpoint(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     model: ModelForm = "openai/whisper-large-v3",
     hf_provider: HfProviderForm = "hf-inference",
     stream: StreamForm = False,
 ) -> FileResponse | StreamingResponse:
+    _ = request
     if not settings.HF_TOKEN:
         raise ValueError("HF_TOKEN is not configured on the server.")
 
@@ -380,8 +395,10 @@ async def transcribe_hf_endpoint(
 
     started = time.monotonic()
     temp_file_path = ""
+    audio_duration_s: float | None = None
     try:
         temp_file_path = await save_upload_to_temp_async(file)
+        audio_duration_s = probe_audio_duration_seconds(temp_file_path)
         response_text = await asyncio.to_thread(
             hf_speech_transcription,
             audio_file_path=temp_file_path,
@@ -390,10 +407,10 @@ async def transcribe_hf_endpoint(
         )
         transcript_text = _coerce_response_text(response_text)
         _, file_path = store_transcript(transcript_text, TRANSCRIPT_HF_FILENAME)
-        _record(PROVIDER_HF, "success", time.monotonic() - started)
+        record_transcription(PROVIDER_HF, "ok", time.monotonic() - started, audio_duration_s)
         return _file_response(file_path, TRANSCRIPT_HF_FILENAME)
     except Exception:
-        _record(PROVIDER_HF, "error", time.monotonic() - started)
+        record_transcription(PROVIDER_HF, "error", time.monotonic() - started, audio_duration_s)
         raise
     finally:
         # cleanup_temp_file is a no-op on empty/None; no outer guard needed.
@@ -404,8 +421,10 @@ async def transcribe_hf_endpoint(
 async def _stream_hf(file: UploadFile, model: str, hf_provider: str) -> AsyncIterator[str]:
     temp_file_path = ""
     started = time.monotonic()
+    audio_duration_s: float | None = None
     try:
         temp_file_path = await save_upload_to_temp_async(file)
+        audio_duration_s = probe_audio_duration_seconds(temp_file_path)
         yield _sse_event(
             {
                 "type": SSE_PROGRESS,
@@ -427,10 +446,10 @@ async def _stream_hf(file: UploadFile, model: str, hf_provider: str) -> AsyncIte
         response_text = await task
         transcript_text = _coerce_response_text(response_text)
         file_id, _ = store_transcript(transcript_text, TRANSCRIPT_HF_FILENAME)
-        _record(PROVIDER_HF, "success", time.monotonic() - started)
+        record_transcription(PROVIDER_HF, "ok", time.monotonic() - started, audio_duration_s)
         yield _sse_event(_complete_event(file_id, PROVIDER_HF, model, "auto"))
     except Exception as exc:
-        _record(PROVIDER_HF, "error", time.monotonic() - started)
+        record_transcription(PROVIDER_HF, "error", time.monotonic() - started, audio_duration_s)
         logger.exception("SSE HF transcription failed")
         yield _sse_event(_error_event(exc))
     finally:
@@ -443,7 +462,9 @@ async def _stream_hf(file: UploadFile, model: str, hf_provider: str) -> AsyncIte
 
 
 @rest_router.post("/audacity", summary="Transcription of Audacity project (.zip)", response_model=None)
+@limiter.limit(settings.RATE_LIMIT_TRANSCRIBE)
 async def transcribe_audacity_endpoint(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     provider: ProviderForm = "local",
     model: ModelForm = "Systran/faster-whisper-large-v3",
@@ -451,6 +472,7 @@ async def transcribe_audacity_endpoint(
     hf_provider: HfProviderForm = "hf-inference",
     stream: StreamForm = False,
 ) -> FileResponse | StreamingResponse:
+    _ = request
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise ValueError("File must be a .zip containing an Audacity project.")
 
@@ -463,21 +485,23 @@ async def transcribe_audacity_endpoint(
 
     started = time.monotonic()
     temp_zip_path = ""
+    audio_duration_s: float | None = None
     extraction_dir = tempfile.mkdtemp(prefix="audacity_")
     try:
         temp_zip_path = await save_upload_to_temp_async(file)
         tracks = await asyncio.to_thread(extract_tracks_from_aup, temp_zip_path, extraction_dir)
         if not tracks:
             raise ValueError("No usable audio tracks found in the uploaded Audacity project.")
+        audio_duration_s = total_audio_duration_seconds(list(tracks.values()))
 
         transcription_text = await transcribe_and_merge_tracks(
             tracks=tracks, provider=provider, model=model, language=lang, hf_provider=hf_provider
         )
         _, file_path = store_transcript(transcription_text, TRANSCRIPT_AUDACITY_FILENAME)
-        _record(provider, "success", time.monotonic() - started)
+        record_transcription(provider, "ok", time.monotonic() - started, audio_duration_s)
         return _file_response(file_path, TRANSCRIPT_AUDACITY_FILENAME)
     except Exception:
-        _record(provider, "error", time.monotonic() - started)
+        record_transcription(provider, "error", time.monotonic() - started, audio_duration_s)
         raise
     finally:
         cleanup_temp_file(temp_zip_path)
@@ -491,6 +515,7 @@ async def _stream_audacity(
     temp_zip_path = ""
     extraction_dir = tempfile.mkdtemp(prefix="audacity_")
     started = time.monotonic()
+    audio_duration_s: float | None = None
     try:
         temp_zip_path = await save_upload_to_temp_async(file)
         yield _sse_event({"type": SSE_PROGRESS, "message": "ZIP uploaded, extracting Audacity project"})
@@ -506,6 +531,7 @@ async def _stream_audacity(
                 }
             )
             return
+        audio_duration_s = total_audio_duration_seconds(list(tracks.values()))
 
         yield _sse_event(
             {
@@ -531,10 +557,10 @@ async def _stream_audacity(
 
         transcription_text = await task
         file_id, _ = store_transcript(transcription_text, TRANSCRIPT_AUDACITY_FILENAME)
-        _record(provider, "success", time.monotonic() - started)
+        record_transcription(provider, "ok", time.monotonic() - started, audio_duration_s)
         yield _sse_event(_complete_event(file_id, provider, model, lang))
     except Exception as exc:
-        _record(provider, "error", time.monotonic() - started)
+        record_transcription(provider, "error", time.monotonic() - started, audio_duration_s)
         logger.exception("SSE Audacity transcription failed")
         yield _sse_event(_error_event(exc))
     finally:

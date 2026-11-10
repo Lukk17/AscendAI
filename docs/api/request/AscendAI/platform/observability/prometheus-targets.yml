@@ -1,0 +1,38 @@
+info:
+  name: prometheus-targets
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7077/api/v1/targets"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("Every expected job has a healthy target", function () {
+            var expected = bru.getEnvVar("expectedJobs").split(",");
+            var active = res.getBody().data.activeTargets;
+            expected.forEach(function (raw) {
+                var job = raw.trim();
+                var found = active.filter(function (t) { return t.labels && t.labels.job === job; });
+                expect(found.length, "job " + job + " has a target").to.be.above(0);
+                found.forEach(function (t) {
+                    expect(t.health, "job " + job + " target health").to.equal("up");
+                });
+            });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

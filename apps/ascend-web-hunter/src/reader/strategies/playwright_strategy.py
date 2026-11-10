@@ -1,5 +1,3 @@
-import logging
-import time
 from collections.abc import Callable
 from typing import Any
 
@@ -8,20 +6,18 @@ from playwright.async_api import Browser, BrowserContext, Page
 from playwright.async_api import Error as PlaywrightError
 from playwright_stealth import Stealth
 
-from src.api.exceptions import ChallengeDetectedException
-from src.config.config import settings
 from src.proxy.proxy_provider import proxy_provider
-from src.reader.cloudflare.challenge_detector import ChallengeDetector
-from src.reader.cloudflare.cookie_manager import cookie_manager
+from src.reader.browser_guard import BrowserFamily, browser_tunnel, install_browser_guard
+from src.reader.cloudflare.cookie_manager import PRODUCED_BY_PLAYWRIGHT, cookie_manager
 from src.reader.fingerprint import Fingerprint, get_default_fingerprint
-from src.reader.strategies.base_strategy import BaseStrategy
+from src.reader.screenshot import capture_page
+from src.reader.strategies.base_strategy import BaseStrategy, FetchedHtml
+from src.reader.strategies.browser_read import render_and_judge
+from src.reader.strategies.main_frame_response import MainFrameResponses
 from src.runtime.browser_pool import browser_pool
 from src.validator.url_validator import URLValidator
 
-logger = logging.getLogger(__name__)
-
-_NETWORKIDLE_POLL_MS = 1000
-_MS_PER_SECOND = 1000
+_PLAYWRIGHT_TIER = "playwright"
 
 
 class PlaywrightStrategy(BaseStrategy):
@@ -43,90 +39,38 @@ class PlaywrightStrategy(BaseStrategy):
 
         return extracted or ""
 
-    async def get_html(self, url: str) -> str:
+    async def screenshot_page(self, url: str) -> tuple[str, bytes] | None:
+        """Capture a full-page PNG of *url* through a fresh stealth context."""
+        browser = await browser_pool.get_browser()
+
+        return await capture_page(
+            lambda: self._create_stealth_context(browser, url),
+            url,
+            self.url_validator,
+            family=BrowserFamily.CHROMIUM,
+            tier=_PLAYWRIGHT_TIER,
+        )
+
+    async def get_html(self, url: str) -> FetchedHtml:
         browser = await browser_pool.get_browser()
         context = await self._create_stealth_context(browser, url)
-        page = await context.new_page()
-
-        await self._apply_protections(page)
-
         try:
-            if ChallengeDetector.is_login_redirect_url(url):
-                logger.warning("PlaywrightStrategy: Pre-emptive redirect login URI detected on %s", url)
-                raise ChallengeDetectedException(intervention_type="login")
+            page = await context.new_page()
+            responses = MainFrameResponses(page)
+            refused_navigations = await self._apply_protections(page)
 
-            timeout_ms = settings.EXTRACT_TIMEOUT * _MS_PER_SECOND
-            initial_response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-
-            response_status = initial_response.status if initial_response else 200
-            poll_start = time.perf_counter()
-            extract_deadline = poll_start + settings.EXTRACT_TIMEOUT
-            challenge_deadline = poll_start + settings.CHALLENGE_CLEAR_WAIT_SECONDS
-
-            content = ""
-            while time.perf_counter() < extract_deadline:
-                try:
-                    content = await page.content()
-                except PlaywrightError:
-                    await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
-                    continue
-
-                if ChallengeDetector.is_login_required(content):
-                    logger.warning("PlaywrightStrategy: Login wall detected on %s (early exit)", url)
-
-                    raise ChallengeDetectedException(intervention_type="login")
-
-                if ChallengeDetector.is_blocked(response_status, content):
-                    if time.perf_counter() >= challenge_deadline:
-                        logger.warning(
-                            "PlaywrightStrategy: WAF/Cloudflare challenge did not auto-clear within "
-                            "%ss on %s; escalating",
-                            settings.CHALLENGE_CLEAR_WAIT_SECONDS,
-                            url,
-                        )
-
-                        raise ChallengeDetectedException(intervention_type="captcha")
-                    await page.wait_for_timeout(_NETWORKIDLE_POLL_MS)
-                    continue
-
-                try:
-                    await page.wait_for_load_state("networkidle", timeout=_NETWORKIDLE_POLL_MS)
-                    break
-                except PlaywrightError:
-                    pass
-
-            await page.wait_for_timeout(settings.DYNAMIC_CONTENT_WAIT)
-            await self._scroll_page(page)
-
-            content = await page.content()
-
-            logger.info(
-                "PlaywrightStrategy: Finished rendering %s. Extracted HTML Length: %d", url, len(content)
+            return await render_and_judge(
+                page,
+                url,
+                responses,
+                refused_navigations,
+                tier=_PLAYWRIGHT_TIER,
+                error_type=PlaywrightError,
+                producer=PRODUCED_BY_PLAYWRIGHT,
+                profile=self.profile,
             )
-
-            if ChallengeDetector.is_blocked(response_status, content):
-                logger.warning("PlaywrightStrategy: WAF/Cloudflare block detected post-render on %s", url)
-
-                raise ChallengeDetectedException(intervention_type="captcha")
-
-            if ChallengeDetector.is_login_required(content):
-                logger.warning(
-                    "PlaywrightStrategy: Late-stage Login wall detected on %s. Content Length: %d",
-                    url,
-                    len(content),
-                )
-
-                raise ChallengeDetectedException(intervention_type="login")
-
-            return content
         finally:
             await context.close()
-
-    async def _scroll_page(self, page: Page) -> None:
-        """Scroll down in increments to trigger lazy-load / infinite-scroll content."""
-        for _ in range(settings.SCROLL_ITERATIONS):
-            await page.evaluate(f"window.scrollBy(0, {settings.SCROLL_STEP_PX})")
-            await page.wait_for_timeout(200)
 
     async def _create_stealth_context(self, browser: Browser, url: str) -> BrowserContext:
         fp = self.fingerprint
@@ -141,17 +85,19 @@ class PlaywrightStrategy(BaseStrategy):
             "timezone_id": fp.timezone_id,
             "geolocation": fp.geolocation,
             "permissions": ["geolocation"],
+            "service_workers": "block",
         }
         if stored_state is not None:
             kwargs["storage_state"] = stored_state
 
         proxy = proxy_provider.for_playwright()
         if proxy is not None:
-            kwargs["proxy"] = proxy
+            kwargs["proxy"] = browser_tunnel.chained_proxy(proxy)
 
         return await browser.new_context(**kwargs)
 
-    async def _apply_protections(self, page: Page) -> None:
+    async def _apply_protections(self, page: Page) -> list[str]:
         stealth = Stealth()
         await stealth.apply_stealth_async(page)
-        await page.route("**/*", self.url_validator.route_handler)
+
+        return await install_browser_guard(page.context, self.url_validator, family=BrowserFamily.CHROMIUM)

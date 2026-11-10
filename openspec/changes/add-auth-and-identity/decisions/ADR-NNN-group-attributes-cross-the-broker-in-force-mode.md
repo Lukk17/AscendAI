@@ -4,7 +4,7 @@ Draft. The number is assigned at implementation time: it takes the next free num
 
 ## Status
 
-Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This file is the draft that task 12.8 installs into `apps/ascend-agent/docs/architecture/decisions/` with this status intact, taking the next free number at that time.
+Deferred, 2026-09-04. Not implemented by the OpenSpec change `add-auth-and-identity`, and not accepted by it. This draft is not installed into `apps/ascend-agent/docs/architecture/decisions/`: it stays in the change's `decisions/` folder, which the archive keeps under `openspec/changes/archive/`, next to the Deferred section of the design (owner answer 93 of 2026-10-08).
 
 ## Deferral, 2026-09-04
 

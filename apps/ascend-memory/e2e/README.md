@@ -26,6 +26,7 @@ apps/ascend-memory/e2e/
     ├── 4-mcp-tools-list-test.md
     ├── 5-mcp-insert-and-search-test.md
     ├── 6-user-isolation-test.md
+    ├── 7-platform-contract-test.md
     ├── templates/                       # run-record templates (immutable), one per spec
     │   ├── README.md
     │   ├── 1-invalid-input-tasks.template.md
@@ -33,7 +34,8 @@ apps/ascend-memory/e2e/
     │   ├── 3-wipe-user-scope-tasks.template.md
     │   ├── 4-mcp-tools-list-tasks.template.md
     │   ├── 5-mcp-insert-and-search-tasks.template.md
-    │   └── 6-user-isolation-tasks.template.md
+    │   ├── 6-user-isolation-tasks.template.md
+    │   └── 7-platform-contract-tasks.template.md
     └── runs/
         ├── README.md
         └── <UTC-timestamp>_<N>-<capability>-tasks.md   # one per executed test (gitignored)
@@ -97,9 +99,10 @@ it, and wipes it. Two tests with disjoint `user_id` lists can run side by side. 
 
 | Constraint | Tests | Why |
 | :--- | :--- | :--- |
-| **No persistence** | 1 | Test 1 hits FastAPI's request validator (422) before mem0 is invoked. No Qdrant writes. Runs in any order. |
+| **No persistence** | 1 | Test 1 hits the request validator (400 `validation` problem body) before mem0 is invoked. No Qdrant writes. Runs in any order. |
 | **Disjoint user IDs** | 2, 3, 5, 6 | Each test owns its own dedicated user IDs (`frostyMemoryInsertSearchTest`, `frostyMemoryWipeAlpha`/`Beta`, `frostyMemoryMcpInsertSearchTest`, `frostyMemoryIsolationUserA`/`B`). No overlap, so they can run in parallel. |
 | **Read-only protocol probe** | 4 | `tools/list` is a pure read against the MCP server. No state writes. |
+| **Read-only platform contract** | 7 | Health, readiness, the problem bodies, the MCP `initialize` and the refused tool call are all reads or request-boundary refusals. No Qdrant write and no `user_id` is touched. Runs in any order, in parallel with everything. |
 
 Recommended layout: run test 1 first (offline-equivalent, fail-fast on validator behaviour), then tests 2-5 in
 parallel or sequential; ordering inside that group does not matter because their `user_id`s are disjoint.
@@ -107,7 +110,7 @@ parallel or sequential; ordering inside that group does not matter because their
 ## Prerequisites before any test
 
 1. AscendMemory container running on port 7020. The docker-compose `ascend-ai` project starts it: `docker compose up -d ascend-memory` (or include in the full stack).
-2. `curl -fsS http://localhost:7020/health` returns HTTP 200 with `{"status":"ok"}`. While the container is still warming up it returns HTTP 503 with `{"status":"starting"}`; wait for `"ok"` before starting the suite.
+2. `curl -fsS http://localhost:7020/health` returns HTTP 200 with `status` `ok`, `service` `ascend-memory` and a non-empty `version`. `/health` answers 200 as soon as the process serves, and the readiness probe `/ready` answers HTTP 503 with `status` `not-ready` until the client is warm, so wait for `/ready` to read `ready` before starting the suite.
 3. Qdrant reachable on `:6333` (AscendMemory needs it for any insert/search).
 4. OpenAI is reachable and `OPENAI_API_KEY` is set on the container, because every insert and search request under `docs/api/request/AscendAI/memory/testing/` pins `provider=openai`. LM Studio is not needed.
 5. Bruno CLI installed: `bru --version` returns a version string. Install once with `npm install -g @usebruno/cli`.
@@ -146,12 +149,37 @@ Numbered by setup cost. Easiest first.
 
 | #  | Spec | What it proves |
 | :- | :--- | :--- |
-| 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `POST /api/v1/memory/insert` with a body missing the required `user_id` field is rejected by FastAPI with HTTP 422 before any mem0 / Qdrant call. |
+| 1  | [testing/1-invalid-input-test.md](testing/1-invalid-input-test.md) | `POST /api/v1/memory/insert` with a body missing the required `user_id` field is rejected with HTTP 400 (`validation` problem body) before any mem0 / Qdrant call. |
 | 2  | [testing/2-insert-and-search-test.md](testing/2-insert-and-search-test.md) | A memory inserted via `POST /api/v1/memory/insert` for a unique `user_id` is retrievable via `GET /api/v1/memory/search` with a semantically related query; the returned `memory` field contains the canary substring `"Reykjavik"`. |
 | 3  | [testing/3-wipe-user-scope-test.md](testing/3-wipe-user-scope-test.md) | `POST /api/v1/memory/wipe?user_id=Alpha` removes Alpha's memories but leaves Beta's intact, proving wipe is scoped to the supplied `user_id` and never bleeds across users. |
 | 4  | [testing/4-mcp-tools-list-test.md](testing/4-mcp-tools-list-test.md) | `tools/list` against `:7020/mcp` (after the `initialize` handshake) advertises memory tools whose names include `insert` and `search`. |
 | 5  | [testing/5-mcp-insert-and-search-test.md](testing/5-mcp-insert-and-search-test.md) | The MCP layer is wired to the same memory client as REST: an insert via the MCP `memory_insert` tool is retrievable via the MCP `memory_search` tool for the same `user_id`. |
 | 6  | [testing/6-user-isolation-test.md](testing/6-user-isolation-test.md) | A memory inserted for user A is not visible when searching as user B; mem0's user-scope filter prevents cross-user memory leakage. |
+| 7  | [testing/7-platform-contract-test.md](testing/7-platform-contract-test.md) | The shared platform contract holds end to end: health and readiness bodies, the 404, 405 and 400 problem bodies, the `traceparent` and `x-request-id` echo, the security headers, the errors counter that grows by one, and the MCP runtime checks: a stateless `initialize` for 2025-06-18 and 2025-11-25 with no `mcp-session-id`, a `memory_wipe` tool call in the session and sessionless forms, the foreign `Host` and `Origin` refusals, the 5 MiB body 413, and one refused tool call. Every request is refused or reads only, so no Qdrant write occurs. |
+
+## What is not tested end to end
+
+The platform contract is tested end to end by spec 7. A few library behaviours stay in the unit and integration
+tests on purpose, because they are not observable from outside the service, or the e2e contract never passes or fails
+on a log line. Each is covered by the test task named.
+
+- The log level, the log format, the refusal log lines, the MCP session digest in log lines, the empty
+  `mcp_session_id` of a sessionless call and the startup banner. Each is a log line, and the e2e contract never passes
+  or fails on a log line. The library and service tests of tasks 1.4, 1.5 and 1.12, the library tests of tasks 6.2 and
+  6.4 of `add-python-runtime-upgrades`, and the service banner tests cover them.
+- One HTTP server span per request and no second exporter, no span sent anywhere with `OTEL_EXPORTER_OTLP_ENDPOINT`
+  unset or `OTEL_SDK_DISABLED=true`, no OpenTelemetry log record carrying the exception text, and no MCP session id on
+  any span. The trace export to Tempo is tested end to end by the trace specs of `add-observability`, and one HTTP
+  server span per request and no second exporter are covered by the library test of task 6.3 of
+  `add-python-runtime-upgrades`. The tracing tests of tasks 1.6 and 1.16 cover the rest, which is not observable from
+  outside the service.
+- The rate limit refusal and the one budget shared by REST, MCP and several containers of one service. The library
+  tests of tasks 1.7 and 1.18 and the service tests of task 2.5 cover them, so the end-to-end rate limit specs were
+  dropped by owner decision 91.3 of 2026-10-08.
+- The invalid settings that stop start-up. The settings tests of task 1.3 cover them.
+- The 401 `unauthorized` body. Raised only once `add-keycloak-login` adds the token check, whose service token specs of
+  tasks 10.9 to 10.13 then test it end to end in all four suites.
+- The trace export to Tempo. Tested end to end by `add-observability`.
 
 ## Adding a new test
 

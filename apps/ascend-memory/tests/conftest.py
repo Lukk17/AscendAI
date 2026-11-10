@@ -1,8 +1,6 @@
 import sys
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
-
-from starlette.types import Receive, Scope, Send
 
 # Mock mem0ai dependencies
 mock_mem0 = MagicMock()
@@ -14,43 +12,8 @@ sys.modules["mem0.llms.openai"] = MagicMock()
 # Mock Qdrant Client (used in config/memory client)
 sys.modules["qdrant_client"] = MagicMock()
 
-# Mock FastMCP (prevents runtime session errors)
-mock_fastmcp_module = MagicMock()
-mock_mcp_instance = MagicMock()
-# Mock tool decorator to be a pass-through
-mock_mcp_instance.tool.return_value = lambda f: f
-
-
-# Mock http_app to return a Starlette-like app with router.lifespan_context
-from contextlib import asynccontextmanager
-
-
-@asynccontextmanager
-async def _mock_lifespan_context(_app: object) -> AsyncIterator[None]:
-    # Intentionally empty: FastAPI's lifespan contract only needs an
-    # enter/exit pair, and the mocked MCP app has no startup or teardown to
-    # perform during tests.
-    yield
-
-
-_mock_router = MagicMock()
-_mock_router.lifespan_context = _mock_lifespan_context
-
-
-class _MockMcpAsgiApp:
-    router = _mock_router
-
-    async def __call__(self, _scope: Scope, _receive: Receive, _send: Send) -> None:
-        # Intentionally a no-op: tests never invoke the MCP ASGI app
-        # directly; this stub only satisfies the ASGI callable protocol so
-        # the FastAPI mount succeeds during app construction.
-        return None
-
-
-mock_mcp_instance.http_app.return_value = _MockMcpAsgiApp()
-
-mock_fastmcp_module.FastMCP.return_value = mock_mcp_instance
-sys.modules["fastmcp"] = mock_fastmcp_module
+# FastMCP is real here: the service error registry and rate limit wiring are
+# the library's FastMCP middleware, which the tests import for real.
 
 import pytest
 import pytest_asyncio
@@ -108,5 +71,4 @@ def reset_global_mocks() -> Iterator[None]:
     mock_memory_instance.get_all.side_effect = None
     mock_memory_instance.get_all.return_value = MagicMock()
 
-    mock_mcp_instance.reset_mock()
     yield

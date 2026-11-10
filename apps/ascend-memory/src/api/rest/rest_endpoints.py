@@ -7,10 +7,12 @@ from pydantic import BaseModel, Field
 
 from src.config.config import settings
 from src.observability.metrics import (
+    MEMORY_DELETE_DURATION_SECONDS,
     MEMORY_INSERT_DURATION_SECONDS,
-    MEMORY_INSERT_TOTAL,
+    MEMORY_OPERATIONS_TOTAL,
     MEMORY_SEARCH_DURATION_SECONDS,
-    MEMORY_SEARCH_TOTAL,
+    MEMORY_WIPE_DURATION_SECONDS,
+    outcome_for_exception,
 )
 from src.service.memory_client import get_memory_client, resolve_provider, wipe_user_all_collections
 
@@ -62,7 +64,7 @@ async def search_memory(
     client = get_memory_client(resolved_provider)
 
     started = time.monotonic()
-    outcome = "success"
+    outcome = "ok"
     try:
         result = await asyncio.to_thread(
             client.search,
@@ -70,12 +72,14 @@ async def search_memory(
             user_id=effective_user_id,
             limit=limit,
         )
-    except Exception:
-        outcome = "error"
+    except Exception as exc:
+        outcome = outcome_for_exception(exc)
         raise
     finally:
-        MEMORY_SEARCH_DURATION_SECONDS.labels(provider=resolved_provider).observe(time.monotonic() - started)
-        MEMORY_SEARCH_TOTAL.labels(provider=resolved_provider, outcome=outcome).inc()
+        MEMORY_SEARCH_DURATION_SECONDS.labels(embedding_provider=resolved_provider).observe(
+            time.monotonic() - started
+        )
+        MEMORY_OPERATIONS_TOTAL.labels(operation="search", outcome=outcome).inc()
     return result
 
 
@@ -111,7 +115,7 @@ async def insert_memory(request: InsertRequest) -> list[dict[str, Any]]:
     client = get_memory_client(resolved_provider)
 
     started = time.monotonic()
-    outcome = "success"
+    outcome = "ok"
     try:
         result = await asyncio.to_thread(
             client.add,
@@ -120,12 +124,12 @@ async def insert_memory(request: InsertRequest) -> list[dict[str, Any]]:
             text=request.text,
             metadata=request.metadata,
         )
-    except Exception:
-        outcome = "error"
+    except Exception as exc:
+        outcome = outcome_for_exception(exc)
         raise
     finally:
         MEMORY_INSERT_DURATION_SECONDS.labels(provider=resolved_provider).observe(time.monotonic() - started)
-        MEMORY_INSERT_TOTAL.labels(provider=resolved_provider, outcome=outcome).inc()
+        MEMORY_OPERATIONS_TOTAL.labels(operation="insert", outcome=outcome).inc()
     return result
 
 
@@ -138,12 +142,23 @@ async def wipe_memory(
 
     effective_user_id = user_id or settings.DEFAULT_USER_ID
 
-    if provider is None or not provider.strip():
-        await asyncio.to_thread(wipe_user_all_collections, user_id=effective_user_id)
-    else:
-        client = get_memory_client(resolve_provider(provider))
+    started = time.monotonic()
+    outcome = "ok"
+    provider_label = "all"
+    try:
+        if provider is None or not provider.strip():
+            await asyncio.to_thread(wipe_user_all_collections, user_id=effective_user_id)
+        else:
+            provider_label = resolve_provider(provider)
+            client = get_memory_client(provider_label)
 
-        await asyncio.to_thread(client.wipe_user, user_id=effective_user_id)
+            await asyncio.to_thread(client.wipe_user, user_id=effective_user_id)
+    except Exception as exc:
+        outcome = outcome_for_exception(exc)
+        raise
+    finally:
+        MEMORY_WIPE_DURATION_SECONDS.labels(provider=provider_label).observe(time.monotonic() - started)
+        MEMORY_OPERATIONS_TOTAL.labels(operation="wipe", outcome=outcome).inc()
 
     return {"status": "success", "message": f"All memories wiped for user {effective_user_id}"}
 
@@ -158,6 +173,15 @@ async def delete_memory(
     resolved_provider = resolve_provider(provider)
     client = get_memory_client(resolved_provider)
 
-    await asyncio.to_thread(client.delete, memory_id=memory_id)
+    started = time.monotonic()
+    outcome = "ok"
+    try:
+        await asyncio.to_thread(client.delete, memory_id=memory_id)
+    except Exception as exc:
+        outcome = outcome_for_exception(exc)
+        raise
+    finally:
+        MEMORY_DELETE_DURATION_SECONDS.labels(provider=resolved_provider).observe(time.monotonic() - started)
+        MEMORY_OPERATIONS_TOTAL.labels(operation="delete", outcome=outcome).inc()
 
     return {"status": "success", "message": f"Memory {memory_id} deleted"}

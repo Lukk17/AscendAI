@@ -2,21 +2,131 @@
 
 Provides two extraction paths:
   - text: the existing flat string (default, backward-compatible)
-  - structured: article metadata from trafilatura + readability-lxml fallback
+  - structured: article metadata from the trafilatura and readability-lxml ensemble
 """
 
+import json
 import logging
-from collections.abc import Callable
+from collections.abc import Iterator
 from typing import Any
 
 import trafilatura
 from bs4 import BeautifulSoup
+from bs4.element import PageElement, PreformattedString, Tag
+from extruct import extract as extruct_extract
 from readability import Document
 
-from src.config.config import settings
-from src.reader.html_utils import remove_noise_tags
-
 logger = logging.getLogger(__name__)
+
+_EMBEDDED_SYNTAXES = ["json-ld", "microdata", "opengraph"]
+
+_BOILERPLATE_MARKERS = (
+    "nav",
+    "sidebar",
+    "footer",
+    "header",
+    "menu",
+    "comment",
+    "related",
+    "promo",
+    "advert",
+    "widget",
+)
+
+_BLOCK_TAGS = frozenset(
+    {
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "body",
+        "br",
+        "dd",
+        "details",
+        "div",
+        "dl",
+        "dt",
+        "figcaption",
+        "figure",
+        "footer",
+        "form",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "header",
+        "hr",
+        "html",
+        "li",
+        "main",
+        "nav",
+        "ol",
+        "p",
+        "pre",
+        "section",
+        "summary",
+        "table",
+        "tbody",
+        "td",
+        "tfoot",
+        "th",
+        "thead",
+        "tr",
+        "ul",
+    }
+)
+
+_NON_TEXT_TAGS = frozenset({"noscript", "script", "style", "template"})
+
+
+def extract_embedded_metadata(html: str) -> dict[str, Any]:
+    """Parse JSON-LD, OpenGraph and microdata with extruct.
+
+    A parse error leaves the metadata empty and logs a WARNING. It never fails the read.
+    """
+    try:
+        data = extruct_extract(html, syntaxes=_EMBEDDED_SYNTAXES, uniform=True)
+    except Exception:
+        logger.warning("extruct embedded-data parse failed", exc_info=True)
+
+        return {}
+
+    return {
+        "json-ld": list(data.get("json-ld", [])),
+        "microdata": list(data.get("microdata", [])),
+        "opengraph": list(data.get("opengraph", [])),
+    }
+
+
+def extract_tables(html: str) -> list[list[list[str]]]:
+    """Parse every HTML table into rows of cell texts.
+
+    One entry per table, one list of cell texts per row, header and body rows
+    alike. A page with no tables yields an empty list, never an error.
+    """
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        logger.warning("table extraction failed", exc_info=True)
+
+        return []
+    tables: list[list[list[str]]] = []
+    for table in soup.find_all("table"):
+        rows: list[list[str]] = []
+        for row in table.find_all("tr"):
+            cells = [
+                cell
+                for cell in (cell.get_text(" ", strip=True) for cell in row.find_all(["th", "td"]))
+                if cell
+            ]
+            if cells:
+                rows.append(cells)
+        if rows:
+            tables.append(rows)
+
+    return tables
 
 
 def _readability_extract(html: str) -> dict[str, Any]:
@@ -33,48 +143,38 @@ def _readability_extract(html: str) -> dict[str, Any]:
     }
 
 
-def _plain_text_length(html: str) -> int:
-    soup = BeautifulSoup(html, "html.parser")
-    remove_noise_tags(soup)
+def _ensemble_score(content: str) -> float:
+    """Score one extraction by text length discounted for links and boilerplate."""
+    soup = BeautifulSoup(content, "html.parser")
+    plain = soup.get_text(" ", strip=True)
+    length = len(plain)
+    if length == 0:
+        return 0.0
+    link_chars = sum(len(link.get_text(" ", strip=True)) for link in soup.find_all("a"))
+    link_density = min(1.0, link_chars / length)
+    boilerplate_chars = 0
+    for tag in soup.find_all(True):
+        class_value = tag.get("class")
+        class_names = " ".join(class_value) if isinstance(class_value, list) else ""
+        marker = f"{class_names} {tag.get('id') or ''}".lower()
+        if any(part in marker for part in _BOILERPLATE_MARKERS):
+            boilerplate_chars += len(tag.get_text(" ", strip=True))
+    boilerplate_ratio = min(1.0, boilerplate_chars / length)
 
-    return len(soup.get_text(" ", strip=True))
-
-
-def _longer_of_two_passes[T](html: str, run_pass: Callable[[bool], T], length_of: Callable[[T], int]) -> T:
-    """Run a precision pass, then a recall pass when the first is thin against the page.
-
-    The first pass is thin when it is shorter than CONTENT_RECALL_FALLBACK_RATIO times the
-    page's plain text. The longer of the two passes wins.
-    """
-    precision_result = run_pass(False)
-    if length_of(precision_result) >= settings.CONTENT_RECALL_FALLBACK_RATIO * _plain_text_length(html):
-        return precision_result
-
-    recall_result = run_pass(True)
-
-    return recall_result if length_of(recall_result) > length_of(precision_result) else precision_result
-
-
-def _structured_content_length(result: dict[str, Any] | None) -> int:
-    content: str = (result or {}).get("content", "")
-
-    return len(content)
+    return length * (1.0 - link_density) * (1.0 - boilerplate_ratio)
 
 
-def _trafilatura_structured(html: str, favor_recall: bool = False) -> dict[str, Any] | None:
-    """Run trafilatura in JSON mode and return a structured dict, or None on failure."""
+def _trafilatura_structured(html: str) -> dict[str, Any] | None:
+    """Run trafilatura once in JSON mode and return a structured dict, or None on failure."""
     try:
         raw = trafilatura.extract(
             html,
             output_format="json",
             with_metadata=True,
             include_comments=False,
-            favor_recall=favor_recall,
         )
         if not raw:
             return None
-
-        import json  # local import to avoid top-level json dep ordering issue
 
         parsed: dict[str, Any] = json.loads(raw)
 
@@ -92,68 +192,87 @@ def _trafilatura_structured(html: str, favor_recall: bool = False) -> dict[str, 
         return None
 
 
+def _trafilatura_text(html: str) -> str:
+    """Run trafilatura once in text mode, returning an empty string on failure."""
+    try:
+        return trafilatura.extract(html) or ""
+    except Exception:
+        logger.debug("trafilatura text extraction failed", exc_info=True)
+
+        return ""
+
+
 def extract_structured(html: str) -> dict[str, Any]:
     """Extract structured article data from HTML.
 
-    Tries trafilatura first.  When the result is shorter than
-    READABILITY_FALLBACK_MIN_CHARS, readability-lxml is tried and the
-    longer result (by character count of the content field) wins.
+    Trafilatura and readability-lxml both run on the same HTML and the higher
+    scoring ensemble result wins. Ties go to trafilatura.
 
-    Returns a dict with keys: title, content, author, date, sitename, source.
+    Returns a dict with keys: title, content, author, date, sitename, source, metadata.
     The "content" key is the main body text (equivalent to the flat string
     returned by plain extract()).
     """
-    traf = _longer_of_two_passes(
-        html,
-        lambda favor_recall: _trafilatura_structured(html, favor_recall),
-        _structured_content_length,
-    )
-    traf_len = _structured_content_length(traf)
-
-    if traf_len >= settings.READABILITY_FALLBACK_MIN_CHARS:
-        return traf or {
-            "title": "",
-            "content": "",
-            "author": "",
-            "date": "",
-            "sitename": "",
-            "source": "none",
-        }
-
+    metadata = extract_embedded_metadata(html)
+    traf = _trafilatura_structured(html)
     read_result = _readability_extract(html)
-    read_len = len(read_result.get("content", ""))
+    traf_content: str = (traf or {}).get("content", "")
+    read_content: str = read_result.get("content", "")
 
-    if traf is not None and traf_len >= read_len:
-        return traf
+    if _ensemble_score(read_content) > _ensemble_score(traf_content):
+        return {**read_result, "content": _html_to_plain_text(read_content), "metadata": metadata}
 
-    return read_result
+    if traf is not None:
+        return {**traf, "metadata": metadata}
+
+    return {
+        "title": "",
+        "content": "",
+        "author": "",
+        "date": "",
+        "sitename": "",
+        "source": "none",
+        "metadata": metadata,
+    }
 
 
-def _extract_text_with_recall_fallback(html: str) -> str:
-    return _longer_of_two_passes(
-        html,
-        lambda favor_recall: trafilatura.extract(html, favor_recall=favor_recall) or "",
-        len,
-    )
+def _inline_text(node: PageElement) -> str:
+    if isinstance(node, Tag):
+        return "" if node.name in _NON_TEXT_TAGS else node.get_text()
+    if isinstance(node, PreformattedString):
+        return ""
+
+    return str(node)
+
+
+def _block_lines(node: Tag) -> Iterator[str]:
+    inline: list[str] = []
+    for child in node.children:
+        if isinstance(child, Tag) and child.name in _BLOCK_TAGS:
+            yield " ".join("".join(inline).split())
+            inline = []
+            yield from _block_lines(child)
+        else:
+            inline.append(_inline_text(child))
+    yield " ".join("".join(inline).split())
+
+
+def _html_to_plain_text(html: str) -> str:
+    """Flatten HTML to plain text, one line per block, entities decoded and whitespace collapsed."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    return "\n".join(line for line in _block_lines(soup) if line)
 
 
 def extract_text_with_fallback(html: str) -> str:
-    """Extract text from HTML, falling back to readability when trafilatura is thin.
+    """Extract text from HTML: both extractors run and the higher scoring result wins.
 
-    This is the flat-string equivalent: returns the content field only.
+    Ties go to trafilatura. This is the flat-string equivalent: returns the content only.
     Used for the default output_format=text path.
     """
-    traf_text = _extract_text_with_recall_fallback(html)
-    traf_len = len(traf_text)
+    traf_text = _trafilatura_text(html)
+    read_content: str = _readability_extract(html).get("content", "")
 
-    if traf_len >= settings.READABILITY_FALLBACK_MIN_CHARS:
-        return traf_text
+    if _ensemble_score(read_content) > _ensemble_score(traf_text):
+        return _html_to_plain_text(read_content)
 
-    read_result = _readability_extract(html)
-    read_content: str = read_result.get("content", "")
-    read_len = len(read_content)
-
-    if traf_text and traf_len >= read_len:
-        return traf_text
-
-    return read_content
+    return traf_text

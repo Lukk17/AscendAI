@@ -1,10 +1,11 @@
 """Generate the twenty-five page canary PDF used by the long-document e2e spec.
 
-Page geometry is deliberate: 595 x 842 points is A4, and the library renders every PDF page at a fixed scale of 2,
-so one page reaches inference at 1190 x 1684 = 2,003,960 pixels, just under the 2,500,000 pixel ceiling the service
-refuses above.
+Page geometry is deliberate: 595 x 842 points is A4, and the library renders every PDF page at a fixed
+scale of 2, so one page reaches inference at 1190 x 1684 = 2,003,960 pixels, just under the 2,500,000
+pixel ceiling the service refuses above.
 """
 
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -66,4 +67,4 @@ pages = [render_page(number) for number in range(1, PAGE_COUNT + 1)]
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
 pages[0].save(OUTPUT, format="PDF", save_all=True, append_images=pages[1:], resolution=72.0)
 
-print(OUTPUT, OUTPUT.stat().st_size, "bytes")
+sys.stdout.write(f"{OUTPUT} {OUTPUT.stat().st_size} bytes\n")

@@ -47,7 +47,7 @@ runtime:
             expect(tool.inputSchema.required).to.be.an("array").that.includes("query");
             expect(tool.inputSchema.properties).to.have.property("limit");
         });
-        test("web_read advertises url (required) and at least one optional extraction flag", function () {
+        test("web_read advertises url (required) and the three optional flags", function () {
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
@@ -55,7 +55,9 @@ runtime:
             expect(tool, "web_read tool").to.be.an("object");
             expect(tool.inputSchema.properties).to.have.property("url");
             expect(tool.inputSchema.required).to.be.an("array").that.includes("url");
-            expect(Object.keys(tool.inputSchema.properties)).to.include.oneOf(["include_links", "link_filter", "heavy_mode"]);
+            expect(tool.inputSchema.properties).to.have.property("include_links");
+            expect(tool.inputSchema.properties).to.have.property("link_filter");
+            expect(tool.inputSchema.properties).to.have.property("heavy_mode");
         });
 
 settings:

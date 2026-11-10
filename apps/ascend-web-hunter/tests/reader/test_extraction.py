@@ -1,19 +1,26 @@
-"""Tests for structured extraction and readability fallback (tasks 5.1, 5.2)."""
+"""Tests for the D2 ensemble: trafilatura and readability-lxml both run, higher score wins."""
 
 from pathlib import Path
 from unittest.mock import patch
 
-import trafilatura
+from bs4 import BeautifulSoup
 
 from src.reader.extraction import (
-    _extract_text_with_recall_fallback,
+    _ensemble_score,
+    _readability_extract,
+    _trafilatura_structured,
+    extract_embedded_metadata,
     extract_structured,
+    extract_tables,
     extract_text_with_fallback,
 )
 
 _FIXTURES = Path(__file__).parent.parent / "fixtures"
 _BOOKS_LISTING_HTML = (_FIXTURES / "books_toscrape_index.html").read_text(encoding="utf-8")
 _ARTICLE_HTML = (_FIXTURES / "gnu_free_sw_article.html").read_text(encoding="utf-8")
+_PRODUCT_HTML = (_FIXTURES / "embedded_product.html").read_text(encoding="utf-8")
+_READABILITY_WINS_HTML = (_FIXTURES / "ensemble_readability_wins.html").read_text(encoding="utf-8")
+_TIE_HTML = (_FIXTURES / "ensemble_tie.html").read_text(encoding="utf-8")
 
 _GOOD_HTML = """
 <html>
@@ -31,7 +38,16 @@ It has multiple sentences to ensure it clears any minimum length requirement.</p
 </html>
 """
 
-_THIN_HTML = "<html><body><p>short</p></body></html>"
+
+def _structured(content: str, source: str) -> dict[str, str]:
+    return {
+        "title": "t",
+        "content": content,
+        "author": "",
+        "date": "",
+        "sitename": "",
+        "source": source,
+    }
 
 
 def test_extract_structured_returns_required_keys() -> None:
@@ -45,6 +61,7 @@ def test_extract_structured_returns_required_keys() -> None:
     assert "date" in result
     assert "sitename" in result
     assert "source" in result
+    assert "metadata" in result
 
 
 def test_extract_structured_content_not_empty_for_good_html() -> None:
@@ -55,72 +72,173 @@ def test_extract_structured_content_not_empty_for_good_html() -> None:
     assert result["content"]
 
 
-def test_extract_structured_falls_back_to_readability_when_trafilatura_thin() -> None:
-    """When trafilatura returns content below the threshold, readability is tried."""
+def test_ensemble_prefers_trafilatura_on_the_article_page() -> None:
+    """On a full article trafilatura's cleaner extraction outscores readability."""
     # when
-    with patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 10_000):
-        result = extract_structured(_GOOD_HTML)
+    result = extract_structured(_ARTICLE_HTML)
 
     # then
-    assert result["source"] in ("readability", "trafilatura")
+    assert result["source"] == "trafilatura"
+    assert "The four essential freedoms" in result["content"]
 
 
-def test_extract_structured_returns_readability_when_traf_fails() -> None:
-    """When trafilatura itself returns None, readability provides the content."""
+def test_ensemble_prefers_trafilatura_on_the_listing_page() -> None:
+    """On the books listing trafilatura's 319 characters outscore readability's 131."""
+    # when
+    result = extract_structured(_BOOKS_LISTING_HTML)
+
+    # then
+    assert result["source"] == "trafilatura"
+
+
+def test_ensemble_prefers_readability_when_trafilatura_fails() -> None:
+    """When trafilatura returns nothing, readability's real extraction wins."""
     # when
     with patch("src.reader.extraction.trafilatura.extract", return_value=None):
         result = extract_structured(_GOOD_HTML)
 
     # then
     assert result["source"] == "readability"
+    assert "Test Article" in result["content"]
 
 
-def test_extract_text_with_fallback_returns_string() -> None:
+def test_ensemble_prefers_readability_on_the_aside_page() -> None:
+    """Trafilatura drops the aside, readability keeps it, so readability outscores it."""
     # when
-    result = extract_text_with_fallback(_GOOD_HTML)
+    result = extract_structured(_READABILITY_WINS_HTML)
 
     # then
-    assert isinstance(result, str)
-    assert len(result) > 0
+    assert result["source"] == "readability"
+    assert "Visiting hours" in result["content"]
 
 
-def test_extract_text_with_fallback_uses_readability_when_traf_thin() -> None:
-    """When trafilatura returns fewer chars than the threshold, readability is tried."""
+def test_structured_content_is_the_text_format_plain_text_when_readability_wins() -> None:
     # when
-    with patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 10_000):
-        result = extract_text_with_fallback(_GOOD_HTML)
+    result = extract_structured(_READABILITY_WINS_HTML)
 
     # then
-    assert isinstance(result, str)
+    assert result["source"] == "readability"
+    assert result["content"] == extract_text_with_fallback(_READABILITY_WINS_HTML)
+    assert "<" not in result["content"]
 
 
-def test_extract_text_with_fallback_returns_traf_when_longer() -> None:
-    """When trafilatura result is longer than readability, trafilatura wins."""
+def test_ensemble_readability_win_scores_rank_unmocked() -> None:
+    """Pin the fixture property: on the aside page the readability score is higher."""
+    # when
+    traf = _trafilatura_structured(_READABILITY_WINS_HTML)
+    read_content: str = _readability_extract(_READABILITY_WINS_HTML).get("content", "")
+
+    # then
+    assert traf is not None
+    assert _ensemble_score(read_content) > _ensemble_score(traf.get("content", ""))
+
+
+def test_ensemble_tie_goes_to_trafilatura_on_the_tie_fixture() -> None:
+    """Both extractors return the same short note, so the scores tie and trafilatura wins."""
+    # when
+    traf = _trafilatura_structured(_TIE_HTML)
+    read_content: str = _readability_extract(_TIE_HTML).get("content", "")
+    result = extract_structured(_TIE_HTML)
+
+    # then
+    assert traf is not None
+    assert _ensemble_score(read_content) == _ensemble_score(traf.get("content", ""))
+    assert result["source"] == "trafilatura"
+
+
+def test_ensemble_tie_goes_to_trafilatura() -> None:
+    """Identical contents score the same, so trafilatura wins the tie."""
     # given
-    long_traf = "x" * 1000
-    short_read = {
-        "content": "short",
-        "title": "",
-        "author": "",
-        "date": "",
-        "sitename": "",
-        "source": "readability",
-    }
+    content = "Same clean content in both extractors."
 
     # when
     with (
-        patch("src.reader.extraction.trafilatura.extract", return_value=long_traf),
-        patch("src.reader.extraction._readability_extract", return_value=short_read),
-        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 50),
+        patch(
+            "src.reader.extraction._trafilatura_structured",
+            return_value=_structured(content, "trafilatura"),
+        ),
+        patch(
+            "src.reader.extraction._readability_extract",
+            return_value=_structured(content, "readability"),
+        ),
     ):
-        result = extract_text_with_fallback(_GOOD_HTML)
+        result = extract_structured(_GOOD_HTML)
 
     # then
-    assert result == long_traf
+    assert result["source"] == "trafilatura"
+
+
+def test_ensemble_returns_none_source_when_both_extractors_are_empty() -> None:
+    """Two empty extractions tie at zero with no trafilatura result, so the none fallback answers."""
+    # when
+    with (
+        patch("src.reader.extraction._trafilatura_structured", return_value=None),
+        patch(
+            "src.reader.extraction._readability_extract",
+            return_value=_structured("", "readability"),
+        ),
+    ):
+        result = extract_structured(_GOOD_HTML)
+
+    # then
+    assert result["source"] == "none"
+    assert result["content"] == ""
+
+
+def test_ensemble_link_density_penalty_flips_the_winner() -> None:
+    """A longer but fully linked readability result loses to a shorter clean trafilatura one."""
+    # given
+    linked = "<p>Listing: " + " ".join(f'<a href="/item{i}">item {i}</a>' for i in range(20)) + "</p>"
+    assert len(linked) > len("Clean result here with enough words to count.")
+
+    # when
+    with (
+        patch(
+            "src.reader.extraction._trafilatura_structured",
+            return_value=_structured("Clean result here with enough words to count.", "trafilatura"),
+        ),
+        patch(
+            "src.reader.extraction._readability_extract",
+            return_value=_structured(linked, "readability"),
+        ),
+    ):
+        result = extract_structured(_GOOD_HTML)
+
+    # then
+    assert result["source"] == "trafilatura"
+
+
+def test_ensemble_boilerplate_penalty_flips_the_winner() -> None:
+    """A longer readability result wrapped in sidebar markup loses to clean trafilatura text."""
+    # given
+    boilerplate = '<div class="sidebar">' + "<p>Promo words here.</p>" * 20 + "</div>"
+    assert len(boilerplate) > len("Clean result here with enough words to count.")
+
+    # when
+    with (
+        patch(
+            "src.reader.extraction._trafilatura_structured",
+            return_value=_structured("Clean result here with enough words to count.", "trafilatura"),
+        ),
+        patch(
+            "src.reader.extraction._readability_extract",
+            return_value=_structured(boilerplate, "readability"),
+        ),
+    ):
+        result = extract_structured(_GOOD_HTML)
+
+    # then
+    assert result["source"] == "trafilatura"
+
+
+def test_ensemble_score_is_zero_for_empty_content() -> None:
+    # when / then
+    assert _ensemble_score("") == 0.0
+    assert _ensemble_score("<div></div>") == 0.0
 
 
 def test_extract_structured_handles_trafilatura_json_exception() -> None:
-    """When trafilatura raises during JSON extraction the exception is caught and readability runs."""
+    """When trafilatura raises during JSON extraction the exception is caught and readability wins."""
     # when
     with patch("src.reader.extraction.trafilatura.extract", side_effect=ValueError("bad json")):
         result = extract_structured(_GOOD_HTML)
@@ -130,190 +248,170 @@ def test_extract_structured_handles_trafilatura_json_exception() -> None:
     assert result["source"] == "readability"
 
 
-def test_extract_structured_prefers_traf_when_traf_below_threshold_but_longer_than_readability() -> None:
-    """When trafilatura is below threshold but still longer than readability, trafilatura wins."""
-    # given
-    very_short_read: dict[str, str] = {
-        "content": "y" * 10,
-        "title": "",
-        "author": "",
-        "date": "",
-        "sitename": "",
-        "source": "readability",
-    }
-    traf_json = f'{{"text": "{"x" * 50}", "title": "", "author": null, "date": null, "sitename": null}}'
-
+def test_extract_text_returns_string_for_good_html() -> None:
     # when
-    with (
-        patch("src.reader.extraction.trafilatura.extract", return_value=traf_json),
-        patch("src.reader.extraction._readability_extract", return_value=very_short_read),
-        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 200),
-    ):
-        result = extract_structured(_GOOD_HTML)
+    result = extract_text_with_fallback(_GOOD_HTML)
 
     # then
-    # traf_len (50) < threshold (200) but traf_len (50) >= read_len (10) → trafilatura wins
-    assert result["source"] == "trafilatura"
+    assert isinstance(result, str)
+    assert len(result) > 0
 
 
-def test_extract_text_with_fallback_prefers_traf_below_threshold_when_longer_than_readability() -> None:
-    """traf below threshold but still longer than readability → traf text is returned."""
-    # given
-    short_traf = "x" * 50
-    very_short_read: dict[str, str] = {
-        "content": "y" * 10,
-        "title": "",
-        "author": "",
-        "date": "",
-        "sitename": "",
-        "source": "readability",
-    }
-
+def test_extract_text_prefers_trafilatura_on_the_article_page() -> None:
     # when
-    with (
-        patch("src.reader.extraction.trafilatura.extract", return_value=short_traf),
-        patch("src.reader.extraction._readability_extract", return_value=very_short_read),
-        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 200),
-    ):
-        result = extract_text_with_fallback(_GOOD_HTML)
-
-    # then
-    assert result == short_traf
-
-
-def test_extract_structured_prefers_readability_when_it_scores_higher() -> None:
-    """When readability content is longer, readability wins."""
-    # given
-    short_traf_json = '{"text": "x", "title": "", "author": "", "date": "", "sitename": ""}'
-    long_read: dict[str, str] = {
-        "content": "y" * 500,
-        "title": "title",
-        "author": "",
-        "date": "",
-        "sitename": "",
-        "source": "readability",
-    }
-
-    # when
-    with (
-        patch("src.reader.extraction.trafilatura.extract", return_value=short_traf_json),
-        patch("src.reader.extraction._readability_extract", return_value=long_read),
-        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 50),
-    ):
-        result = extract_structured(_GOOD_HTML)
-
-    # then
-    assert result["source"] == "readability"
-    assert result["content"] == long_read["content"]
-
-
-def test_extract_text_with_fallback_returns_listing_titles_through_recall_pass() -> None:
-    """The books listing loses every title in precision mode and the recall pass restores them."""
-    # when
-    result = extract_text_with_fallback(_BOOKS_LISTING_HTML)
-
-    # then
-    assert "Tipping the Velvet" in result
-    assert "Sharp Objects" in result
-    assert "£51.77" in result
-
-
-def test_extract_text_with_fallback_precision_pass_alone_drops_listing_titles() -> None:
-    """With the ratio at 0 the recall pass never runs and the listing comes back as prices only."""
-    # when
-    with patch("src.reader.extraction.settings.CONTENT_RECALL_FALLBACK_RATIO", 0.0):
-        result = extract_text_with_fallback(_BOOKS_LISTING_HTML)
-
-    # then
-    assert "Tipping the Velvet" not in result
-    assert "£51.77" in result
-
-
-def test_extract_text_with_fallback_article_page_uses_precision_pass_only() -> None:
-    """An article page clears the ratio on the first pass, so trafilatura runs exactly once."""
-    # when
-    with patch("src.reader.extraction.trafilatura.extract", wraps=trafilatura.extract) as extract:
-        result = extract_text_with_fallback(_ARTICLE_HTML)
+    result = extract_text_with_fallback(_ARTICLE_HTML)
 
     # then
     assert "The four essential freedoms" in result
-    extract.assert_called_once_with(_ARTICLE_HTML, favor_recall=False)
 
 
-def test_extract_text_with_fallback_keeps_precision_pass_when_recall_pass_is_not_longer() -> None:
-    """A recall pass that returns less than the precision pass is discarded."""
-    # given
-    passes = ["precision text", "short"]
+def test_extract_text_prefers_readability_when_trafilatura_returns_none() -> None:
+    # when
+    with patch("src.reader.extraction.trafilatura.extract", return_value=None):
+        result = extract_text_with_fallback(_GOOD_HTML)
 
+    # then
+    assert "Test Article" in result
+
+
+def test_extract_text_returns_empty_string_when_both_extractors_fail() -> None:
     # when
     with (
-        patch("src.reader.extraction.trafilatura.extract", side_effect=passes) as extract,
-        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 0),
+        patch("src.reader.extraction.trafilatura.extract", side_effect=ValueError("bad html")),
+        patch(
+            "src.reader.extraction._readability_extract",
+            return_value=_structured("", "readability"),
+        ),
     ):
         result = extract_text_with_fallback(_GOOD_HTML)
 
     # then
-    assert result == "precision text"
-    assert extract.call_count == 2
-    assert extract.call_args_list[1].kwargs == {"favor_recall": True}
-
-
-def test_recall_pass_is_skipped_when_the_page_has_no_text() -> None:
-    """A page whose plain text is empty never triggers the second pass, and no division happens."""
-    # when
-    with patch("src.reader.extraction.trafilatura.extract", return_value=None) as extract:
-        result = _extract_text_with_recall_fallback("<html><body><script>1</script></body></html>")
-
-    # then
     assert result == ""
-    extract.assert_called_once()
 
 
-def test_extract_structured_returns_listing_titles_through_recall_pass() -> None:
-    """The structured path shares the two-pass rule, so the books listing keeps its titles there too."""
+def test_extract_text_is_plain_text_with_paragraph_breaks_when_readability_wins() -> None:
     # when
-    result = extract_structured(_BOOKS_LISTING_HTML)
+    result = extract_text_with_fallback(_READABILITY_WINS_HTML)
 
     # then
-    assert result["source"] == "trafilatura"
-    assert "Tipping the Velvet" in result["content"]
-    assert "Sharp Objects" in result["content"]
+    lines = result.split("\n")
+    assert "<" not in result
+    assert "readabilityBody" not in result
+    assert lines[0] == "City garden opens its gates"
+    assert "Visiting hours" in lines
+    assert "The garden welcomes visitors every day from nine in the morning until sunset." in lines
 
 
-def test_extract_structured_keeps_precision_pass_when_recall_pass_fails() -> None:
-    """A recall pass that yields nothing leaves the precision pass in place."""
+def test_extract_text_counts_the_same_words_as_the_readability_winner() -> None:
     # given
-    precision_json = '{"text": "precision text", "title": "t", "author": "", "date": "", "sitename": ""}'
-    passes = [precision_json, None]
+    read_html: str = _readability_extract(_READABILITY_WINS_HTML)["content"]
+    visible_words = BeautifulSoup(read_html, "html.parser").get_text(" ", strip=True).split()
+
+    # when
+    result = extract_text_with_fallback(_READABILITY_WINS_HTML)
+
+    # then
+    assert result.split() == visible_words
+
+
+def test_extract_text_decodes_entities_and_keeps_inline_tags_on_one_line() -> None:
+    # given
+    read_html = (
+        "<html><body><div><h2>Menu&nbsp;today</h2>"
+        "<p>Fish &amp; chips cost &pound;5, <a href='/m'>see <b>the</b> list</a>.<br>Open late"
+        "<script>var hidden = 1;</script><style>p { color: red; }</style></p>"
+        "<!-- hidden note --><ul><li>Tea</li><li>Coffee</li></ul>Closing words</div></body></html>"
+    )
 
     # when
     with (
-        patch("src.reader.extraction.trafilatura.extract", side_effect=passes) as extract,
-        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 0),
+        patch("src.reader.extraction._trafilatura_text", return_value=""),
+        patch(
+            "src.reader.extraction._readability_extract",
+            return_value=_structured(read_html, "readability"),
+        ),
     ):
-        result = extract_structured(_GOOD_HTML)
+        result = extract_text_with_fallback(_GOOD_HTML)
 
     # then
-    assert result["content"] == "precision text"
-    assert result["title"] == "t"
-    assert extract.call_count == 2
-    assert extract.call_args_list[0].kwargs["favor_recall"] is False
-    assert extract.call_args_list[1].kwargs["favor_recall"] is True
+    assert result == (
+        "Menu today\nFish & chips cost \u00a35, see the list.\nOpen late\nTea\nCoffee\nClosing words"
+    )
 
 
-def test_extract_structured_uses_recall_pass_when_precision_pass_fails() -> None:
-    """A precision pass that yields nothing is replaced by a recall pass that yields content."""
-    # given
-    recall_json = '{"text": "recall text", "title": "t", "author": "", "date": "", "sitename": ""}'
-    passes = [None, recall_json]
-
+def test_embedded_metadata_holds_the_product_block_in_every_syntax() -> None:
     # when
-    with (
-        patch("src.reader.extraction.trafilatura.extract", side_effect=passes),
-        patch("src.reader.extraction.settings.READABILITY_FALLBACK_MIN_CHARS", 0),
-    ):
-        result = extract_structured(_GOOD_HTML)
+    metadata = extract_embedded_metadata(_PRODUCT_HTML)
 
     # then
-    assert result["content"] == "recall text"
-    assert result["source"] == "trafilatura"
+    assert metadata["json-ld"][0]["name"] == "Northwind Lamp"
+    assert metadata["json-ld"][0]["offers"]["price"] == "45.99"
+    assert metadata["microdata"][0]["name"] == "Northwind Lamp"
+    assert metadata["microdata"][0]["price"] == "45.99"
+    assert metadata["opengraph"][0]["og:title"] == "Northwind Lamp"
+
+
+def test_embedded_metadata_parse_error_leaves_metadata_empty() -> None:
+    # when
+    with patch("src.reader.extraction.extruct_extract", side_effect=ValueError("bad markup")):
+        metadata = extract_embedded_metadata(_GOOD_HTML)
+
+    # then
+    assert metadata == {}
+
+
+def test_extract_structured_carries_metadata_beside_the_article_fields() -> None:
+    # when
+    result = extract_structured(_PRODUCT_HTML)
+
+    # then
+    assert result["metadata"]["json-ld"][0]["name"] == "Northwind Lamp"
+    assert result["title"] or result["content"]
+
+
+_TABLE_HTML = """
+<html><body><article>
+<p>This opening paragraph explains the quarterly figures in plain sentences for everyone.</p>
+<table><tr><th>Product name</th><th>Quarterly revenue</th></tr>
+<tr><td>Red Widget</td><td>Nineteen thousand dollars in the first quarter</td></tr>
+<tr><td>Blue Widget</td><td>Twenty one thousand dollars in the first quarter</td></tr>
+</table>
+<table><tr><td>Lonely cell</td></tr></table>
+</article></body></html>
+"""
+
+
+def test_extract_tables_returns_rows_cell_for_cell() -> None:
+    # when
+    tables = extract_tables(_TABLE_HTML)
+
+    # then
+    assert tables == [
+        [
+            ["Product name", "Quarterly revenue"],
+            ["Red Widget", "Nineteen thousand dollars in the first quarter"],
+            ["Blue Widget", "Twenty one thousand dollars in the first quarter"],
+        ],
+        [["Lonely cell"]],
+    ]
+
+
+def test_extract_tables_skips_empty_rows_and_tables() -> None:
+    # when
+    tables = extract_tables("<html><body><table><tr></tr><tr><th></th></tr></table></body></html>")
+
+    # then
+    assert tables == []
+
+
+def test_extract_tables_without_tables_is_empty() -> None:
+    assert extract_tables(_GOOD_HTML) == []
+
+
+def test_extract_tables_parse_error_is_empty() -> None:
+    # when
+    with patch("src.reader.extraction.BeautifulSoup", side_effect=ValueError("bad markup")):
+        tables = extract_tables(_GOOD_HTML)
+
+    # then
+    assert tables == []

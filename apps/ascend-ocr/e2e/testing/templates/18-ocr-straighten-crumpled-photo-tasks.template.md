@@ -18,7 +18,7 @@ Copy this file to `../runs/<UTC-timestamp>_18-ocr-straighten-crumpled-photo-task
 
 - [ ] Job records dropped from the container's jobs directory
 - [ ] `ocr-results` bucket emptied
-- [ ] `/ready` reports `jobs_queued=0` and `jobs_running=0`, and the bucket is confirmed empty
+- [ ] `/ready` reports `checks.jobs.queued=0` and `checks.jobs.running=0`, and the bucket is confirmed empty
 
 ### Run
 

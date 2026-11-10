@@ -6,9 +6,9 @@ Same ffmpeg-segment chunking strategy as OpenAI - no pydub buffer.
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from huggingface_hub import InferenceClient
@@ -78,7 +78,7 @@ def hf_transcript(
             num_chunks = len(chunks)
             for idx, chunk_path in enumerate(chunks):
                 chunk_num = idx + 1
-                chunk_size_mb = os.path.getsize(chunk_path) / 1024 / 1024
+                chunk_size_mb = Path(chunk_path).stat().st_size / 1024 / 1024
                 if progress_callback:
                     progress_callback(
                         {

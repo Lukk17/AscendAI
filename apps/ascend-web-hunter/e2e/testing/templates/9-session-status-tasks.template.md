@@ -2,14 +2,14 @@
 
 Spec: [../9-session-status-test.md](../9-session-status-test.md)
 
-Copy this file to `../runs/<UTC-timestamp>_9-session-status-tasks.md` before starting a run. Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
+Copy this file to `../runs/<UTC-timestamp>_9-session-status-tasks.md` before starting a run. For a repeated run of the same spec in the same sweep, which shares the sweep's timestamp, add `-rerun<N>` before `.md` (`-rerun2` for the second run, `-rerun3` for the third). Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
 
 ## Tasks
 
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 - [ ] Redis reachable: `docker exec redis redis-cli PING` returns `PONG`
 
 ### Reset state

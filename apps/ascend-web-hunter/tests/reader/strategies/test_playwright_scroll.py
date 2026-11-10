@@ -15,9 +15,13 @@ def _make_url_validator() -> URLValidator:
 
 
 def _make_browser_and_page() -> tuple[MagicMock, MagicMock, MagicMock]:
+    goto_response = MagicMock(status=200)
+    goto_response.all_headers = AsyncMock(return_value={})
     page = MagicMock()
-    page.goto = AsyncMock(return_value=MagicMock(status=200))
-    page.content = AsyncMock(return_value="<html><body>loaded content</body></html>")
+    page.goto = AsyncMock(return_value=goto_response)
+    page.content = AsyncMock(
+        return_value="<html><body><article><p>" + "word " * 30 + "</p></article></body></html>"
+    )
     page.url = "https://example.com/page"
     page.wait_for_load_state = AsyncMock()
     page.wait_for_timeout = AsyncMock()
@@ -27,6 +31,10 @@ def _make_browser_and_page() -> tuple[MagicMock, MagicMock, MagicMock]:
     context = MagicMock()
     context.new_page = AsyncMock(return_value=page)
     context.close = AsyncMock()
+    context.cookies = AsyncMock(return_value=[])
+    context.route = AsyncMock()
+    context.route_web_socket = None
+    page.context = context
 
     browser = MagicMock()
     browser.new_context = AsyncMock(return_value=context)
@@ -57,17 +65,12 @@ async def test_scroll_called_configured_number_of_times() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_required",
-            return_value=False,
-        ),
-        patch("src.reader.strategies.playwright_strategy.ChallengeDetector.is_blocked", return_value=False),
-        patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch("src.reader.strategies.playwright_strategy.proxy_provider.for_playwright", return_value=None),
-        patch("src.reader.strategies.playwright_strategy.settings.SCROLL_ITERATIONS", scroll_iters),
-        patch("src.reader.strategies.playwright_strategy.settings.SCROLL_STEP_PX", scroll_step),
+        patch("src.reader.strategies.browser_read.settings.SCROLL_ITERATIONS", scroll_iters),
+        patch("src.reader.strategies.browser_read.settings.SCROLL_STEP_PX", scroll_step),
     ):
         strategy = PlaywrightStrategy(lambda: "UA", _make_url_validator())
         await strategy.get_html("https://example.com/page")
@@ -100,17 +103,12 @@ async def test_scroll_uses_configured_step_px() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_required",
-            return_value=False,
-        ),
-        patch("src.reader.strategies.playwright_strategy.ChallengeDetector.is_blocked", return_value=False),
-        patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch("src.reader.strategies.playwright_strategy.proxy_provider.for_playwright", return_value=None),
-        patch("src.reader.strategies.playwright_strategy.settings.SCROLL_ITERATIONS", 1),
-        patch("src.reader.strategies.playwright_strategy.settings.SCROLL_STEP_PX", scroll_step),
+        patch("src.reader.strategies.browser_read.settings.SCROLL_ITERATIONS", 1),
+        patch("src.reader.strategies.browser_read.settings.SCROLL_STEP_PX", scroll_step),
     ):
         strategy = PlaywrightStrategy(lambda: "UA", _make_url_validator())
         await strategy.get_html("https://example.com/page")

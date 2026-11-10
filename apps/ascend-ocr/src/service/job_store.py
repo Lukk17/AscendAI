@@ -1,16 +1,15 @@
 import asyncio
-import os
 import re
 import secrets
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
+from ascend_python_common.log_config import get_logger
 from pydantic import ValidationError
 
 from src.api.exception_handlers import JobNotFoundError
 from src.config.config import settings
-from src.config.logging_config import get_logger
 from src.model.ocr_models import (
     FAILURE_LIFETIME_EXCEEDED,
     FAILURE_SERVICE_RESTARTED,
@@ -85,7 +84,7 @@ def atomic_write_bytes(path: Path, payload: bytes) -> None:
     """Write through a temporary file in the same directory, so no reader sees a partial file."""
     temp_path = path.with_name(f"{path.name}{_TEMP_SUFFIX}")
     temp_path.write_bytes(payload)
-    os.replace(temp_path, path)
+    temp_path.replace(path)
 
 
 def write_progress(job_id: str, pages_done: int) -> None:
@@ -188,7 +187,9 @@ class JobStore:
             if record.is_terminal:
                 continue
 
-            recovered.append(self.fail(record, FAILURE_SERVICE_RESTARTED, "Service restarted before the work finished"))
+            recovered.append(
+                self.fail(record, FAILURE_SERVICE_RESTARTED, "Service restarted before the work finished")
+            )
 
         return recovered
 
@@ -213,7 +214,7 @@ class JobStore:
         return record
 
     def fail(self, record: JobRecord, code: str, detail: str) -> JobRecord:
-        """Write a terminal failed record carrying the reason, whether it is worth resubmitting, and the pages read."""
+        """Write a terminal failed record carrying the reason and the pages read."""
         record.error_code = code
         record.error_reason = detail
         record.retryable = code in RETRYABLE_FAILURE_REASONS
@@ -221,10 +222,12 @@ class JobStore:
         return self._finish_before_the_last_page(record, "failed")
 
     def cancel(self, record: JobRecord) -> JobRecord:
-        """Write a terminal cancelled record, which is not a failure, carries no result, and keeps the pages read."""
+        """Write a terminal cancelled record, which carries no result and keeps the pages read."""
         return self._finish_before_the_last_page(record, "cancelled")
 
-    def succeed(self, record: JobRecord, location: JobResultLocation, processing_time_seconds: float) -> JobRecord:
+    def succeed(
+        self, record: JobRecord, location: JobResultLocation, processing_time_seconds: float
+    ) -> JobRecord:
         """Write a terminal successful record, which is only ever done once the object is in the bucket."""
         record.result = location
         record.processing_time_seconds = processing_time_seconds
@@ -233,7 +236,7 @@ class JobStore:
         return self._finish(record, "succeeded")
 
     def _finish_before_the_last_page(self, record: JobRecord, state: JobState) -> JobRecord:
-        """Keep the pages the worker reported, read before _finish removes the progress file that holds them."""
+        """Keep the pages the worker reported before _finish removes the progress file."""
         record.pages_done = read_progress(record.job_id)
 
         return self._finish(record, state)
@@ -267,7 +270,9 @@ class JobStore:
             if record.is_terminal or record.submitted_at > cutoff:
                 continue
 
-            expired.append(self.fail(record, FAILURE_LIFETIME_EXCEEDED, "Work exceeded the maximum lifetime for a job"))
+            expired.append(
+                self.fail(record, FAILURE_LIFETIME_EXCEEDED, "Work exceeded the maximum lifetime for a job")
+            )
             logger.warning("Job %s failed: it outlived the maximum lifetime for a job", record.job_id)
 
         return expired

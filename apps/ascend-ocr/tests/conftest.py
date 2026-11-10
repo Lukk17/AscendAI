@@ -6,8 +6,12 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
+from ascend_python_common.rate_limit import McpRateLimitMiddleware
+from limits.storage import MemoryStorage
 from PIL import Image
 
+from src.api.mcp.mcp_server import mcp
+from src.api.rest.rest_endpoints import limiter
 from src.config.config import LANGUAGE_MODEL_OVERRIDES, ModelPair, settings
 from src.model.ocr_models import (
     JobRecord,
@@ -149,6 +153,31 @@ def write_finished_record(store: JobStore, state: JobState) -> JobRecord:
         return store.fail(record, "OCR_FAILED", "engine gave up")
 
     return store.cancel(record)
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiters() -> None:
+    # create_service_app appends its three middlewares to the shared mcp server on every
+    # test app, so drop everything past FastMCP's own entry plus the module app's triplet.
+    del mcp.middleware[4:]
+    # The module limiter points at Redis in production wiring, and no test runs a
+    # server, so a Redis storage gets a fresh in-memory storage per test while a
+    # memory storage is reset. Either way every test starts with an empty budget.
+    seen: set[int] = set()
+    owned = [limiter]
+    owned.extend(
+        middleware._limiter for middleware in mcp.middleware if isinstance(middleware, McpRateLimitMiddleware)
+    )
+    for owned_limiter in owned:
+        if id(owned_limiter) in seen:
+            continue
+        seen.add(id(owned_limiter))
+        if isinstance(owned_limiter._storage, MemoryStorage):
+            owned_limiter.reset()
+        else:
+            fresh = MemoryStorage()
+            owned_limiter._storage = fresh
+            owned_limiter._limiter.storage = fresh
 
 
 @pytest.fixture

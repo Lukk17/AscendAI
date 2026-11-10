@@ -41,10 +41,12 @@ endpoints. Both surfaces call `get_memory_client()` from the same service module
 
 ### ADR-005: Liveness / readiness split, RFC 7807 errors, Prometheus `/metrics`
 
-`/health` is always-200 liveness; `/ready` actively probes Qdrant, the embedding API, and the mem0 client.
-Error responses use `application/problem+json` (400 with `detail` for `ValueError`, 500 with `detail` redacted for
-unhandled exceptions). `/metrics` exposes provider-labelled counters and histograms. Every response echoes
-`X-Request-ID` for log correlation. Accepted. See
+`/health` is always-200 liveness with `service` and `version`; `/ready` aggregates the Qdrant, embedding API,
+and mem0 client probes and answers `ready` (200) or `not-ready` (503).
+Error responses use `application/problem+json` with `code` and `traceId` (400 `validation` with `detail` for
+`ValueError`, 400 `validation` with `errors` for router validation failures, 500 `internal` with a fixed detail for
+unhandled exceptions; MCP refusals are tool errors starting with `<code>: `). `/metrics` exposes provider-labelled
+counters and histograms. Every response echoes `X-Request-ID` for log correlation. Accepted. See
 [ADR-005](../decisions/ADR-005-observability-and-error-envelope.md).
 
 ---

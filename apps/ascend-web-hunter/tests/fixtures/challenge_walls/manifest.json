@@ -1,0 +1,1186 @@
+[
+  {
+    "path": "cloudflare-rendered-en.html",
+    "vendor": "cloudflare",
+    "language": "en",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "server": "cloudflare",
+      "cf-mitigated": "challenge",
+      "cf-ray": ""
+    },
+    "cookie_names": [
+      "AWSALB",
+      "AWSALBCORS"
+    ],
+    "source_url": "https://www.scrapingcourse.com/cloudflare-challenge",
+    "captured_on": "2026-10-19",
+    "captured_with": "playwright locale=en",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "interstitial_structure",
+        "phrase_title"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Rendered managed challenge; title and heading localised per navigator.language."
+  },
+  {
+    "path": "cloudflare-rendered-pl.html",
+    "vendor": "cloudflare",
+    "language": "pl",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "server": "cloudflare",
+      "cf-mitigated": "challenge",
+      "cf-ray": ""
+    },
+    "cookie_names": [
+      "AWSALB",
+      "AWSALBCORS"
+    ],
+    "source_url": "https://www.scrapingcourse.com/cloudflare-challenge",
+    "captured_on": "2026-10-19",
+    "captured_with": "playwright locale=pl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "interstitial_structure",
+        "phrase_title"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Rendered managed challenge; title and heading localised per navigator.language."
+  },
+  {
+    "path": "cloudflare-rendered-de.html",
+    "vendor": "cloudflare",
+    "language": "de",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "server": "cloudflare",
+      "cf-mitigated": "challenge",
+      "cf-ray": ""
+    },
+    "cookie_names": [
+      "AWSALB",
+      "AWSALBCORS"
+    ],
+    "source_url": "https://www.scrapingcourse.com/cloudflare-challenge",
+    "captured_on": "2026-10-19",
+    "captured_with": "playwright locale=de",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "interstitial_structure",
+        "phrase_title"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Rendered managed challenge; title and heading localised per navigator.language."
+  },
+  {
+    "path": "cloudflare-rendered-fr.html",
+    "vendor": "cloudflare",
+    "language": "fr",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "server": "cloudflare",
+      "cf-mitigated": "challenge",
+      "cf-ray": ""
+    },
+    "cookie_names": [
+      "AWSALB",
+      "AWSALBCORS"
+    ],
+    "source_url": "https://www.scrapingcourse.com/cloudflare-challenge",
+    "captured_on": "2026-10-19",
+    "captured_with": "playwright locale=fr",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "interstitial_structure",
+        "phrase_title"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Rendered managed challenge; title and heading localised per navigator.language."
+  },
+  {
+    "path": "cloudflare-rendered-ja.html",
+    "vendor": "cloudflare",
+    "language": "ja",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "server": "cloudflare",
+      "cf-mitigated": "challenge",
+      "cf-ray": ""
+    },
+    "cookie_names": [
+      "AWSALB",
+      "AWSALBCORS"
+    ],
+    "source_url": "https://www.scrapingcourse.com/cloudflare-challenge",
+    "captured_on": "2026-10-19",
+    "captured_with": "playwright locale=ja",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "interstitial_structure",
+        "phrase_title"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Rendered managed challenge; title and heading localised per navigator.language."
+  },
+  {
+    "path": "cloudflare-rendered-ar.html",
+    "vendor": "cloudflare",
+    "language": "ar",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "server": "cloudflare",
+      "cf-mitigated": "challenge",
+      "cf-ray": ""
+    },
+    "cookie_names": [
+      "AWSALB",
+      "AWSALBCORS"
+    ],
+    "source_url": "https://www.scrapingcourse.com/cloudflare-challenge",
+    "captured_on": "2026-10-19",
+    "captured_with": "playwright locale=ar",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "interstitial_structure",
+        "phrase_title"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Rendered managed challenge; title and heading localised per navigator.language."
+  },
+  {
+    "path": "cloudflare-curl.html",
+    "vendor": "cloudflare",
+    "language": "en",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "server": "cloudflare",
+      "cf-mitigated": "challenge",
+      "cf-ray": ""
+    },
+    "cookie_names": [],
+    "source_url": "https://www.scrapingcourse.com/cloudflare-challenge",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl_cffi",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "definitive_header"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Same page through curl_cffi: default English text, 403 with challenge headers."
+  },
+  {
+    "path": "amazon-de.html",
+    "vendor": "amazon",
+    "language": "de",
+    "kind": "wall",
+    "status": 503,
+    "headers": {
+      "server": "Server"
+    },
+    "cookie_names": [],
+    "source_url": "https://www.amazon.de/errors/validateCaptcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "amazon",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": [
+        "captcha_input"
+      ]
+    },
+    "notes": "Button variant: form action marker fires, no captcha input served. Owner decision 65.27: both form paths stay matched."
+  },
+  {
+    "path": "amazon-fr.html",
+    "vendor": "amazon",
+    "language": "fr",
+    "kind": "wall",
+    "status": 503,
+    "headers": {
+      "server": "Server"
+    },
+    "cookie_names": [],
+    "source_url": "https://www.amazon.fr/errors/validateCaptcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "amazon",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": [
+        "captcha_input"
+      ]
+    },
+    "notes": "Button variant: form action marker fires, no captcha input served. Owner decision 65.27: both form paths stay matched."
+  },
+  {
+    "path": "amazon-it.html",
+    "vendor": "amazon",
+    "language": "it",
+    "kind": "wall",
+    "status": 503,
+    "headers": {
+      "server": "Server"
+    },
+    "cookie_names": [],
+    "source_url": "https://www.amazon.it/errors/validateCaptcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "amazon",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": [
+        "captcha_input"
+      ]
+    },
+    "notes": "Button variant: form action marker fires, no captcha input served. Owner decision 65.27: both form paths stay matched."
+  },
+  {
+    "path": "amazon-es.html",
+    "vendor": "amazon",
+    "language": "es",
+    "kind": "wall",
+    "status": 503,
+    "headers": {
+      "server": "Server"
+    },
+    "cookie_names": [],
+    "source_url": "https://www.amazon.es/errors/validateCaptcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "amazon",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": [
+        "captcha_input"
+      ]
+    },
+    "notes": "Button variant: form action marker fires, no captcha input served. Owner decision 65.27: both form paths stay matched."
+  },
+  {
+    "path": "amazon-jp.html",
+    "vendor": "amazon",
+    "language": "ja",
+    "kind": "wall",
+    "status": 503,
+    "headers": {
+      "server": "Server"
+    },
+    "cookie_names": [],
+    "source_url": "https://www.amazon.co.jp/errors/validateCaptcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "amazon",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": [
+        "captcha_input"
+      ]
+    },
+    "notes": "Button variant: form action marker fires, no captcha input served. Owner decision 65.27: both form paths stay matched."
+  },
+  {
+    "path": "amazon-com.html",
+    "vendor": "amazon",
+    "language": "en",
+    "kind": "wall",
+    "status": 503,
+    "headers": {
+      "server": "Server"
+    },
+    "cookie_names": [],
+    "source_url": "https://www.amazon.com/errors/validateCaptcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "amazon",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": [
+        "captcha_input"
+      ]
+    },
+    "notes": "Button variant: form action marker fires, no captcha input served. Owner decision 65.27: both form paths stay matched."
+  },
+  {
+    "path": "amazon-pl.html",
+    "vendor": "amazon",
+    "language": "pl",
+    "kind": "wall",
+    "status": 503,
+    "headers": {
+      "server": "Server"
+    },
+    "cookie_names": [],
+    "source_url": "https://www.amazon.pl/errors/validateCaptcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "amazon",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": [
+        "captcha_input"
+      ]
+    },
+    "notes": "Button variant: form action marker fires, no captcha input served. Owner decision 65.27: both form paths stay matched."
+  },
+  {
+    "path": "amazon-uk.html",
+    "vendor": "amazon",
+    "language": "en",
+    "kind": "wall",
+    "status": 503,
+    "headers": {
+      "server": "Server"
+    },
+    "cookie_names": [],
+    "source_url": "https://www.amazon.co.uk/errors/validateCaptcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "amazon",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": [
+        "captcha_input"
+      ]
+    },
+    "notes": "Button variant: form action marker fires, no captcha input served. Owner decision 65.27: both form paths stay matched."
+  },
+  {
+    "path": "amazon-se.html",
+    "vendor": "amazon",
+    "language": "sv",
+    "kind": "wall",
+    "status": 503,
+    "headers": {
+      "server": "Server"
+    },
+    "cookie_names": [],
+    "source_url": "https://www.amazon.se/errors/validateCaptcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "amazon",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": [
+        "captcha_input"
+      ]
+    },
+    "notes": "Button variant: form action marker fires, no captcha input served. Owner decision 65.27: both form paths stay matched."
+  },
+  {
+    "path": "recaptcha-demo.html",
+    "vendor": "recaptcha",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://www.google.com/recaptcha/api2/demo",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "recaptcha",
+      "signals_must_fire": [
+        "vendor_script"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Public demo whose whole purpose is the widget."
+  },
+  {
+    "path": "hcaptcha-demo.html",
+    "vendor": "hcaptcha",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://democaptcha.com/demo-form-eng/hcaptcha.html",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "hcaptcha",
+      "signals_must_fire": [
+        "vendor_script"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Spec 11 human-spec contract pinned by this unit fixture."
+  },
+  {
+    "path": "geetest-demo.html",
+    "vendor": "geetest",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://www.geetest.com/en/demo",
+    "captured_on": "2026-10-19",
+    "captured_with": "playwright locale=en",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "geetest",
+      "signals_must_fire": [
+        "vendor_script"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Rendered adaptive-captcha demo."
+  },
+  {
+    "path": "datadome-allegro.html",
+    "vendor": "datadome",
+    "language": "en",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "x-dd-b": ""
+    },
+    "cookie_names": [
+      "_cmuid",
+      "wdctx",
+      "datadome"
+    ],
+    "source_url": "https://allegro.pl/listing?string=lego",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "datadome",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Real DataDome block. Token values (cid, hsh, cookie) redacted to REDACTED per the no-secrets rule; markers kept."
+  },
+  {
+    "path": "synthetic-akamai.html",
+    "vendor": "akamai",
+    "language": "en",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "server": "AkamaiGHost"
+    },
+    "cookie_names": [],
+    "source_url": "",
+    "captured_on": "2026-10-19",
+    "captured_with": "synthetic",
+    "synthetic": true,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "akamai",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Built from the cited markers alone; gated on 403."
+  },
+  {
+    "path": "synthetic-imperva.html",
+    "vendor": "imperva",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {
+      "x-iinfo": ""
+    },
+    "cookie_names": [
+      "incap_ses_abc"
+    ],
+    "source_url": "",
+    "captured_on": "2026-10-19",
+    "captured_with": "synthetic",
+    "synthetic": true,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "imperva",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Built from the cited markers alone, plus the catalogue title phrase."
+  },
+  {
+    "path": "synthetic-kasada.html",
+    "vendor": "kasada",
+    "language": "en",
+    "kind": "wall",
+    "status": 429,
+    "headers": {
+      "x-kpsdk-ct": ""
+    },
+    "cookie_names": [],
+    "source_url": "",
+    "captured_on": "2026-10-19",
+    "captured_with": "synthetic",
+    "synthetic": true,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "kasada",
+      "signals_must_fire": [
+        "script_only_body"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Built from the cited markers alone."
+  },
+  {
+    "path": "synthetic-perimeterx.html",
+    "vendor": "perimeterx",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {},
+    "cookie_names": [
+      "_px3"
+    ],
+    "source_url": "",
+    "captured_on": "2026-10-19",
+    "captured_with": "synthetic",
+    "synthetic": true,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "perimeterx",
+      "signals_must_fire": [
+        "interstitial_structure"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Built from the cited markers alone."
+  },
+  {
+    "path": "synthetic-ddosguard.html",
+    "vendor": "ddos_guard",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {
+      "server": "ddos-guard"
+    },
+    "cookie_names": [],
+    "source_url": "",
+    "captured_on": "2026-10-19",
+    "captured_with": "synthetic",
+    "synthetic": true,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "ddos_guard",
+      "signals_must_fire": [
+        "phrase_title"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Built from the cited markers alone; title phrase carries the wall."
+  },
+  {
+    "path": "synthetic-awswaf.html",
+    "vendor": "aws_waf",
+    "language": "en",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "x-amzn-waf-action": "challenge"
+    },
+    "cookie_names": [],
+    "source_url": "",
+    "captured_on": "2026-10-19",
+    "captured_with": "synthetic",
+    "synthetic": true,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "aws_waf",
+      "signals_must_fire": [
+        "definitive_header"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Built from the cited markers alone."
+  },
+  {
+    "path": "nowsecure-rendered.html",
+    "vendor": "cloudflare",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://nowsecure.nl",
+    "captured_on": "2026-10-19",
+    "captured_with": "playwright locale=en",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "vendor_script"
+      ],
+      "signals_must_not_fire": []
+    },
+    "notes": "Deliberate-cost wall: thin Turnstile shell scores above the threshold. Design Decision 2 row 12; spec 7 row n accepts {success, intervention}."
+  },
+  {
+    "path": "vendor-content-hcaptcha.html",
+    "vendor": "hcaptcha",
+    "language": "en",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://www.hcaptcha.com/",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": "hcaptcha",
+      "signals_must_fire": [],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Vendor page hosting its widget beside 2000+ words of real content."
+  },
+  {
+    "path": "vendor-content-friendly.html",
+    "vendor": "friendly_captcha",
+    "language": "en",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://developer.friendlycaptcha.com/playground",
+    "captured_on": "2026-10-19",
+    "captured_with": "playwright locale=en",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Rendered widget playground beside real docs text."
+  },
+  {
+    "path": "vendor-content-mtcaptcha.html",
+    "vendor": "mtcaptcha",
+    "language": "en",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://www.mtcaptcha.com/",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": "mtcaptcha",
+      "signals_must_fire": [],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Vendor homepage hosting its widget beside real content."
+  },
+  {
+    "path": "article-en.html",
+    "vendor": null,
+    "language": "en",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://en.wikipedia.org/wiki/Turnstile_(symbol)",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Real article; rich-content and many-links guards hold."
+  },
+  {
+    "path": "article-pl.html",
+    "vendor": null,
+    "language": "pl",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://pl.wikipedia.org/wiki/CAPTCHA",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Real article; rich-content and many-links guards hold."
+  },
+  {
+    "path": "article-de.html",
+    "vendor": null,
+    "language": "de",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://de.wikipedia.org/wiki/Captcha",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Real article; rich-content and many-links guards hold."
+  },
+  {
+    "path": "article-ja.html",
+    "vendor": null,
+    "language": "ja",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://ja.wikipedia.org/wiki/CAPTCHA",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Real article; rich-content and many-links guards hold."
+  },
+  {
+    "path": "article-ar.html",
+    "vendor": null,
+    "language": "ar",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://ar.wikipedia.org/wiki/كابتشا",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Real article; rich-content and many-links guards hold."
+  },
+  {
+    "path": "notfound-404.html",
+    "vendor": null,
+    "language": "en",
+    "kind": "counterexample",
+    "status": 404,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://en.wikipedia.org/wiki/ThisPageDoesNotExist12345xyz",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [],
+      "signals_must_not_fire": [
+        "status_small_body"
+      ]
+    },
+    "notes": "Real 404 with a large real body."
+  },
+  {
+    "path": "reddit-network-block-403.html",
+    "vendor": null,
+    "language": "en",
+    "kind": "wall",
+    "status": 403,
+    "headers": {
+      "server": "snooserv"
+    },
+    "cookie_names": [
+      "csv",
+      "edgebucket"
+    ],
+    "source_url": "https://old.reddit.com/login/",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl_cffi",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [
+        "status_large_body",
+        "phrase_body"
+      ],
+      "signals_must_not_fire": [
+        "rich_content"
+      ]
+    },
+    "notes": "Reddit's block page, a 403 with a large body whose visible text is \"You've been blocked by network security\". Filed as content until 2026-11-07, when it was found to be a block page, not a real article: its phrase now fires and makes it a wall."
+  },
+  {
+    "path": "script-shell.html",
+    "vendor": null,
+    "language": "en",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://quotes.toscrape.com/js/",
+    "captured_on": "2026-10-19",
+    "captured_with": "curl",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [],
+      "signals_must_not_fire": []
+    },
+    "notes": "Raw script-only application shell."
+  },
+  {
+    "path": "blog-recaptcha-comment-form.html",
+    "vendor": "recaptcha",
+    "language": "en",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8"
+    },
+    "cookie_names": {},
+    "source_url": "https://www.codexworld.com/create-temperature-widget-using-javascript-php-auto-location-live-weather-api/",
+    "captured_on": "2026-11-02",
+    "captured_with": "curl_cffi 0.15.0 impersonate=chrome",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": "recaptcha",
+      "signals_must_fire": [
+        "vendor_script",
+        "rich_content"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Real article hosting a reCAPTCHA comment form; rich_content and many_links hold it below the threshold."
+  },
+  {
+    "path": "mtcaptcha-demo-rendered.html",
+    "vendor": "mtcaptcha",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {},
+    "cookie_names": {},
+    "source_url": "https://service.mtcaptcha.com/mtcv1/demo/",
+    "captured_on": "2026-11-03",
+    "captured_with": "playwright chromium, domcontentloaded plus 8 s",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "login",
+      "vendor": "mtcaptcha",
+      "signals_must_fire": [
+        "vendor_script",
+        "captcha_input",
+        "captcha_element"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "MTCaptcha demo studio after rendering: a live login card (email, password, captcha widget), thin text, scores well above the threshold. Doubles as the login page with a captcha."
+  },
+  {
+    "path": "arkose-iframe.html",
+    "vendor": "arkose",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {
+      "content-type": "text/html",
+      "server": "cloudfront"
+    },
+    "cookie_names": {},
+    "source_url": "https://iframe.arkoselabs.com/",
+    "captured_on": "2026-11-03",
+    "captured_with": "curl_cffi 0.15.0 impersonate=chrome",
+    "synthetic": false,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "arkose",
+      "signals_must_fire": [
+        "vendor_script"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Arkose enforcement iframe landing page (cloudfront): vendor script loads the challenge, thin text, no article."
+  },
+  {
+    "path": "synthetic-friendly-captcha.html",
+    "vendor": "friendly_captcha",
+    "language": "en",
+    "kind": "wall",
+    "status": 200,
+    "headers": {},
+    "cookie_names": [],
+    "source_url": "",
+    "captured_on": "2026-11-03",
+    "captured_with": "synthetic",
+    "synthetic": true,
+    "expected": {
+      "wall": true,
+      "intervention_type": "captcha",
+      "vendor": "friendly_captcha",
+      "signals_must_fire": [
+        "vendor_script",
+        "captcha_input",
+        "captcha_element",
+        "phrase_body"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header"
+      ]
+    },
+    "notes": "Built from the SDK markers in challenge_dictionary.json alone; no public Friendly Captcha page scored as a wall (best 80 of 100 on app.friendlycaptcha.eu)."
+  },
+  {
+    "path": "reddit-login-redirect-rendered.html",
+    "vendor": null,
+    "language": "en",
+    "kind": "login_wall",
+    "status": 200,
+    "headers": {
+      "server": "snooserv"
+    },
+    "cookie_names": [
+      "_GRECAPTCHA",
+      "csrf_token",
+      "csv",
+      "edgebucket",
+      "g_state",
+      "loid",
+      "session_tracker",
+      "token_v2"
+    ],
+    "source_url": "https://old.reddit.com/r/programming/",
+    "final_url": "https://old.reddit.com/login/?reason=lor2&dest=https%3A%2F%2Fold.reddit.com%2Fr%2Fprogramming%2F",
+    "captured_on": "2026-11-07",
+    "captured_with": "playwright through the 4-playwright_stealth tier",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": null,
+      "signals_must_fire": [
+        "thin_text",
+        "few_links",
+        "no_article"
+      ],
+      "signals_must_not_fire": [
+        "rich_content",
+        "status_large_body"
+      ],
+      "login_wall": true
+    },
+    "notes": "Anonymous read of a subreddit, redirected with 302 to the login page, which answered 200 titled Welcome to Reddit with no password input outside shadow roots. The score alone keeps it content, so only the login path of the final address makes it a login wall. Inline script and style bodies trimmed to 200 characters. The loid, clienthash, country, cluster, nonce, renderId, cas and cb values and every UUID replaced with REDACTED."
+  },
+  {
+    "path": "scrapingcourse-cloudflare-cleared.html",
+    "vendor": "cloudflare",
+    "language": "en",
+    "kind": "counterexample",
+    "status": 200,
+    "headers": {
+      "server": "cloudflare",
+      "cf-ray": "a57d1b77acd63eae-WAW",
+      "cf-cache-status": "DYNAMIC",
+      "content-type": "text/html; charset=utf-8"
+    },
+    "cookie_names": [
+      "cf_clearance",
+      "XSRF-TOKEN",
+      "scrapingcoursecom_session",
+      "AWSALB",
+      "AWSALBCORS"
+    ],
+    "source_url": "https://www.scrapingcourse.com/cloudflare-challenge",
+    "captured_on": "2026-11-09",
+    "captured_with": "patchright through the browser guard and the pinned tunnel, visible window, nobody clicking",
+    "synthetic": false,
+    "expected": {
+      "wall": false,
+      "intervention_type": "captcha",
+      "vendor": "cloudflare",
+      "signals_must_fire": [
+        "vendor_script",
+        "vendor_presence",
+        "few_links",
+        "served_page"
+      ],
+      "signals_must_not_fire": [
+        "definitive_header",
+        "interstitial_structure",
+        "captcha_element",
+        "captcha_input",
+        "thin_text",
+        "no_article"
+      ]
+    },
+    "notes": "The page a cleared Cloudflare challenge lands on: answered 200 with no cf-mitigated header, the Turnstile script stays in its head and the Cloudflare headers and cookies stay on the response. No challenge structure, so the script and vendor presence alone must not make it a wall."
+  }
+]

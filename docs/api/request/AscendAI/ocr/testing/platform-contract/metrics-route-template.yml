@@ -1,0 +1,40 @@
+info:
+  name: metrics-route-template
+  type: http
+  seq: 112
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7022/metrics"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        function handlersFor(text) {
+            var handlers = [];
+            String(text).split("\n").forEach(function (line) {
+                if (line.indexOf("http_requests_total{") !== 0) { return; }
+                var pattern = /handler="([^"]*)"/g;
+                var hm;
+                while ((hm = pattern.exec(line)) !== null) {
+                    handlers.push(hm[1]);
+                }
+            });
+            return handlers;
+        }
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("the request series carries the route template, not the id", function () {
+            const handlers = handlersFor(res.getBody());
+            expect(handlers).to.include("/v1/ocr/jobs/{job_id}");
+            expect(handlers).to.not.include("/v1/ocr/jobs/BBBBBBBBBBBBBBBBBBBBBB");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

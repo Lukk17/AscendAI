@@ -77,7 +77,7 @@ path. It uses no bind mount. The runner uploads the fixture from the host during
 Test 6's Bruno request then passes `file_uri="http://host.docker.internal:9070/e2e-fixtures/argent-saga-chronicles-page1.png"`.
 ascend-ocr's MCP tool follows that URL back out to the host-published object store and pulls the bytes itself over
 HTTP, so the fixture never has to be visible on the container filesystem. This requires the ascend-ocr container's
-`MCP_ALLOWED_HOSTS` to include `host.docker.internal`, since the MCP SSRF guard blocks RFC1918 destinations by
+`ALLOWED_PRIVATE_HOSTS` to include `host.docker.internal`, since the MCP SSRF guard blocks RFC1918 destinations by
 default (see [ADR-001](../../docs/architecture/decisions/ADR-001-mcp-file-transport-uri-only.md)).
 
 ## How to regenerate

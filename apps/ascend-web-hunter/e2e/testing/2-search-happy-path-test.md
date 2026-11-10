@@ -4,7 +4,9 @@
 
 - `GET /api/v1/web/search?query=OpenStreetMap&limit=3` returns HTTP 200 and a JSON array body.
 - The array has at least one element and at most three (honours the `limit` parameter).
-- Each element is an object with non-empty string fields `title`, `url`, `content`.
+- Each element is an object with non-empty string fields `title` and `url`, and a string field `content`. The
+  service writes `content` as an empty string when the SearXNG result has no snippet, so `content` is always
+  present but may be empty.
 - At least one element's `url` field starts with `http://` or `https://`.
 - At least one element's `title` or `content` field references OpenStreetMap (case-insensitive substring match
   on `"openstreetmap"`).
@@ -24,13 +26,13 @@ bru --version
 
 Expect a version string.
 
-Check the ascend-web-hunter server is reachable.
+Check the ascend-web-hunter server is reachable. The `-w` option prints the status code after the body.
 
 ```bash
-curl -fsS http://localhost:7021/health
+curl -fsS -w "\nHTTP %{http_code}\n" http://127.0.0.1:7021/health
 ```
 
-Expect HTTP 200 with `{"status":"ok"}`.
+Expect a body with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`, then the line `HTTP 200`.
 
 Check the SearXNG backend is reachable from the host.
 
@@ -63,11 +65,33 @@ path. Mark this run **BLOCKED** (not FAIL) and re-run when an upstream is reacha
 
 ## Reset state
 
-None. SearXNG owns its own internal cache; the host does not write persisted state for the search path.
+The search path writes no search state. SearXNG owns its own internal cache. The call does count against the
+caller's rate limit window for the route, which lives in Redis under one key per caller and path:
+`LIMITS:LIMITER/ascend-web-hunter/<caller address>//api/v1/web/search/<limit>/1/minute`. The shared library
+(`build_limiter` in `libs/ascend-python-common`) sets the key prefix `ascend-web-hunter`, and the path part is the
+request path with its leading slash, so two slashes follow the caller address. `<limit>` is the
+`RATE_LIMIT_DEFAULT` count (1200 by default). `<caller address>` is the address the container sees for a call from
+the host, the gateway of the compose network, which differs from host to host. A window left nearly full by an
+earlier run can answer the search with HTTP 429, so delete the key before the run.
+
+List the key first (a read, it deletes nothing) to get the exact key on this host.
+
+```bash
+docker exec redis redis-cli --scan --pattern "LIMITS:LIMITER/ascend-web-hunter/*/api/v1/web/search/*"
+```
+
+Expect no line (no window open) or one line naming the key. When the scan printed no line, skip the next step.
+Otherwise delete that exact key: replace `<key the scan printed>` with the whole line, unchanged.
+
+```bash
+docker exec redis redis-cli DEL "<key the scan printed>"
+```
+
+Expect `1`.
 
 ## Run
 
-Single Bruno request.
+Single Bruno request. Move into the Bruno collection root first, from the repository root.
 
 ```bash
 cd docs/api/request/AscendAI
@@ -101,3 +125,12 @@ should not block a merge.
 ## Fixtures
 
 None.
+
+## Concurrency
+
+Writes no `session:*`, tier-memory, crawl or recipe key. The search call writes only SearXNG's own cache, out of
+process, and the rate limit window of the route, which its reset deletes. Spec 1
+([1-invalid-input-test.md](1-invalid-input-test.md)) counts against the same window, and neither spec asserts on the
+count, so the two still run side by side. Safe beside every other spec.
+
+- Serial: false

@@ -1,11 +1,12 @@
 import time
 from typing import TYPE_CHECKING, Final, Literal
 
+from ascend_python_common.log_config import get_logger
+
 from src.api.exception_handlers import FileSizeExceededError, JobNotFoundError, UnsupportedLanguageError
 from src.api.limits import enforce_page_limit, inspect_input
 from src.api.mime_sniffer import sniff_mime
 from src.config.config import QualityMode, settings
-from src.config.logging_config import get_logger
 from src.model.ocr_models import (
     JobListEntry,
     JobListResponse,
@@ -227,7 +228,9 @@ def enforce_byte_cap(size_bytes: int) -> None:
     """
     max_size_bytes = settings.MAX_FILE_SIZE_MB * BYTES_PER_MB
     if size_bytes > max_size_bytes:
-        raise FileSizeExceededError(f"File size {size_bytes} bytes exceeds maximum {settings.MAX_FILE_SIZE_MB} MB")
+        raise FileSizeExceededError(
+            f"File size {size_bytes} bytes exceeds maximum {settings.MAX_FILE_SIZE_MB} MB"
+        )
 
 
 # The composition root for the job path. Both surfaces and the lifespan import these

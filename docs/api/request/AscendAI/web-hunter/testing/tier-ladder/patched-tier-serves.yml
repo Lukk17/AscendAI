@@ -1,0 +1,44 @@
+info:
+  name: patched-tier-serves
+  type: http
+  seq: 55
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Forces the one tier named by --env-var tier (4a-patchright or 4b-camoufox) to read the fake site article.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/article",
+        "include_links": false,
+        "heavy_mode": false,
+        "tier": "{{tier}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 200", function () {
+            expect(res.getStatus()).to.equal(200);
+        });
+        test("patched tier serves the article as itself", function () {
+            const b = res.getBody();
+            expect(b.status).to.equal("success");
+            expect(b.content).to.include("QUARRY-THRUSH");
+            // bru 4.2.1 does not interpolate --env-var values inside test
+            // scripts, so this file only checks that mode is one of the two
+            // patched tiers. Spec 18 Step 5 saves the run with -o and -f json
+            // and reads mode back from that file to prove it equals the
+            // requested tier.
+            expect(["4a-patchright", "4b-camoufox"]).to.include(b.mode);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -31,16 +31,28 @@ An invite SHALL create a Keycloak user whose `tenant` attribute is the caller's 
 
 ### Requirement: Role assignment and account state are managed per tenant
 
-A tenant `ADMIN` SHALL be able to promote a user to `ADMIN`, demote back to `USER`, and enable or disable an account, all scoped to their tenant, with each change reflected in Keycloak. Removing a user SHALL disable the Keycloak account and clear its personal attributes, and SHALL NOT delete the account, and MAY chain the per-user erasure job (`add-audit-and-gdpr-compliance`) when the caller requests data removal. Every invite, role change, enable/disable, and removal SHALL emit an audit event.
+A tenant `ADMIN` SHALL be able to promote a user to `ADMIN`, demote back to `USER`, and enable or disable an account, all scoped to their tenant, with each change reflected in Keycloak. Disabling and enabling SHALL be the routes `POST /api/v1/admin/users/{userId}/disable` and `POST /api/v1/admin/users/{userId}/enable`, where `{userId}` is the Keycloak user id, and each SHALL change only that user's Keycloak `enabled` flag. Removing a user SHALL disable the Keycloak account and clear its personal attributes, and SHALL NOT delete the account. Chaining the per-user erasure job on removal is added by `add-audit-and-gdpr-compliance`, which lands later. Every invite, role change, enable/disable, and removal SHALL record one event through `AuditEventPort`.
 
 #### Scenario: Promotion reflected in Keycloak
 
 - **WHEN** a tenant `ADMIN` promotes a user to `ADMIN`
 - **THEN** the user holds the `ADMIN` realm role in Keycloak
-- **AND** an audit row records the role change with actor and subject
+- **AND** one event naming the role change with actor and subject reaches `AuditEventPort`
 
-#### Scenario: Remove with data erasure
+#### Scenario: Disable and enable through their own routes
 
-- **WHEN** a tenant `ADMIN` removes a user requesting data removal
+- **WHEN** a tenant `ADMIN` of `acme` sends `POST /api/v1/admin/users/{userId}/disable` for a user of `acme`
+- **THEN** the response is HTTP 200, the user's Keycloak account is disabled and the user cannot obtain a token
+- **AND** after `POST /api/v1/admin/users/{userId}/enable` for the same user the account is enabled and the user can obtain a token again
+
+#### Scenario: Disable of another tenant's user refused
+
+- **WHEN** a tenant `ADMIN` of `acme` sends `POST /api/v1/admin/users/{userId}/disable` for a user of `globex`
+- **THEN** the response is HTTP 403
+- **AND** the `globex` user's account stays enabled
+
+#### Scenario: Remove keeps the account
+
+- **WHEN** a tenant `ADMIN` removes a user
 - **THEN** the Keycloak account is disabled and still exists
-- **AND** a per-user erasure job is started for that user
+- **AND** its personal attributes are cleared

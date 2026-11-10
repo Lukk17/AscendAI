@@ -30,10 +30,17 @@ docs/
 | [ADR-006](architecture/decisions/ADR-006-proxy-seam-and-fingerprint.md) | Outbound proxy seam and browser fingerprint rotation. |
 | [ADR-007](architecture/decisions/ADR-007-structured-output-and-readability-fallback.md) | Structured article output (`output_format=structured`) and readability-lxml fallback for thin extractions. |
 | [ADR-008](architecture/decisions/ADR-008-blocklist-vendored-not-fetched.md) | Blocklist vendored into the image, loaded from disk only, refreshed solely via `POST /api/v1/blocklist/refresh`. |
-| [ADR-009](architecture/decisions/ADR-009-recall-pass-for-thin-precision-extractions.md) | A trafilatura recall pass when the precision pass is shorter than `CONTENT_RECALL_FALLBACK_RATIO` (0.75) of the page's plain text, longer result wins. |
-| [ADR-010](architecture/decisions/ADR-010-producer-aware-session-replay.md) | Every session record names the tier that produced it; a FlareSolverr-produced clearance is replayed by FlareSolverr first. |
+| [ADR-009](architecture/decisions/ADR-009-recall-pass-for-thin-precision-extractions.md) | Superseded by ADR-016. Was: a trafilatura recall pass when the precision pass is shorter than `CONTENT_RECALL_FALLBACK_RATIO` (0.75) of the page's plain text, longer result wins. |
+| [ADR-010](architecture/decisions/ADR-010-producer-aware-session-replay.md) | Every session record names the tier that produced it; a stored session starts the read at the browser tiers. |
 | [ADR-011](architecture/decisions/ADR-011-caller-selectable-starting-tier.md) | A caller may name the tier the escalation chain starts at, and escalation continues from there. |
-| [ADR-012](architecture/decisions/ADR-012-connect-time-address-pinning.md) | The in-process fetch connects to the address its own SSRF lookup validated; the other tiers keep pre-dispatch validation. |
+| [ADR-012](architecture/decisions/ADR-012-connect-time-address-pinning.md) | Every fetch connects to the address its own SSRF lookup validated; the browser tiers too, since 2026-11-09 through a local pinned tunnel. |
+| [ADR-013](architecture/decisions/ADR-013-concurrent-human-intervention-windows.md) | Concurrent human-intervention windows on one shared display: per-container slots, Redis flow records, joins, ephemeral CDP ports, cascade layout, owner-named VNC URLs. |
+| [ADR-014](architecture/decisions/ADR-014-scored-challenge-detection.md) | Scored challenge verdict over five signal families, catalogue with provenance, fixture corpus as the admission rule. |
+| [ADR-015](architecture/decisions/ADR-015-patched-browser-tiers-and-tier-memory.md) | Patched browser tiers (`4a-patchright`, `4b-camoufox`), FlareSolverr off by default (removed by ADR-018), the guarded browser route handler and per-domain tier memory. Amended 2026-11-06 for the tier memory write rule. |
+| [ADR-016](architecture/decisions/ADR-016-scored-ensemble-replaces-recall-pass.md) | Scored ensemble of trafilatura and readability-lxml replacing the recall pass; higher score wins, ties to trafilatura. |
+| [ADR-017](architecture/decisions/ADR-017-schema-extraction-recipes-and-safety.md) | Schema-guided extraction through a configurable model endpoint with self-healing per-domain selector recipes and model-input safety. |
+| [ADR-018](architecture/decisions/ADR-018-flaresolverr-tier-removed.md) | The FlareSolverr tier, its settings, its container and its references are removed; the value `3-flaresolverr` is refused and never reused. |
+| [ADR-019](architecture/decisions/ADR-019-crawl-jobs.md) | Polling crawl jobs over a shared Redis frontier: Lua-claimed URLs, per-domain politeness, Floci results with incremental recrawl, several instances sharing one crawl. |
 
 The [architecture/decisions/README.md](architecture/decisions/README.md) lists the same set with status flags.
 
@@ -69,5 +76,6 @@ container diagram and the extraction-strategy escalation sequence. Both are Merm
 
 ### Where else to look
 
+- [challenge-detection.md](challenge-detection.md) for the scored challenge verdict: families, weights, threshold, catalogue provenance and capture rules
 - [../README.md](../README.md) for commands and quick start
 - [../AGENTS.md](../AGENTS.md) for the AI-agent contract

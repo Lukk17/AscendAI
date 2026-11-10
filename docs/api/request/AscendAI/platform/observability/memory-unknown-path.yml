@@ -1,0 +1,35 @@
+info:
+  name: memory-unknown-path
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{protocol}}://{{baseUrl}}:7020/does-not-exist"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 404", function () {
+            expect(res.getStatus()).to.equal(404);
+        });
+        test("Content-Type is application/problem+json", function () {
+            expect(res.getHeader("content-type")).to.include("application/problem+json");
+        });
+        test("code is not_found", function () {
+            expect(res.getBody().code).to.equal("not_found");
+        });
+        test("traceId is 32 lower case hex characters", function () {
+            var traceId = res.getBody().traceId;
+            expect(traceId).to.match(/^[0-9a-f]{32}$/);
+            bru.setVar("traceId", traceId);
+            console.log("traceId=" + traceId);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

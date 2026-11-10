@@ -37,15 +37,15 @@ curl -fsS http://localhost:9070/_floci/health
 
 Expect HTTP 200 with `"s3":"running"` in the JSON body.
 
-Check the ascend-ocr container has `MCP_ALLOWED_HOSTS` including `host.docker.internal`. The MCP tool's SSRF guard
+Check the ascend-ocr container has `ALLOWED_PRIVATE_HOSTS` including the object store's host. The MCP tool's SSRF guard
 blocks RFC1918 destinations by default, and the docker-internal `host.docker.internal` host-gateway resolves to a
 private address. See [ADR-001](../../docs/architecture/decisions/ADR-001-mcp-file-transport-uri-only.md).
 
 ```bash
-docker exec ascend-ocr printenv MCP_ALLOWED_HOSTS
+docker exec ascend-ocr printenv ALLOWED_PRIVATE_HOSTS
 ```
 
-Expect `host.docker.internal,localhost,127.0.0.1`, or any superset containing `host.docker.internal`.
+Expect a list containing `e2e-s3-9070` on this stack, which names the sidecar object store, or `host.docker.internal` on a host where that name is directly reachable. Either way the `file_uri` must name the same host the guard allows.
 
 ## Reset state
 
@@ -95,7 +95,7 @@ Open an MCP session and keep the session id. FastMCP answers the `initialize` ca
 curl -isS -X POST http://localhost:7022/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"e2e\",\"version\":\"1\"}}}"
 ```
 
-Expect HTTP 200 and an `mcp-session-id` response header. Use that value as the `mcp_session_id` env-var below.
+Expect HTTP 200 with no `mcp-session-id` response header: the service is stateless HTTP, so pass `mcp_session_id` empty in the commands below.
 
 ```bash
 cd docs/api/request/AscendAI

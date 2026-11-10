@@ -144,7 +144,10 @@ Before running the application, ensure the support services are reachable.
 The monorepo's [compose.yaml](../../compose.yaml) brings up the in-stack services. External prerequisites
 (PostgreSQL, Redis, Qdrant, object storage) are run on the host or in cloud.
 
-- **Object storage** (locally: Floci). S3-compatible storage for file ingestion. Ports `9070` (API), `9071` (web UI).
+- **Object storage** (locally: Floci). S3-compatible storage for file ingestion. Ports `9070` (API), `9071` (web UI) by
+  default. When the store listens elsewhere, set `OBJECT_STORE_S3_ENDPOINT` (the address a container reaches) and
+  `OBJECT_STORE_S3_PUBLIC_ENDPOINT` (the address the host reaches) in the root `.env`, see
+  [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 - **Qdrant.** Vector database for embeddings.
 - **Unstructured API.** Document parsing for PDFs / PPTX / etc.
 - **PostgreSQL.** Metadata store (schema `ascend_ai`).
@@ -208,7 +211,7 @@ docker compose up -d --build
 
 External prerequisites (PostgreSQL, Redis, Qdrant, object storage) must already be running on the host. They aren't part of
 compose. Compose itself brings up the application services (ascend-memory, ascend-web-hunter, ascend-audio-scribe, etc.)
-plus the support stack (SearXNG, FlareSolverr, Docling, Unstructured).
+plus the support stack (SearXNG, Docling, Unstructured).
 
 #### 2. Run the ascend-ai-agent
 
@@ -355,7 +358,8 @@ The capture reads one page on the OCR engine, so it runs alone, with no end-to-e
 
 - ascend-ocr on port 7022, answering `ready` on `/ready`.
 - The object store on port 9070. The compose stack signs result links for `http://localhost:9070`
-  (`OCR_RESULT_S3_PUBLIC_ENDPOINT`), so the link works from the host.
+  (`OCR_RESULT_S3_PUBLIC_ENDPOINT`, set from `OBJECT_STORE_S3_PUBLIC_ENDPOINT` in the root `.env`), so the link
+  works from the host.
 - `curl`. In PowerShell, call it as `curl.exe`, because `curl` in Windows PowerShell 5.1 is an alias for
   `Invoke-WebRequest`. On Unix, `jq` reads the answers.
 

@@ -51,21 +51,21 @@ def fake_client(store: ResultStore) -> MagicMock:
 
 
 class TestRenderMarkdown:
-    def test_each_page_is_a_heading_followed_by_its_lines_in_order(self):
+    def test_each_page_is_a_heading_followed_by_its_lines_in_order(self) -> None:
         # When
         markdown = render_markdown(_response(["first line", "second line"], ["third line"]))
 
         # Then
         assert markdown == "## Page 1\nfirst line\nsecond line\n\n## Page 2\nthird line\n"
 
-    def test_a_page_with_no_recognised_lines_keeps_its_heading(self):
+    def test_a_page_with_no_recognised_lines_keeps_its_heading(self) -> None:
         # When
         markdown = render_markdown(_response(["only page one"], []))
 
         # Then
         assert markdown.endswith("## Page 2\n")
 
-    def test_markdown_control_characters_in_the_text_are_carried_verbatim(self):
+    def test_markdown_control_characters_in_the_text_are_carried_verbatim(self) -> None:
         # Given — the document's own text, not something to escape: the agent indexes
         # whatever this returns, so altering the characters alters the document
 
@@ -77,7 +77,7 @@ class TestRenderMarkdown:
         assert "- not a list" in markdown
         assert "**bold** | pipe" in markdown
 
-    def test_the_rendering_carries_no_front_matter(self):
+    def test_the_rendering_carries_no_front_matter(self) -> None:
         # When
         markdown = render_markdown(_response(["text"]))
 
@@ -255,14 +255,18 @@ class TestPresignedUrl:
         internal.generate_presigned_url.assert_not_called()
         assert public.generate_presigned_url.call_args.kwargs["ExpiresIn"] == 600
 
-    def test_the_expiry_never_exceeds_the_remaining_retention(self, store: ResultStore, fake_client: MagicMock) -> None:
+    def test_the_expiry_never_exceeds_the_remaining_retention(
+        self, store: ResultStore, fake_client: MagicMock
+    ) -> None:
         # When
         store.presigned_url(f"{JOB_ID}.md", 42.7)
 
         # Then — floored, never rounded up past what the object has left
         assert fake_client.generate_presigned_url.call_args.kwargs["ExpiresIn"] == 42
 
-    def test_a_result_a_moment_from_expiry_still_signs(self, store: ResultStore, fake_client: MagicMock) -> None:
+    def test_a_result_a_moment_from_expiry_still_signs(
+        self, store: ResultStore, fake_client: MagicMock
+    ) -> None:
         # When
         store.presigned_url(f"{JOB_ID}.md", 0.2)
 
@@ -276,7 +280,9 @@ class TestDelete:
         store.delete_result(f"{JOB_ID}.md")
 
         # Then
-        fake_client.delete_object.assert_called_once_with(Bucket=settings.OCR_RESULT_S3_BUCKET, Key=f"{JOB_ID}.md")
+        fake_client.delete_object.assert_called_once_with(
+            Bucket=settings.OCR_RESULT_S3_BUCKET, Key=f"{JOB_ID}.md"
+        )
 
     def test_deleting_twice_is_not_an_error(self, store: ResultStore, fake_client: MagicMock) -> None:
         # When

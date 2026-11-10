@@ -1,5 +1,4 @@
 import asyncio
-import os
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -157,7 +156,7 @@ def test_remove_entry_with_explicit_path(tmp_path: Path) -> None:
 
 def test_cleanup_file_swallows_oserror(tmp_path: Path) -> None:
     # when / then
-    with patch.object(os, "remove", side_effect=OSError("nope")):
+    with patch.object(Path, "unlink", side_effect=OSError("nope")):
         mgr._cleanup_file(str(tmp_path / "x"))
 
 

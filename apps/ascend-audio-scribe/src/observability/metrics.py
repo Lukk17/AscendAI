@@ -25,12 +25,20 @@ FFMPEG_INVOCATIONS_TOTAL = Counter(
 )
 
 # Realistic per-backend latency spread: openai (~3-60s), hf (~5-120s), local (~10-600s on CPU).
-# outcome label values: "success" | "error"
+# outcome label values: "ok" | "error"
 TRANSCRIPTION_DURATION_SECONDS = Histogram(
-    "ascendaudioscribe_transcription_duration_seconds",
+    "transcription_duration_seconds",
     "Wall-clock duration of transcription requests",
     ["provider", "outcome"],
     buckets=(1, 5, 10, 30, 60, 120, 300, 600, 1200),
+)
+
+# Input audio length spread: clips (~1-60s), episodes (~600-3600s).
+TRANSCRIPTION_AUDIO_DURATION_SECONDS = Histogram(
+    "transcription_audio_duration_seconds",
+    "Input audio length in seconds",
+    ["provider"],
+    buckets=(1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600),
 )
 
 DOWNLOAD_DURATION_SECONDS = Histogram(
@@ -38,3 +46,12 @@ DOWNLOAD_DURATION_SECONDS = Histogram(
     "Wall-clock duration of MCP audio_uri fetches",
     buckets=(0.1, 0.5, 1, 5, 10, 30, 60, 120),
 )
+
+
+def record_transcription(
+    provider: str, outcome: str, duration_s: float, audio_duration_s: float | None = None
+) -> None:
+    TRANSCRIPTION_REQUESTS_TOTAL.labels(provider=provider, outcome=outcome).inc()
+    TRANSCRIPTION_DURATION_SECONDS.labels(provider=provider, outcome=outcome).observe(duration_s)
+    if audio_duration_s is not None:
+        TRANSCRIPTION_AUDIO_DURATION_SECONDS.labels(provider=provider).observe(audio_duration_s)

@@ -8,7 +8,7 @@ Proposed, 2026-09-04. Becomes Accepted when the OpenSpec change `add-tenant-isol
 
 ## Context
 
-Every tenant-scoped operation needs a resolved tenant id, and similarity search and source presigning additionally need the caller's resolved principal set. Both come from the request, by way of `add-auth-and-identity`. Both can be absent: an unauthenticated path, a misconfiguration, an internal caller that forgot to propagate context, an asynchronous worker running off the request thread, a scheduled job.
+Every tenant-scoped operation needs a resolved tenant id, and similarity search and source presigning additionally need the caller's resolved principal set. Both come from the request: the tenant through the resolved identity of `add-keycloak-login` with the claim-reading tenant resolver of `add-auth-and-identity`, and the principal set through the principal contributor of `add-auth-and-identity`. Both can be absent: an unauthenticated path, a misconfiguration, an internal caller that forgot to propagate context, an asynchronous worker running off the request thread, a scheduled job.
 
 Something has to decide what happens then, and the tempting answers are the dangerous ones. Falling back to the `default` tenant keeps local workflows working. Falling back to a tenant-only filter when only the principal set is missing keeps search returning results and looks like a graceful degradation.
 
@@ -20,22 +20,22 @@ Fail closed, on both values, with no fallback of any kind.
 
 - An unresolved tenant id throws. It does not degrade to the `default` tenant, to an unfiltered query, or to a shared Redis key.
 - An unresolved principal set throws for similarity search and for source presigning. It does not degrade to a filter carrying the tenant conjunct alone.
-- The web layer surfaces both as 401 or 403 per the error contract in `add-auth-and-identity`, and service-layer callers get an exception.
+- The web layer surfaces both as 401 or 403 per the error contract of `add-keycloak-login`, and service-layer callers get an exception.
 - The principal accessor returns an `Optional` of the set, so an unresolved set and an empty set are distinguishable at the type level. An empty set is a successful answer, and a search runs with it and returns nothing.
 
-`default` is a migration target reached through ordinary authenticated context like any other tenant, never a fallback.
+`default` is an ordinary tenant that the migration creates, reached through ordinary authenticated context like any other tenant, never a fallback.
 
 ## Consequences
 
 - A propagation bug produces an error, not a leak. The failure is loud, immediate, and attributable to the request that caused it.
 - Degradation is visible rather than silent. A tenant-only fallback would return 200 with a fluent answer drawn from documents the caller is not entitled to, and nothing in the response or the logs would say the access axis was skipped.
 - Anything running off the request thread has to carry the context explicitly. The presign fan-out onto the task executor is the concrete case: tenant and principals are captured on the request thread and passed into the asynchronous work, because reading the accessors inside the worker throws on every request, which is fail-closed as an outage rather than as a control.
-- Existing unauthenticated local workflows break the day this lands. That is the explicit cost of depending on `add-auth-and-identity`, and the development-profile token that carries `tenant=default` is owned by that change.
-- A background or scheduled job that legitimately spans tenants cannot rely on ambient context and must loop over tenants explicitly, passing each id. The one-shot migration task is written that way.
+- Existing unauthenticated local workflows break the day this lands. That is the explicit cost of depending on `add-keycloak-login` and `add-auth-and-identity`. The dev profile identity, which carries the tenant `default`, is owned by `add-keycloak-login` (its D5), and its principal set by `add-auth-and-identity` (its D5b).
+- A background or scheduled job that legitimately spans tenants cannot rely on ambient context and must loop over tenants explicitly, passing each id.
 
 ### Alternatives considered
 
-Fall back to the `default` tenant when context is missing. Keeps everything working and turns every propagation bug into a cross-tenant read into the default tenant's pool, which after the migration is exactly where the existing single-company corpus lives. Rejected.
+Fall back to the `default` tenant when context is missing. Keeps everything working and turns every propagation bug into a cross-tenant read into the default tenant's pool, which is exactly where a single-company corpus lives. Rejected.
 
 Fall back to a tenant-only filter when only the principal set is missing. Rejected for the same shape of reason, one level down. It over-shares inside a tenant, it is invisible in the response, and it hands the caller precisely the documents their company chose to restrict, which is the failure the access axis exists to prevent.
 

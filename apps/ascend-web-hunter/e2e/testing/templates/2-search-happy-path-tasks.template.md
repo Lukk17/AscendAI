@@ -2,23 +2,24 @@
 
 Spec: [../2-search-happy-path-test.md](../2-search-happy-path-test.md)
 
-Copy this file to `../runs/<UTC-timestamp>_2-search-happy-path-tasks.md` before starting a run. Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
+Copy this file to `../runs/<UTC-timestamp>_2-search-happy-path-tasks.md` before starting a run. For a repeated run of the same spec in the same sweep, which shares the sweep's timestamp, add `-rerun<N>` before `.md` (`-rerun2` for the second run, `-rerun3` for the third). Tick boxes as you go. Add anything you did beyond the spec under **Additional tasks I did**.
 
 ## Tasks
 
 ### Prerequisites
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
-- [ ] ascend-web-hunter `/health` returns HTTP 200 with `{"status":"ok"}`
+- [ ] ascend-web-hunter `/health` (`curl -fsS -w` prints the status code) returns HTTP 200 with `status` `ok`, `service` `ascend-web-hunter` and a non-empty `version`
 - [ ] SearXNG `/search?q=test&format=html` returns HTTP 200 with HTML content
 - [ ] SearXNG `/search?q=openstreetmap&format=json` returns a non-zero `results.Count` (otherwise mark **BLOCKED**, not FAIL)
 
 ### Reset state
 
-- [ ] None required
+- [ ] Listed the `LIMITS:LIMITER/ascend-web-hunter/*/api/v1/web/search/*` rate limit key with one scan. When it printed a line, deleted that exact key with one `DEL` (`1`). When it printed no line, skipped the `DEL`
 
 ### Run
 
+- [ ] From the repository root, `cd docs/api/request/AscendAI`
 - [ ] Send `search-stable-query.yml` via `bru run` and wait for HTTP 200
 
 ### Expected

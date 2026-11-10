@@ -1,0 +1,44 @@
+info:
+  name: submit-fake-site
+  type: http
+  seq: 30
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v1/crawl/jobs"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: X-Ascend-Tenant
+      value: "{{tenant}}"
+  body:
+    type: json
+    data: |-
+      {
+        "seeds": ["http://e2e-fake-site:7031/crawl/"],
+        "include_patterns": ["/crawl/[ab]*"],
+        "max_depth": 2,
+        "page_budget": 5,
+        "respect_robots": true
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 202", function () {
+            expect(res.getStatus()).to.equal(202);
+        });
+        test("submission answers a job id in waiting state with the poll hint", function () {
+            const b = res.getBody();
+            expect(b.job_id).to.be.a("string").and.match(/^[0-9a-f]{32}$/);
+            expect(b.state).to.equal("waiting");
+            expect(b.poll_after_seconds).to.equal(5);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

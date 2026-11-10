@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -11,6 +12,10 @@ from adblockparser import AdblockRules
 from src.config.config import settings
 
 logger = logging.getLogger(__name__)
+
+_HTML_MARKUP = re.compile(r"<\s*(?:!doctype\s+html|html|head|body)\b", re.IGNORECASE)
+_RULE_OPERATORS = ("||", "##", "#@#", "#?#", "#$#", "@@", "^", "$")
+_RULE_PREFIXES = ("/", "|")
 
 
 class BlocklistValidationError(Exception):
@@ -101,15 +106,16 @@ class BlocklistLoader:
                 response.raise_for_status()
                 content = response.content
 
-            raw_rules = self._extract_rule_lines(content.decode("utf-8", errors="ignore"))
-            if not raw_rules:
+            text = content.decode("utf-8", errors="ignore")
+            raw_rules = self._extract_rule_lines(text)
+            if _HTML_MARKUP.search(text) or not any(self._is_rule_line(line) for line in raw_rules):
                 raise BlocklistValidationError(
                     f"Downloaded blocklist from {settings.BLOCKLIST_URL} contained no usable rules; "
                     "the previously loaded list remains active."
                 )
-            rules = AdblockRules(raw_rules)
+            rules = await asyncio.to_thread(AdblockRules, raw_rules)
 
-            self._atomic_write(content)
+            await asyncio.to_thread(self._atomic_write, content)
             state = BlocklistState(rule_count=len(raw_rules), loaded_at=datetime.now(UTC))
             self._state = state
             logger.info(f"Blocklist refreshed: {len(raw_rules)} rules now active.")
@@ -128,6 +134,11 @@ class BlocklistLoader:
         tmp_path = self.blocklist_path.with_suffix(".tmp")
         tmp_path.write_bytes(content)
         tmp_path.replace(self.blocklist_path)
+
+    @staticmethod
+    def _is_rule_line(line: str) -> bool:
+        """True when *line* carries adblock filter syntax, a network or an element hiding rule."""
+        return line.startswith(_RULE_PREFIXES) or any(operator in line for operator in _RULE_OPERATORS)
 
     @staticmethod
     def _extract_rule_lines(text: str) -> list[str]:

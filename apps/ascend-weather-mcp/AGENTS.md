@@ -53,6 +53,7 @@ Communication is **SSE** (Server-Sent Events) over HTTP on port 9998. STDIO tran
 - Standard Spring Boot patterns
 - Constructor injection
 - `@Tool` annotation for MCP tool definitions via Spring AI
+- When instrumenting new code (metrics, logs, or spans), follow [../../docs/OBSERVABILITY.md](../../docs/OBSERVABILITY.md)
 
 ## Relevant Skills
 

@@ -1,0 +1,32 @@
+info:
+  name: delete-health
+  type: http
+  seq: 6
+
+http:
+  method: DELETE
+  url: "{{protocol}}://{{baseUrl}}:7022/health"
+  headers:
+    - name: accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 405", function () {
+            expect(res.getStatus()).to.equal(405);
+        });
+        test("code is method_not_allowed", function () {
+            expect(res.getBody().code).to.equal("method_not_allowed");
+        });
+        test("an Allow header is present", function () {
+            expect(res.getHeader("allow")).to.be.a("string").and.not.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

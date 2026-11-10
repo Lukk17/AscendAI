@@ -10,7 +10,7 @@ Copy this file to `../runs/<UTC-timestamp>_11-mcp-file-uri-jail-tasks.md` before
 
 - [ ] Bruno CLI present (`bru --version` returns a version)
 - [ ] ascend-ocr `/health` returns HTTP 200 with `"status":"ok"`
-- [ ] `/ready` reports `jobs_queued` 0 and `jobs_running` 0
+- [ ] `/ready` reports `checks.jobs.queued` 0 and `checks.jobs.running` 0
 - [ ] Image `ascend-ai-ascend-ocr:latest` exists
 - [ ] No container named `ascend-ocr-jail` exists
 - [ ] Nothing answers on port 7023
@@ -21,13 +21,13 @@ Copy this file to `../runs/<UTC-timestamp>_11-mcp-file-uri-jail-tasks.md` before
 
 ### Run
 
-- [ ] Step 1: `initialize` handshake on port 7022 returns an `mcp-session-id` header
+- [ ] Step 1: `initialize` handshake on port 7022 returns HTTP 200 with no `mcp-session-id` header (stateless service)
 - [ ] Step 1: `notifications/initialized` sent with `ocr/testing/mcp-initialized.yml` and that session id, HTTP 202 with an empty body
 - [ ] Step 2: send `ocr/testing/mcp-file-uri-disabled.yml` with that session id
 - [ ] Step 3: send `ocr/testing/ocr-jobs-list-empty.yml`
 - [ ] Step 4: start `ascend-ocr-jail` with `MCP_FILE_URI_ROOT=/tmp/ocr-jail` on `127.0.0.1:7023` (in Git Bash with `MSYS_NO_PATHCONV=1`)
 - [ ] Step 5: `/health` on port 7023 answers, and `/tmp/ocr-jail` is created inside the container (in Git Bash with `MSYS_NO_PATHCONV=1`)
-- [ ] Step 6: `initialize` handshake on port 7023 returns an `mcp-session-id` header
+- [ ] Step 6: `initialize` handshake on port 7023 returns HTTP 200 with no `mcp-session-id` header (stateless service)
 - [ ] Step 6: `notifications/initialized` sent with `ocr/testing/mcp-initialized-jail.yml` and the step 6 session id, HTTP 202 with an empty body
 - [ ] Step 7: send `ocr/testing/mcp-file-uri-jail-escape.yml` with the step 6 session id
 - [ ] Step 8: read `http://localhost:7023/v1/ocr/jobs`
@@ -39,9 +39,10 @@ Copy this file to `../runs/<UTC-timestamp>_11-mcp-file-uri-jail-tasks.md` before
 - [ ] Step 2: the answer carries `UNSAFE_URI`
 - [ ] Step 2: no `job_id` is issued
 - [ ] Step 3: HTTP 200 with `{"jobs": []}`
-- [ ] Steps 4 to 6: the throwaway container answers `/health` within 120 seconds, opens a session and accepts the notification with 202
+- [ ] Steps 4 to 6: the throwaway container answers `/health` within 120 seconds, answers `initialize` with 200 and no session header, and accepts the notification with 202
 - [ ] Step 7: HTTP 200 at the transport, with a JSON-RPC error frame or an `isError` result
-- [ ] Step 7: the answer carries `UNSAFE_URI` and `escapes MCP_FILE_URI_ROOT`, not `MCP_FILE_URI_ROOT is unset`
+- [ ] Step 7: the answer carries `UNSAFE_URI` and never names `MCP_FILE_URI_ROOT` or its state
+- [ ] Step 7a: a missing file inside the jail root on port 7023 answers `DOWNLOAD_FAILED`, never `UNSAFE_URI`, so the jail is active
 - [ ] Step 7: no line of `/etc/passwd` and no `job_id` in the answer
 - [ ] Step 8: `{"jobs":[]}`
 - [ ] Step 9: the container is removed and the confirmation prints nothing

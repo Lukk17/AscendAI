@@ -8,6 +8,20 @@ against re-publishing an already-released version, so keep it at the top and bum
 before every release. The `version` in `build.gradle.kts` is a cosmetic label the release
 workflow does not read; if the two ever disagree, this file wins for release purposes.
 
+## [0.0.5] - <release date>
+
+### Added
+- A `GlobalExceptionHandler` answers a request for an unknown path with 404 and a body naming the
+  path, and logs the refused path as one WARN line, so the log pipeline sees it. A unit test covers
+  the 404 status and the path in the body.
+- An `application-docker.yaml` profile sets the OTLP tracing endpoint
+  (`MANAGEMENT_OTLP_TRACING_ENDPOINT`, default `http://otel-collector:4318/v1/traces`) and the
+  sampling probability (`MANAGEMENT_TRACING_SAMPLING_PROBABILITY`, default `1.0`), so the container
+  exports traces to the platform collector.
+
+### Changed
+- AGENTS.md points new metrics, logs and spans at docs/OBSERVABILITY.md.
+
 ## [0.0.4] - 2026-10-01
 
 ### Fixed

@@ -2,6 +2,8 @@ server:
   port: 9917
 
 management:
+  server:
+    port: 9918
   endpoints:
     web:
       exposure:
@@ -19,6 +21,7 @@ management:
       percentiles-histogram:
         mcp.tool.duration: true
         rag.top_score: true
+        http.server.requests: true
 
 app:
   ingestion:
@@ -98,7 +101,7 @@ app:
 
   s3:
     bucket: knowledge-base
-    endpoint: http://localhost:9070
+    endpoint: ${OBJECT_STORE_S3_PUBLIC_ENDPOINT:http://localhost:9070}
     # Endpoint embedded into presigned URLs returned to API callers. Defaults to
     # `endpoint`; override when the agent reaches the S3-compatible object store
     # (Floci locally) via a docker-internal host (e.g., http://floci:4566) but

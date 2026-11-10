@@ -15,9 +15,13 @@ def _make_url_validator() -> URLValidator:
     return URLValidator(rules)
 
 
-def _make_browser_and_context(html: str = "<html><body>content</body></html>") -> tuple[MagicMock, MagicMock]:
+def _make_browser_and_context(
+    html: str = "<html><body><article><p>" + "word " * 30 + "</p></article></body></html>",
+) -> tuple[MagicMock, MagicMock]:
+    goto_response = MagicMock(status=200)
+    goto_response.all_headers = AsyncMock(return_value={})
     page = MagicMock()
-    page.goto = AsyncMock(return_value=MagicMock(status=200))
+    page.goto = AsyncMock(return_value=goto_response)
     page.content = AsyncMock(return_value=html)
     page.url = "https://example.com/page"
     page.wait_for_load_state = AsyncMock()
@@ -28,6 +32,10 @@ def _make_browser_and_context(html: str = "<html><body>content</body></html>") -
     context = MagicMock()
     context.new_page = AsyncMock(return_value=page)
     context.close = AsyncMock()
+    context.cookies = AsyncMock(return_value=[])
+    context.route = AsyncMock()
+    context.route_web_socket = None
+    page.context = context
 
     browser = MagicMock()
     browser.new_context = AsyncMock(return_value=context)
@@ -91,12 +99,7 @@ async def test_playwright_uses_fingerprint_locale_and_timezone() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_required",
-            return_value=False,
-        ),
-        patch("src.reader.strategies.playwright_strategy.ChallengeDetector.is_blocked", return_value=False),
-        patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch("src.reader.strategies.playwright_strategy.proxy_provider.for_playwright", return_value=None),
@@ -134,12 +137,7 @@ async def test_playwright_no_proxy_when_unconfigured() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_required",
-            return_value=False,
-        ),
-        patch("src.reader.strategies.playwright_strategy.ChallengeDetector.is_blocked", return_value=False),
-        patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch("src.reader.strategies.playwright_strategy.proxy_provider.for_playwright", return_value=None),
@@ -176,12 +174,7 @@ async def test_playwright_passes_proxy_when_configured() -> None:
         ),
         patch("src.reader.strategies.playwright_strategy.Stealth.apply_stealth_async", new=AsyncMock()),
         patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_required",
-            return_value=False,
-        ),
-        patch("src.reader.strategies.playwright_strategy.ChallengeDetector.is_blocked", return_value=False),
-        patch(
-            "src.reader.strategies.playwright_strategy.ChallengeDetector.is_login_redirect_url",
+            "src.reader.strategies.browser_read.ChallengeDetector.is_login_redirect_url",
             return_value=False,
         ),
         patch("src.reader.strategies.playwright_strategy.proxy_provider.for_playwright", return_value=proxy),
@@ -191,4 +184,4 @@ async def test_playwright_passes_proxy_when_configured() -> None:
 
     # then
     call_kwargs = browser.new_context.call_args.kwargs
-    assert call_kwargs.get("proxy") == proxy
+    assert call_kwargs.get("proxy") == {"server": "chained:socks5://proxy.internal:1080"}

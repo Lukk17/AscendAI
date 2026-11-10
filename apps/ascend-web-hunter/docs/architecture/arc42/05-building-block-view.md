@@ -22,7 +22,6 @@ graph TB
             subgraph "strategies"
                 bs["strategies/beautifulsoup_strategy.py"]
                 traf["strategies/trafilatura_strategy.py"]
-                flare["strategies/flaresolverr_strategy.py"]
                 pw["strategies/playwright_strategy.py"]
                 crawlee["strategies/crawlee_strategy.py"]
                 novnc["strategies/novnc_strategy.py"]
@@ -66,7 +65,6 @@ graph TB
     mcp --> url
     webreader --> bs
     webreader --> traf
-    webreader --> flare
     webreader --> pw
     webreader --> crawlee
     webreader --> novnc
@@ -74,7 +72,6 @@ graph TB
     webreader --> detector
     bs --> cookies
     traf --> cookies
-    flare --> cookies
     novnc --> cookies
     pw --> url
     crawlee --> url
@@ -94,7 +91,6 @@ graph TB
 | `WebReader` | `src/reader/web_reader.py` | Ordered dict of six strategies. Iterates until `ContentValidator` passes or all strategies exhausted. |
 | `BeautifulSoupStrategy` | `src/reader/strategies/beautifulsoup_strategy.py` | `curl_cffi` Chrome120 impersonation + BeautifulSoup parse. Reads cached session from `CookieManager`. |
 | `TrafilaturaStrategy` | `src/reader/strategies/trafilatura_strategy.py` | Same `curl_cffi` transport; Trafilatura extraction pipeline instead of BeautifulSoup. |
-| `FlareSolverrStrategy` | `src/reader/strategies/flaresolverr_strategy.py` | Posts URL to FlareSolverr, parses solved HTML with Trafilatura, saves `cf_clearance` to `CookieManager`. |
 | `PlaywrightStrategy` | `src/reader/strategies/playwright_strategy.py` | Headless=False Chromium with `playwright-stealth`. Polls for network idle; runs adblock route filter. |
 | `CrawleeStrategy` | `src/reader/strategies/crawlee_strategy.py` | Crawlee `AdaptivePlaywrightCrawler`; geolocation context; adblock route filter. |
 | `NoVNCStrategy` | `src/reader/strategies/novnc_strategy.py` | Spawns background cookie monitor; raises `HumanInterventionRequiredException` with resolved VNC URL. |
@@ -102,6 +98,6 @@ graph TB
 | `CookieManager` | `src/reader/cloudflare/cookie_manager.py` | Singleton. Redis-backed session store with in-process fallback. Apex domain normalisation. |
 | `SearxngClient` | `src/search/search_client.py` | Async `httpx` client for SearXNG HTML search. BeautifulSoup `article.result` parser. |
 | `ContentValidator` | `src/validator/content_validator.py` | Word count, error-keyword check, Flesch reading ease, type-token ratio. |
-| `URLValidator` | `src/validator/url_validator.py` | Wraps adblock `AdblockRules` for route filtering; `is_safe_external_url` standalone SSRF guard. The module-level `url_validator` singleton is shared by every `WebReader`; a refresh reassigns its `.rules` in place. |
+| `URLValidator` | `src/validator/url_validator.py` | Wraps adblock `AdblockRules` for route filtering. The module-level `url_validator` singleton is shared by every `WebReader`; a refresh reassigns its `.rules` in place. |
 | `BlocklistLoader` | `src/config/blocklist_loader.py` | Loads the vendored blocklist from `BLOCKLIST_PATH`; `refresh()` downloads, validates, and atomically swaps the on-disk file and in-memory rules. |
 | `Settings` | `src/config/config.py` | Pydantic-settings class. Single `settings` singleton. Reads `.env` file or environment. |

@@ -3,7 +3,6 @@ package com.lukk.ascend.ai.agent.service.rag;
 import com.lukk.ascend.ai.agent.config.properties.RagProperties;
 import com.lukk.ascend.ai.agent.service.provider.VectorStoreResolver;
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -61,14 +60,6 @@ class RagRetrievalServiceMetricsTest {
     }
 
     @Test
-    @DisplayName("rag.last_top_score gauge is registered by the constructor")
-    void constructor_RegistersLastTopScoreGauge() {
-        // then
-        Gauge gauge = registry.find("rag.last_top_score").gauge();
-        assertThat(gauge).isNotNull();
-    }
-
-    @Test
     @DisplayName("retrieve registers rag.retrieval.duration timer with provider and outcome=ok tags on success")
     void retrieve_Success_RegistersRetrievalDurationTimer() {
         // given
@@ -122,23 +113,6 @@ class RagRetrievalServiceMetricsTest {
                 .counter();
         assertThat(counter).isNotNull();
         assertThat(counter.count()).isEqualTo(1.0);
-    }
-
-    @Test
-    @DisplayName("retrieve updates rag.last_top_score gauge to the max score among candidates")
-    void retrieve_WithCandidates_UpdatesLastTopScoreGauge() {
-        // given
-        Document d1 = mockDoc("a", 0.75, Map.of("source", "a.pdf"));
-        Document d2 = mockDoc("b", 0.92, Map.of("source", "b.pdf"));
-        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(d1, d2));
-
-        // when
-        service.retrieve("test query", PROVIDER);
-
-        // then
-        Gauge gauge = registry.find("rag.last_top_score").gauge();
-        assertThat(gauge).isNotNull();
-        assertThat(gauge.value()).isEqualTo(0.92);
     }
 
     private Document mockDoc(String text, double score, Map<String, Object> metadata) {

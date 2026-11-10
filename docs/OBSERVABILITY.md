@@ -9,10 +9,12 @@ AscendAI ships a full three-pillar observability stack (metrics, logs, traces) a
 | Pillar | Tool | Access |
 |---|---|---|
 | Metrics | Prometheus + Grafana | Prometheus: http://localhost:7077, Grafana: http://localhost:7078 |
-| Logs | Vector (shipper) + Loki (storage) + Grafana | http://localhost:7078 → Explore → Loki |
+| Logs | OpenTelemetry collector (shipper) + Loki (storage) + Grafana | http://localhost:7078 → Explore → Loki |
 | Traces | OTel Collector + Tempo + Grafana | http://localhost:7078 → Explore → Tempo |
 
-All seven observability containers start automatically with `docker compose up`. There is no profile flag required - observability is always-on.
+All six observability containers start automatically with `docker compose up`. There is no profile flag required - observability is always-on. The stack is always on and is core, never a switchable part of the deployment: no service carries a compose profile for observability and no service switches its metric, log, or trace export off.
+
+Prometheus and Grafana read their operational values from environment variables passed by `compose.yaml`, each in `VAR=${VAR:-default}` form. A change of the committed `infra/observability/prometheus/prometheus.yaml` or of a value needs `docker compose up -d prometheus` (recreate the container for a changed value, restart it for a changed file). Grafana provisioning files expand `${VAR}` with no default form, so the compose line is the only default for the Grafana settings.
 
 ---
 
@@ -65,7 +67,7 @@ Prometheus scrapes every 15 seconds. Scrape targets are in `infra/observability/
 
 ### Logs
 
-Vector reads Docker container stdout/stderr via the Docker socket and ships to Loki with labels `service` (from `container_name`) and `source` (`docker`). No code changes are required in any service - they just write to stdout.
+The OpenTelemetry collector reads the Docker `json-file` logs through a `filelog` receiver per application container and ships to Loki with the resource attributes `service` (the compose service name) and `source` (`docker`). No code changes are required in any service - they just write to stdout.
 
 To query logs in Grafana: Explore → Loki → `{service="ascend-ai-agent"}`.
 
@@ -75,6 +77,8 @@ To filter by level: `{service="ascend-ai-agent"} |= "WARN"`.
 
 The OTel Collector receives OTLP on port 4317 (gRPC) and 4318 (HTTP) from all six application services. It batches and forwards to Tempo.
 
+The collector runs only in the main stack (`compose.yaml`, project `ascend-ai`). ascend-web-hunter gets its collector address there from `compose.ascend-web-hunter.platform.yaml`, which the main file's `include:` merges over `compose.ascend-web-hunter.yaml`. Run alone (project `ascend-scrapper`), the scraping file leaves `OTEL_EXPORTER_OTLP_ENDPOINT` empty, so ascend-web-hunter exports nothing. Setting the variable in `.env` overrides the address in both projects.
+
 - ascend-ai-agent and ascend-weather-mcp: Spring AI 1.1 emits OTel spans for every LLM call, tool call, and embedding call when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (which it is via compose.yaml). No additional code is required.
 - Python services: OTel auto-instrumentation is activated when `OTEL_EXPORTER_OTLP_ENDPOINT` is set and the `opentelemetry-distro` package is installed and activated in `src/main.py`. FastAPI, httpx, and requests are auto-instrumented.
 
@@ -82,27 +86,57 @@ To view traces in Grafana: Explore → Tempo → search by `service.name=ascend-
 
 ---
 
+## From an error to its trace
+
+Every Python service error is an RFC 7807 problem body carrying a `traceId`, the 32 lower case hex W3C trace id of
+the request that failed. When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, the collector ships that same trace to Tempo, so
+one error answer is enough to pull up the whole request in Grafana. See [Traces](#traces) for the export path and
+[How to Reach Grafana](#how-to-reach-grafana) for the datasources.
+
+1. Copy the `traceId` out of the problem body, for example the field a `GET /does-not-exist` 404 returns.
+2. Open Grafana at http://localhost:7078 and go to Explore, the compass icon.
+3. Pick the Tempo datasource.
+4. Paste the id into the Trace ID field. Tempo accepts it with or without the hyphens.
+5. Run the query.
+
+The trace that comes back holds the request's spans, each with `service.name` set to the failing service, for example
+`ascend-memory`, so the span that wrote the error is the one whose attributes match the problem body. The same id also
+works against Tempo's HTTP API from inside the compose network:
+
+```bash
+docker compose exec grafana wget -qO- http://tempo:3200/api/traces/<traceId>
+```
+
 ## Metrics Inventory
 
-Every custom metric emitted by ascend-ai-agent. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters.
+Every custom metric emitted by the application services. Micrometer converts dot-separated names to underscore-separated Prometheus metric names and appends `_total` to counters. The L3 cache hit rate divides cache-read tokens by the input series of `gen_ai_client_token_usage_total`, not by a dedicated total counter.
 
-| Metric (Spring notation) | Prometheus name | Type | Tags | Dashboards |
-|---|---|---|---|---|
-| `gen_ai.client.token.usage` | `gen_ai_client_token_usage_total` | counter (auto, Spring AI) | `gen_ai_system`, `gen_ai_request_model`, `gen_ai_token_type` | AI Pipeline, L1 Token Cost |
-| `memory.extraction.parse_failed` | `memory_extraction_parse_failed_total` | counter | `provider`, `model` | AI Pipeline |
-| `memory.insert.failed` | `memory_insert_failed_total` | counter | `embedding_provider`, `reason` | - |
-| `memory.search.duration` | `memory_search_duration_seconds_*` | timer | `embedding_provider`, `outcome` | - |
-| `rag.retrieval.hits` | `rag_retrieval_hits_total` | counter | `provider`, `embedding_provider`, `above_threshold` | AI Pipeline, L2 RAG Quality |
-| `rag.retrieval.duration` | `rag_retrieval_duration_seconds_*` | timer | `provider`, `outcome` | - |
-| `rag.last_top_score` | `rag_last_top_score` | gauge | `provider` | L2 RAG Quality |
-| `rag.top_score` | `rag_top_score_bucket` | histogram | `provider` | L2 RAG Quality |
-| `mcp.tool.duration` | `mcp_tool_duration_seconds_*` | timer | `tool`, `outcome` | AI Pipeline |
-| `ingestion.upload.bytes` | `ingestion_upload_bytes_total` | counter | `source_type`, `outcome` | L2 RAG Quality |
-| `prompt_cache.tokens.read` | `prompt_cache_tokens_read_total` | counter | `provider` | L3 Cache Hit Rate |
-| `prompt_cache.tokens.creation` | `prompt_cache_tokens_creation_total` | counter | `provider` (Anthropic only) | L3 Cache Hit Rate |
-| `prompt_cache.tokens.total` | `prompt_cache_tokens_total` | counter | `provider` | L3 Cache Hit Rate |
+| Service | Metric | Prometheus name | Type | Tags | Dashboards |
+|---|---|---|---|---|---|
+| ascend-agent | `gen_ai.client.token.usage` | `gen_ai_client_token_usage_total` | counter (auto, Spring AI) | `gen_ai_system`, `gen_ai_request_model`, `gen_ai_token_type` | AI Pipeline, L1 Token Cost |
+| ascend-agent | `memory.extraction.parse_failed` | `memory_extraction_parse_failed_total` | counter | `provider`, `model` | AI Pipeline |
+| ascend-agent | `memory.insert.failed` | `memory_insert_failed_total` | counter | `embedding_provider`, `reason` | - |
+| ascend-agent | `memory.search.duration` | `memory_search_duration_seconds_*` | timer | `embedding_provider`, `outcome` | - |
+| ascend-agent | `rag.retrieval.hits` | `rag_retrieval_hits_total` | counter | `provider`, `embedding_provider`, `above_threshold` | AI Pipeline, L2 RAG Quality |
+| ascend-agent | `rag.retrieval.duration` | `rag_retrieval_duration_seconds_*` | timer | `provider`, `outcome` | - |
+| ascend-agent | `rag.top_score` | `rag_top_score_bucket` | histogram | `provider` | L2 RAG Quality |
+| ascend-agent, ascend-weather-mcp | `mcp.tool.duration` | `mcp_tool_duration_seconds_*` | timer | `tool`, `outcome` | AI Pipeline |
+| ascend-agent | `ingestion.upload.bytes` | `ingestion_upload_bytes_total` | counter | `source_type`, `outcome` | L2 RAG Quality |
+| ascend-agent | `prompt_cache.tokens.read` | `prompt_cache_tokens_read_total` | counter | `provider` | L3 Cache Hit Rate |
+| ascend-agent | `prompt_cache.tokens.creation` | `prompt_cache_tokens_creation_total` | counter | `provider` (Anthropic only) | L3 Cache Hit Rate |
+| ascend-web-hunter | `strategy_attempts_total` | `strategy_attempts_total` | counter | `strategy`, `outcome`, `domain` | - |
+| ascend-web-hunter | `challenge_verdicts_total` | `challenge_verdicts_total` | counter | `verdict` (`wall`, `content`, `no_content`), `tier` | - |
+| ascend-web-hunter | `challenge_signals_fired_total` | `challenge_signals_fired_total` | counter | `signal`, `vendor` | - |
+| ascend-web-hunter | `challenge_score` | `challenge_score_bucket` | histogram | none | - |
+| ascend-ocr | `ascendocr_jobs_total` | `ascendocr_jobs_total` | counter | `outcome` | - |
+| ascend-ocr | `ascendocr_job_duration_seconds` | `ascendocr_job_duration_seconds` | histogram | none | - |
+| ascend-ocr | `ascendocr_job_queue_wait_seconds` | `ascendocr_job_queue_wait_seconds` | histogram | none | - |
+| ascend-ocr | `ascendocr_job_queue_documents` | `ascendocr_job_queue_documents` | gauge | none | - |
+| ascend-ocr | `ascendocr_job_queue_pages` | `ascendocr_job_queue_pages` | gauge | none | - |
 
-Allowed values for `outcome` tag: `ok`, `error`, `timeout`, `rate_limited`. Never use free-form strings - see Cardinality Rules below.
+Allowed values for `outcome` tag: `ok`, `error`, `timeout`, `rate_limited`, `not_found`. Never use free-form strings - see Cardinality Rules below.
+
+`challenge_verdicts_total`, `challenge_signals_fired_total` and `challenge_score` record one verdict per read for each read tier. A NoVNC window (tier `novnc-monitor`) rechecks its page on every poll while it waits for a human, and records only its last check in all three, once per window when the window ends. A window that never checked a page records nothing.
 
 ---
 
@@ -182,7 +216,7 @@ The metrics appear at `/metrics` and are scraped by Prometheus.
 
 ## How to Add a Log Field
 
-Python services log via the standard `logging` module. To add a structured field, use a `LogRecord` extra or a custom formatter. The log line is already tagged with `service` by Vector when it ships to Loki.
+Python services log via the standard `logging` module. To add a structured field, use a `LogRecord` extra or a custom formatter. The log line is already tagged with `service` by the collector when it ships to Loki.
 
 Java services use standard SLF4J + Logback. Structured logging can be added via `net.logstash.logback:logstash-logback-encoder`. The existing setup writes plain text; to add key-value fields, use MDC:
 
@@ -237,8 +271,8 @@ with tracer.start_as_current_span("my-operation") as span:
 
 These rules prevent Prometheus from accumulating millions of time-series (high cardinality) which causes memory exhaustion and slow queries.
 
-1. Never tag metrics with `user_id` directly. If you need to track per-user state, use a rotating slot gauge (contact the platform team first).
-2. Never tag with free-form strings such as URLs, prompt text, error messages, or model responses. Use a closed set: `outcome` must be one of `ok`, `error`, `timeout`, `rate_limited`. If you need richer error context, write a WARN log line (it goes to Loki and is searchable) instead of adding an unbounded tag.
+1. Never tag metrics with `user_id` directly. If you need any per-user state, use a rotating slot gauge (contact the platform team first).
+2. Never tag with free-form strings such as URLs, prompt text, error messages, or model responses. Use a closed set: `outcome` must be one of `ok`, `error`, `timeout`, `rate_limited`, `not_found`. If you need richer error context, write a WARN log line (it goes to Loki and is searchable) instead of adding an unbounded tag.
 3. The `model` tag is allowed because the set of models used is small and known (< 20 values).
 4. When in doubt, query the candidate metric in Prometheus with `count(count by (<tag>) (my_metric))` to estimate cardinality before merging.
 
@@ -246,48 +280,49 @@ These rules prevent Prometheus from accumulating millions of time-series (high c
 
 ## Token Cost Pricing Rates
 
-Token cost estimates in the L1 dashboard use hardcoded rates from `infra/observability/grafana/dashboards/pricing.yaml`. When a provider changes its pricing:
+Prometheus records the per-provider token rates from `infra/observability/grafana/dashboards/pricing.yaml` at start as the series `token_price_usd_per_1k`, and the L1 dashboard multiplies usage by that series, so the dashboard holds no rate. When a provider changes its pricing:
 
 1. Edit `infra/observability/grafana/dashboards/pricing.yaml` with the new rates.
-2. Update the matching PromQL expressions in `infra/observability/grafana/dashboards/token-cost.json` (the multiplier constants match the rates in `pricing.yaml`).
-3. Restart Grafana to reload the provisioned dashboard.
+2. Restart Prometheus so it re-reads the file and records the new series.
 
 ```bash
-docker compose restart grafana
+docker compose restart prometheus
 ```
 
 ---
 
-## Vector to Cloud Migration
+## Collector to Cloud Migration
 
-If you want to ship logs to Datadog, CloudWatch, or Splunk instead of (or in addition to) Loki, edit `infra/observability/vector/vector.toml`. The file contains commented-out sink blocks for each target. Uncomment the desired sink, set the required environment variable, and restart Vector.
+If you want to ship logs to Datadog, CloudWatch, or Splunk instead of (or in addition to) Loki, add an exporter of type `datadog`, `awscloudwatchlogs` or `splunk_hec` to `infra/observability/otel-collector/otel-collector-config.yaml`, fed by its `logs` pipeline, with its credentials, then drop or keep `otlphttp/loki`.
 
 ```bash
-docker compose restart vector
+docker compose restart otel-collector
 ```
 
-No service code changes are required. Vector handles the fan-out.
+No service code changes are required. The collector handles the fan-out.
 
 ---
 
 ## Resource Usage
 
-At idle, the seven observability containers consume approximately:
+At idle, the six observability containers consume approximately:
 
 | Container | RAM (idle) |
 |---|---|
 | prometheus | ~80 MB |
 | grafana | ~120 MB |
 | loki | ~80 MB |
-| vector | ~30 MB |
 | otel-collector | ~40 MB |
 | tempo | ~120 MB |
-| **Total** | **~470 MB** |
+| **Total** | **~440 MB** |
 
-Disk retention is bounded:
-- Prometheus: 72 hours (`--storage.tsdb.retention.time=72h`), approximately 200 MB steady state under normal load.
-- Loki: 168 hours (7 days), approximately 500 MB steady state.
-- Tempo: 168 hours (7 days), approximately 300 MB steady state.
+Disk retention is bounded, and the bounds below are measured, not planned. Load test of task 15.5 (180 MiniMax chat prompts, one every 10 seconds, 2026-10-15): Prometheus grew 0.041 MB/min, Loki 0.076 MB/min and Tempo 0.128 MB/min over the last 10 minutes of the run, with the 10-to-20 minute window at 0.042, 0.067 and 0.172 MB/min, so Prometheus and Tempo fall and Loki rises 14 percent, because every prompt of the test reuses one user whose chat history grows turn by turn. Projected per day and over each default retention window:
+
+- Prometheus: about 59 MB per day, about 180 MB over 72 hours (`--storage.tsdb.retention.time=72h`).
+- Loki: about 110 MB per day, about 9.9 GB over 2160 hours.
+- Tempo: about 184 MB per day, about 16.6 GB over 2160 hours.
+
+Reserve 30 GB on one server for the three volumes together.
 
 Total expected disk usage: approximately 1-2 GB steady state on a local development machine running representative traffic.
 

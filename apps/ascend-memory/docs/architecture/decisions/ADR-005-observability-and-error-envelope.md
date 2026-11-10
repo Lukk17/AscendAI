@@ -20,20 +20,25 @@ endpoint, so latency and error-rate were invisible to the platform's observabili
 
 Three coordinated changes, shipped together because they share consumers.
 
-**Liveness and readiness are separate endpoints.** `/health` returns 200 the moment uvicorn binds and stays 200 for
-the life of the process. `/ready` actively probes Qdrant, the default embedding API, and constructs the mem0 client.
-It returns 200 when every probe is ok, 503 otherwise. The legacy combined contract stays available at
-`/health/legacy` for callers still on the old shape, with a `Deprecation` and `Sunset` header (informally documented
-here; not yet emitted programmatically). The Docker `HEALTHCHECK` and `docker-compose` healthcheck both target
-`/health`, never `/ready`, because the container is "alive" the moment the process can respond. Orchestrators that
-want readiness should call `/ready` directly. (`src/main.py`, `src/api/readiness.py`)
+**Liveness and readiness are separate endpoints.** `/health` returns 200 with `{"status": "ok", "service":
+"ascend-memory", "version": ...}` the moment uvicorn binds and stays 200 for the life of the process. `/ready`
+actively probes Qdrant, the default embedding API, and constructs the mem0 client through the
+`ascend-python-common` readiness aggregator (probes run at once, 3 s budget each). It returns 200 when every probe
+is ok or skipped, 503 otherwise, both with `{"status": "ready" | "not-ready", "service", "version", "checks"}`. The
+legacy combined contract stays available at `/health/legacy` for callers still on the old shape, with a
+`Deprecation` and `Sunset` header (informally documented here; not yet emitted programmatically). The Docker
+`HEALTHCHECK` and `docker-compose` healthcheck both target `/health`, never `/ready`, because the container is
+"alive" the moment the process can respond. Orchestrators that want readiness should call `/ready` directly.
+(`src/main.py`, `src/api/readiness.py`)
 
 **Error responses use RFC 7807 problem documents.** A `ValueError` raised anywhere in the request lifecycle maps to
-`400 application/problem+json` with `type`, `title`, `status`, `detail`, `instance`. Unhandled exceptions map to
-`500 application/problem+json` with the same envelope, but `detail` is dropped server-side so upstream stack traces
-never reach the caller. The full exception is logged with `logger.exception` for observability. The MCP surface
-returns a structured envelope (`{status: "error", code: "validation_error" | "internal_error", operation, message}`)
-because MCP tool results are JSON, not HTTP. (`src/api/exception_handlers.py`, `src/api/mcp/mcp_server.py`)
+`400 application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, `code: "validation"`, and
+`traceId`. A request the router cannot validate answers `400` with code `validation` and an `errors` array sorted by
+`field`. Unhandled exceptions map to `500 application/problem+json` with the same envelope, code `"internal"`, and
+a fixed generic detail server-side so upstream stack traces never reach the caller. The full exception is logged
+with `logger.exception` for observability. The MCP surface raises tool errors whose text starts with the registry
+code (`validation: ...`, `internal: ...`) because MCP tool results are JSON, not HTTP.
+(`src/api/exception_handlers.py`, `src/api/mcp/mcp_server.py`)
 
 **`/metrics` exposes Prometheus counters and histograms.** Four counters (`memory_insert_total`,
 `memory_search_total`, `memory_delete_total`, `memory_wipe_total`) labelled by `provider` and `outcome`, plus four
@@ -43,9 +48,10 @@ share that network. (`src/observability/metrics.py`, `src/main.py`)
 
 **`X-Request-ID` middleware** echoes any caller-supplied request ID (regex-validated, max 128 chars) back on every
 response, and generates a UUID4 when no header is sent or the value is malformed (CR/LF injection guard). The ID is
-stored in a `contextvars.ContextVar` and threaded into every log line via the `CorrelationFilter` so logs from a
-single request can be reassembled from log aggregation. (`src/observability/request_context.py`,
-`src/config/logging_config.py`)
+stored in a `contextvars.ContextVar` and threaded into every log line so logs from a single request can be
+reassembled from log aggregation. Request correlation and logging come from `ascend-python-common`
+(`request_context.py`, `log_config.py`); the service keeps neither module. Log lines start with `[ascend-memory]`
+and honour `LOG_LEVEL`.
 
 ---
 

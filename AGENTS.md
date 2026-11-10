@@ -139,6 +139,8 @@ Use multiline prompts when you need to include logs or detailed context with a c
 
 **Approval gate:** after creating a change proposal, **always wait for explicit user approval** before starting implementation. Do NOT modify source code, configs, or any project files until the user explicitly approves the plan. This is the most important rule in the workflow.
 
+**Living suite:** the change `add-web-search-scraping-e2e` is a living end-to-end suite. It is never archived. No agent run may archive it or propose archiving it (owner decision 2026-10-08, answer 12).
+
 ## What This Repo Is
 
 AscendAI is a multi-module AI orchestration platform built with Spring AI and the Model Context Protocol (MCP). It routes user prompts to multiple AI providers (LM Studio, OpenAI, Gemini, Anthropic, MiniMax) with per-request selection, extends LLM capabilities with external tools via MCP, and provides a RAG pipeline with semantic memory.
@@ -158,26 +160,33 @@ AscendAI is a multi-module AI orchestration platform built with Spring AI and th
 | [AscendMemory](apps/ascend-memory/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7020 | Semantic memory service using mem0ai + Qdrant |
 | [ascend-weather-mcp](apps/ascend-weather-mcp/AGENTS.md) | Java 21, Spring Boot 3.5.14, Gradle | 9998 | MCP server for weather data |
 | [ascend-ocr](apps/ascend-ocr/AGENTS.md) | Python 3.11, FastAPI, FastMCP | 7022 | OCR service using PaddleOCR |
+| [ascend-python-common](libs/ascend-python-common/README.md) | Python 3.11, shared library (no service, no image) | - | Shared platform code (errors, settings, logging, tracing, rate limiting) for the four Python services |
 
 ## External Prerequisites
 
 These services must be running before starting docker-compose. In production they map to managed cloud services (e.g., AWS ElastiCache, Qdrant Cloud, S3).
+
+On Docker Engine for Linux each of these services must listen on an address the containers reach (the bridge address or all addresses), see [Reaching the host from a container](docs/DEPLOYMENT.md#reaching-the-host-from-a-container).
 
 | Service | Port(s) | Purpose |
 |---|---|---|
 | PostgreSQL | 5432 | Persistent metadata, chat history, ingestion state |
 | Redis | 6379 | Chat history cache and session persistence |
 | Qdrant | 6333 / 6334 | Vector database for RAG embeddings and semantic memory |
-| Object storage (locally: Floci) | 9070 / 9071 | S3-compatible object storage for RAG document ingestion |
+| Object storage (locally: Floci) | 9070 / 9071 | S3-compatible object storage for RAG document ingestion. A store on another address is set in `.env` with `OBJECT_STORE_S3_ENDPOINT` (as a container reaches it) and `OBJECT_STORE_S3_PUBLIC_ENDPOINT` (as the host reaches it) |
 
 ## Docker Compose Services
+
+A container that calls the host follows five rules ([Reaching the host from a container](docs/DEPLOYMENT.md#reaching-the-host-from-a-container)): container to container by name on the shared network, host to container by `127.0.0.1` and a published port, container to host by `host.docker.internal` only together with `extra_hosts` in compose or `--add-host=host.docker.internal:host-gateway` on a `docker run` (needs Docker Engine 20.10 or newer), `localhost` inside a container meaning that container itself, and a `docker run` that calls no other service needing none of this.
 
 Compose is split into two project files. The second is reached only through the main file's `include:`, so every command runs against the main file with no `-f` flag and the merge puts both stacks in one Docker Desktop group:
 
 - **`compose.yaml`** (project `ascend-ai`) - main application stack. Top-level `include:` pulls in the scrapper file, so `docker compose up` from the repo root brings up everything (merged into one project).
 - **`compose.ascend-web-hunter.yaml`** (project `ascend-scrapper`) - web-scraping stack, pulled in by the main file's `include:`.
 
-Both files use the same four fixed container names, `searxng`, `flaresolverr`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`, so only one of the two projects runs at a time: the main stack (project `ascend-ai`, which already includes the scraping file) or the scraping file alone (project `ascend-scrapper`). Switching means `docker compose down` on the project you leave, which removes its containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create its containers with a name conflict. Running the scraping file alone on a host without its own Redis also needs `COMPOSE_PROFILES=redis` and `REDIS_URL=redis://redis:6379/0` in `.env`, which `.env.example` documents as commented-out lines. To leave the main stack and start the scraping stack alone, from the repo root:
+The main file's `include:` also merges `compose.ascend-web-hunter.platform.yaml` over the scraping file. It only points `ascend-web-hunter` at the platform's `otel-collector`, so the scraping file alone exports no telemetry, and a value of `OTEL_EXPORTER_OTLP_ENDPOINT` in `.env` wins in both projects.
+
+Both files use the same three fixed container names, `searxng`, `ascend-web-hunter` and `ngrok-ascend-web-hunter`, so only one of the two projects runs at a time: the main stack (project `ascend-ai`, which already includes the scraping file) or the scraping file alone (project `ascend-scrapper`). Switching means `docker compose down` on the project you leave, which removes its containers. `stop` is not enough, because a stopped container still holds its name and the other project then refuses to create its containers with a name conflict. Running the scraping file alone on a host without its own Redis also needs `COMPOSE_PROFILES=redis` and `REDIS_URL=redis://redis:6379/0` in `.env`, which `.env.example` documents as commented-out lines. To leave the main stack and start the scraping stack alone, from the repo root:
 
 ```bash
 docker compose down
@@ -217,7 +226,6 @@ A third, separate artifact exists for deploying the web-search stack to a machin
 | Service | Port | Purpose |
 |---|---|---|
 | SearXNG | 9020 (bound to 127.0.0.1) | Privacy-respecting meta search engine |
-| FlareSolverr | 8191 (bound to 127.0.0.1) | Cloudflare bypass proxy for web scraping |
 | ascend-web-hunter | 7021 | Web search & scraping MCP |
 | ngrok-ascend-web-hunter | - | Ngrok tunnel for NoVNC CAPTCHA intervention |
 
@@ -247,6 +255,25 @@ docker compose up -d --build
 - **Java modules** (ascend-ai-agent, ascend-weather-mcp): Java 21, Spring Boot 3.5.14, Gradle, Spring AI 1.1.5.
 - **Python modules** (ascend-audio-scribe, ascend-web-hunter, AscendMemory, ascend-ocr): FastAPI + Uvicorn, pydantic for validation, FastMCP for MCP server mode.
 - **Python virtual environments**: every Python module has its own `.venv/` at the module root. Run every `pip`, `pytest`, `uvicorn`, `ruff`, and `mypy` invocation through that module's own `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Linux/macOS) - never the system Python. A bare `pip` or `pytest` resolves to whatever Python is first on `PATH`, which does not have the module's dependencies installed and fails with import errors instead of running the intended command. Each module's own `AGENTS.md` gives the exact commands.
+- **Python shared library install order**: every Python service pins `ascend-python-common==2.0.0` and the name is on no package index, so install the library from its folder before the service itself, otherwise pip asks the index and fails. From the repository root, PowerShell:
+
+```powershell
+apps/ascend-memory/.venv/Scripts/python.exe -m pip install -e libs/ascend-python-common
+```
+
+```powershell
+apps/ascend-memory/.venv/Scripts/python.exe -m pip install -e apps/ascend-memory
+```
+
+From the repository root, Linux/macOS:
+
+```bash
+apps/ascend-memory/.venv/bin/python -m pip install -e libs/ascend-python-common
+```
+
+```bash
+apps/ascend-memory/.venv/bin/python -m pip install -e apps/ascend-memory
+```
 - All services expose a `/health` endpoint for Docker healthchecks.
 - All services are containerized with Dockerfiles and wired through `compose.yaml` (with `compose.ascend-web-hunter.yaml` included for the web-scraping stack).
 - MCP servers use SSE (Server-Sent Events) or Streamable HTTP for communication with the ascend-ai-agent.

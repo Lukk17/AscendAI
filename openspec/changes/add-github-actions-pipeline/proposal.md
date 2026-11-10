@@ -13,7 +13,7 @@ This change adds two GitHub Actions workflows under `.github/workflows/`. All wo
 
 - `ci.yaml`: build, lint, type check, test and coverage gates. Never pushes images. Triggers: `pull_request`, `push: branches: [master]`, and `workflow_dispatch`. A `changes` job builds a dynamic matrix holding only the services whose source changed, or every service when `.github/workflows/**` changed. A docs-only PR runs zero builds.
   - Java services run `./gradlew --no-daemon build test`. ascend-agent then runs `jacocoTestCoverageVerification`, which fails below 80 percent instruction coverage.
-  - Python services run `pip install -e .[dev]`, `ruff check .`, a Mypy step and a pytest step, and fail below 100 percent branch coverage (set in each module's pytest options, and written out on the command line for ascend-web-hunter and ascend-memory). Mypy runs `mypy src`, except ascend-ocr, which runs `mypy src tests`. ascend-audio-scribe runs plain `pytest`, ascend-ocr runs `pytest -m "not contract"` (the contract test runs in `contract-provider` instead), and ascend-web-hunter and ascend-memory run `pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100`.
+  - Python services run `pip install -e .[dev]`, `ruff check .`, a Mypy step and a pytest step, and fail below 100 percent branch coverage (set once, in each module's pytest options, owner answer 93 of 2026-10-08). Mypy runs `mypy src`, except ascend-ocr, which runs `mypy src tests`. ascend-ocr runs `pytest -m "not contract"` (the contract test runs in `contract-provider` instead), and the other three run plain `pytest`.
   - A `verify-changelog` job runs on pull requests and manual dispatches for every changed app, and fails when the app's `CHANGELOG.md` top `## [x.y.z]` entry is missing, not higher than the base ref's, or empty. A failure there blocks the build jobs. A skipped check does not.
   - An `integration-test` job runs `./gradlew --no-daemon integrationTest` (Testcontainers) for ascend-agent in parallel with the unit-test matrix.
   - This workflow has no secrets and produces no artifacts beyond test reports and the pact file.
@@ -61,6 +61,10 @@ The change also pins the GitHub repository configuration these workflows depend 
 - Repository settings: the two Docker Hub secrets, and making each GHCR package public once after its first push. No branch-protection or auto-delete-branches recommendations (maintainer's policy, out of scope).
 - Backwards compat: fully additive. Existing manual `./gradlew build` and `docker push` flows still work.
 
+## Build order
+
+Build order (owner build order of 2026-10-04, which supersedes the earlier orders): build group 1 (finish started work), position 2. It needs no earlier change for its workflows. Its end-to-end table (task 7.3) and the rows later changes added to it (`add-ascend-python-common`, `add-python-runtime-upgrades` and `upgrade-spring-boot-4`) were removed by owner answer 93 of 2026-10-08, because no workflow runs those specs.
+
 ## Relevant Skills
 
 Load these from `.agents/skills/` before implementing or verifying this change:
@@ -70,3 +74,4 @@ Load these from `.agents/skills/` before implementing or verifying this change:
 - `github-ops` for driving and reading workflow runs with the `gh` command line in the verification tasks
 - `git-workflow` for the throwaway `ci-verify/*` branches and changelog convention
 - `markdown-writer` for `.github/workflows/README.md` and `contracts/README.md`
+- `e2e-runbooks` for reading the verdicts of the workflow runs and the released image check (task group 7)

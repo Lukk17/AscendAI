@@ -34,21 +34,21 @@ def _two_frame_tiff() -> bytes:
 
 
 class TestPdfPages:
-    def test_a_page_is_rendered_at_the_modes_resolution(self):
+    def test_a_page_is_rendered_at_the_modes_resolution(self) -> None:
         # When
         pages = list(render_pages(_red_pdf(100, 50), PROFILE))
 
         # Then
         assert [page.shape for page in pages] == [(100, 200, 3)]
 
-    def test_every_page_is_rendered_in_order(self):
+    def test_every_page_is_rendered_in_order(self) -> None:
         # When
         pages = list(render_pages(_make_pdf((100, 100), (50, 100)), PROFILE))
 
         # Then
         assert [page.shape for page in pages] == [(200, 200, 3), (200, 100, 3)]
 
-    def test_a_page_larger_than_the_largest_supported_page_is_rendered_at_the_reduced_scale(self):
+    def test_a_page_larger_than_the_largest_supported_page_is_rendered_at_the_reduced_scale(self) -> None:
         # Given: 2000 pt at 144 dpi would be 4000 px on the long side
         document = _red_pdf(2000, 1000)
 
@@ -58,7 +58,7 @@ class TestPdfPages:
         # Then
         assert [page.shape for page in pages] == [(LARGEST_LONG_SIDE // 2, LARGEST_LONG_SIDE, 3)]
 
-    def test_pixels_arrive_in_the_bgr_order_the_engine_reads(self):
+    def test_pixels_arrive_in_the_bgr_order_the_engine_reads(self) -> None:
         # When
         page = next(render_pages(_red_pdf(20, 20), PROFILE))
 
@@ -66,7 +66,7 @@ class TestPdfPages:
         assert page.dtype == np.uint8
         assert page[5, 5].tolist() == pytest.approx(RED_IN_BGR, abs=2)
 
-    def test_forms_are_initialised_and_the_document_is_closed_when_the_reader_stops_early(self):
+    def test_forms_are_initialised_and_the_document_is_closed_when_the_reader_stops_early(self) -> None:
         # Given
         page = MagicMock()
         page.get_size.return_value = (100.0, 100.0)
@@ -89,14 +89,14 @@ class TestPdfPages:
 
 
 class TestImagePages:
-    def test_an_image_within_the_largest_supported_size_is_read_at_its_own_size(self):
+    def test_an_image_within_the_largest_supported_size_is_read_at_its_own_size(self) -> None:
         # When
         pages = list(render_pages(_encode(Image.new("RGB", (30, 20), color="red"), "PNG"), PROFILE))
 
         # Then
         assert [page.shape for page in pages] == [(20, 30, 3)]
 
-    def test_pixels_arrive_in_the_bgr_order_the_engine_reads(self):
+    def test_pixels_arrive_in_the_bgr_order_the_engine_reads(self) -> None:
         # When
         page = next(render_pages(_encode(Image.new("RGB", (4, 4), color="red"), "PNG"), PROFILE))
 
@@ -105,7 +105,7 @@ class TestImagePages:
         assert page.flags["C_CONTIGUOUS"]
         assert page[0, 0].tolist() == RED_IN_BGR
 
-    def test_an_oversized_image_is_shrunk_to_the_largest_supported_long_side_keeping_its_aspect(self):
+    def test_an_oversized_image_is_shrunk_to_the_largest_supported_long_side_keeping_its_aspect(self) -> None:
         # Given
         oversized = _encode(Image.new("RGB", (LARGEST_LONG_SIDE * 2, LARGEST_LONG_SIDE), color="red"), "PNG")
 
@@ -115,7 +115,7 @@ class TestImagePages:
         # Then
         assert [page.shape for page in pages] == [(LARGEST_LONG_SIDE // 2, LARGEST_LONG_SIDE, 3)]
 
-    def test_an_oversized_jpeg_is_shrunk_too(self):
+    def test_an_oversized_jpeg_is_shrunk_too(self) -> None:
         # Given
         oversized = _encode(Image.new("RGB", (LARGEST_LONG_SIDE * 4, 100), color="red"), "JPEG")
 
@@ -125,7 +125,7 @@ class TestImagePages:
         # Then
         assert page.shape[1] == LARGEST_LONG_SIDE
 
-    def test_exif_orientation_is_applied(self):
+    def test_exif_orientation_is_applied(self) -> None:
         # Given: orientation 6 means the stored pixels must be turned a quarter to be upright
         exif = Image.Exif()
         exif[0x0112] = 6
@@ -137,14 +137,14 @@ class TestImagePages:
         # Then
         assert page.shape == (40, 20, 3)
 
-    def test_a_single_channel_image_is_read_as_three_channels(self):
+    def test_a_single_channel_image_is_read_as_three_channels(self) -> None:
         # When
         page = next(render_pages(_encode(Image.new("L", (8, 6), color=255), "PNG"), PROFILE))
 
         # Then
         assert page.shape == (6, 8, 3)
 
-    def test_every_frame_of_a_tiff_is_a_page(self):
+    def test_every_frame_of_a_tiff_is_a_page(self) -> None:
         # When
         pages = list(render_pages(_two_frame_tiff(), PROFILE))
 
@@ -153,7 +153,7 @@ class TestImagePages:
 
 
 class TestImagePageCount:
-    def test_a_tiff_has_as_many_pages_as_frames(self):
+    def test_a_tiff_has_as_many_pages_as_frames(self) -> None:
         # When
         with Image.open(io.BytesIO(_two_frame_tiff())) as image:
             count = image_page_count(image)
@@ -161,7 +161,7 @@ class TestImagePageCount:
         # Then
         assert count == 2
 
-    def test_any_other_format_is_read_at_its_first_frame_only(self):
+    def test_any_other_format_is_read_at_its_first_frame_only(self) -> None:
         # Given
         frames = [Image.new("P", (4, 4), color=index) for index in range(3)]
         animation = _encode(frames[0], "GIF", save_all=True, append_images=frames[1:])
@@ -175,7 +175,9 @@ class TestImagePageCount:
 
 
 class TestDecompressionBombGuard:
-    def test_the_image_library_limit_is_the_source_pixel_ceiling(self, monkeypatch):
+    def test_the_image_library_limit_is_the_source_pixel_ceiling(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         # Given
         monkeypatch.setattr(settings, "OCR_MAX_SOURCE_PIXELS", 123)
         monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", Image.MAX_IMAGE_PIXELS)
@@ -186,6 +188,6 @@ class TestDecompressionBombGuard:
         # Then
         assert Image.MAX_IMAGE_PIXELS == 123
 
-    def test_it_is_applied_when_the_renderer_is_imported(self):
+    def test_it_is_applied_when_the_renderer_is_imported(self) -> None:
         # When / Then: the worker process imports the renderer and nothing else sets it there
         assert Image.MAX_IMAGE_PIXELS == settings.OCR_MAX_SOURCE_PIXELS

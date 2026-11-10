@@ -57,6 +57,12 @@ Inline base64 is **not** accepted today. If a future caller needs to push bytes 
 ## Related
 
 - `apps/ascend-ocr/src/api/mcp/mcp_server.py` - `ocr_process`, `_fetch_file`, `_read_jailed_file`, `_download_http`, `_validate_host`, `_is_blocked`, `_is_within`.
-- `apps/ascend-ocr/src/config/config.py` - `MCP_FILE_URI_ROOT`, `MCP_ALLOWED_HOSTS`, `MCP_DOWNLOAD_TIMEOUT_SECONDS`.
+- `apps/ascend-ocr/src/config/config.py` - `MCP_FILE_URI_ROOT`, `ALLOWED_PRIVATE_HOSTS`, `MCP_DOWNLOAD_TIMEOUT_SECONDS`.
 - `apps/ascend-ocr/e2e/testing/6-mcp-ocr-test.md` - operator-facing test that exercises this path; requires `host.docker.internal` in `MCP_ALLOWED_HOSTS`.
 - ADR-M002 (monorepo) - MCP as the standard tool-services protocol.
+
+## Amendment 2026-10-04: the setting is now `ALLOWED_PRIVATE_HOSTS` (add-ascend-python-common, owner answer 68.2)
+
+The allow list setting this record names is `ALLOWED_PRIVATE_HOSTS`. It was renamed from `MCP_ALLOWED_HOSTS` on
+2026-10-04; every other setting keeps its name. The `Related` entry above names the new setting because it points
+at current code. The status line above and the rest of this record are unchanged.

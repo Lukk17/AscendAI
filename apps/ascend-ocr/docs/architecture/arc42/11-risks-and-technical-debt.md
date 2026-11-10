@@ -27,7 +27,7 @@
 | Item | File | Priority |
 | :--- | :--- | :--- |
 | No `HEALTHCHECK` instruction in Dockerfile | `apps/ascend-ocr/Dockerfile` | Medium - Docker Desktop and compose mark the container healthy via process liveness only; operators must add a compose `healthcheck` stanza pointing at `/health` manually. |
-| `MCP_ALLOWED_HOSTS` absent from default compose block | `compose.yaml` | Medium - the e2e MCP test (spec 6) fails without `MCP_ALLOWED_HOSTS=host.docker.internal`, but nothing in the default compose configuration sets it, making the test silently non-runnable without a manual edit. |
+| `ALLOWED_PRIVATE_HOSTS` absent from default compose block | `compose.yaml` | Medium - the e2e MCP test (spec 6) fails without `ALLOWED_PRIVATE_HOSTS=host.docker.internal`, but nothing in the default compose configuration sets it, making the test silently non-runnable without a manual edit. |
 | Module-level `_http_session` global in `mcp_server.py` | `src/api/mcp/mcp_server.py:24` | Low - works correctly with a single Uvicorn worker. Multi-worker deployments would require moving session state into a context variable or request-local holder. |
 | No `Sunset` header or deprecation window policy for REST | `src/api/rest/rest_endpoints.py` | Low - [ADR-003](../decisions/ADR-003-versioning-strategy.md) defers `Sunset` to when the client population grows. |
 | Pre-cached models limited to the default pair in Dockerfile | `apps/ascend-ocr/Dockerfile:23` | Low: the build bakes every pair a supported language can reach, which at the defaults is the one `PP-OCRv6_small` pair every supported language reads with. A language opted back in with a pair of its own needs an image rebuild to be baked, or it downloads at first use. |

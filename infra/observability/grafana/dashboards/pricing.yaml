@@ -1,7 +1,7 @@
 # Per-provider token pricing in USD per 1,000 tokens.
-# Update this file and restart Grafana (docker compose restart grafana) when
-# provider pricing changes. The token-cost dashboard reads these rates via
-# JSON variable references embedded at dashboard-build time.
+# Prometheus reads this file at start and records each rate as
+# token_price_usd_per_1k for the token-cost dashboard. Update this file and
+# run docker compose restart prometheus when provider pricing changes.
 #
 # Rates as of 2026-06 - verify at each provider's pricing page before deploying.
 

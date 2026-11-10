@@ -8,8 +8,10 @@ http:
   url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
   body:
     type: json
-    # A genuine Cloudflare challenge page (the curl tier is blocked) that FlareSolverr
-    # solves and that returns real content -- proves the Cloudflare/FlareSolverr tier.
+    # A genuine Cloudflare challenge page (the curl tier is blocked). A browser tier either
+    # solves it and returns the page, or the site rates this address and the service answers
+    # 428 with the human-help body; both prove the browser-tier path and neither returns the
+    # block page as content.
     data: |-
       {
         "url": "https://www.scrapingcourse.com/cloudflare-challenge",
@@ -22,14 +24,19 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("Status code is 200", function () {
-            expect(res.getStatus()).to.equal(200);
+        test("the read is answered, solved or gated", function () {
+            const st = res.getStatus();
+            expect([200, 428]).to.include(st);
         });
-        test("Cloudflare tier: status is success (challenge solved)", function () {
-            expect(res.getBody().status).to.equal("success");
-        });
-        test("Cloudflare tier: content proves the challenge was bypassed", function () {
+        test("Cloudflare tier: solved page or human help, never the block page", function () {
+            const st = res.getStatus();
             const b = res.getBody();
+            if (st === 428) {
+                expect(b.code).to.equal("human_intervention_required");
+                expect(b.vnc_url).to.be.a("string").and.not.empty;
+                return;
+            }
+            expect(b.status).to.equal("success");
             const content = (b.content || b.text || b.markdown || "").toLowerCase();
             expect(content.length).to.be.at.least(50);
             expect(content).to.include("cloudflare challenge");

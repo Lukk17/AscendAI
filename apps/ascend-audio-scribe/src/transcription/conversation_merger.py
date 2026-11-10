@@ -57,10 +57,12 @@ async def _transcribe_one_track(
 
     segments: list[dict[str, Any]] = []
     if provider == "local":
-        async for s in local_speech_transcription(
-            audio_file_path=track_wav, model_path=model, language=language
-        ):
-            segments.append({"text": s["text"], "start": float(s["start"]), "end": float(s["end"])})
+        segments = [
+            {"text": s["text"], "start": float(s["start"]), "end": float(s["end"])}
+            async for s in local_speech_transcription(
+                audio_file_path=track_wav, model_path=model, language=language
+            )
+        ]
     elif provider == "openai":
         result = await asyncio.to_thread(
             openai_speech_transcription,

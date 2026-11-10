@@ -244,7 +244,7 @@ The jobs are independent and run in parallel. Each job installs the Bruno CLI wi
 |---|---|---|---|---|
 | `ascend-weather-mcp` | `ascend-weather-mcp` | polls `/actuator/health` on port 9998, because the service has no compose healthcheck | 7 of 7 | nothing. The container is restarted before spec 7, which needs a cold geocoding cache |
 | `ascend-ocr` | `ascend-ocr` (`--wait`) | polls `/ready` on port 7022 until the default engine is warm | 12 of 16 | the other 4 specs |
-| `ascend-web-hunter` | `searxng`, `flaresolverr`, `ascend-web-hunter` (`--wait`) | the compose healthchecks | 11 of 12 | spec 11, which needs a human to solve a CAPTCHA through NoVNC |
+| `ascend-web-hunter` | `searxng`, `ascend-web-hunter` (`--wait`) | the compose healthchecks | 11 of 12 | spec 11, which needs a human to solve a CAPTCHA through NoVNC |
 | `ascend-memory` | `ascend-memory` (`--wait`) | the compose healthcheck | 2 of 6 (specs 1 and 4) | specs 2, 3, 5 and 6, which make paid OpenAI embedding calls |
 
 The external prerequisites are job-level service containers, not compose services: `redis:7-alpine` on port 6379 for `ascend-web-hunter` and `qdrant/qdrant:v1.13.0` on port 6333 for `ascend-memory`. The `ascend-web-hunter` job writes a random `SEARXNG_SECRET` (`openssl rand -hex 32`) to the job environment before compose starts, because compose refuses to start SearXNG without one.
@@ -254,6 +254,10 @@ Some `ascend-web-hunter` specs (tiered scraping, the real-world URL matrix, clea
 ### Permissions and concurrency
 
 The workflow has `contents: read` only. It uses `cancel-in-progress: false` with one group per ref, so a new push to `master` waits for the running e2e run instead of cancelling it.
+
+### Why `docs/E2E_RUN_SCENARIOS.md` names no CI or release run
+
+The `add-github-actions-pipeline` verification runs start on GitHub (a pull request from a `ci-verify/*` branch, or a `Release` workflow dispatch), not through an end-to-end runner on the host, so no run scenario in `docs/E2E_RUN_SCENARIOS.md` reaches them and that document gets no entry from this change.
 
 ---
 

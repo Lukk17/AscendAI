@@ -10,6 +10,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import uvicorn
+from ascend_python_common.request_context import (
+    CORRELATION_ID_HEADER,
+    CorrelationIdLogFilter,
+    digest_of_mcp_session_id,
+)
 from asgi_lifespan import LifespanManager
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -17,7 +22,6 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from sse_starlette.sse import AppStatus
 from starlette.types import Receive, Scope, Send
 
-from src.api.middleware.correlation_id import CORRELATION_ID_HEADER, CorrelationIdLogFilter, digest_of_mcp_session_id
 from src.config.config import MCP_ENDPOINT_PATH
 from src.main import create_app
 from src.model.ocr_models import FAILURE_SERVICE_RESTARTED
@@ -51,7 +55,9 @@ def app_with_lifespan(
         yield create_app(), mock_start_pool, mock_stop_pool, mock_ensure_bucket, store, runner
 
 
-async def test_lifespan_starts_worker_pool_and_banner(app_with_lifespan):
+async def test_lifespan_starts_worker_pool_and_banner(
+    app_with_lifespan: tuple[FastAPI, MagicMock, MagicMock, MagicMock, JobStore, JobRunner],
+) -> None:
     # Given. asgi-lifespan drives the ASGI lifespan protocol that httpx does not trigger by
     # default, so start_worker_pool, the MCP session manager startup, and the banner all run.
     app, mock_start_pool, mock_stop_pool, mock_ensure_bucket, _store, _runner = app_with_lifespan
@@ -72,7 +78,9 @@ async def test_lifespan_starts_worker_pool_and_banner(app_with_lifespan):
     mock_stop_pool.assert_called_once()
 
 
-async def test_lifespan_recovers_work_in_flight_before_the_runner_starts(app_with_lifespan):
+async def test_lifespan_recovers_work_in_flight_before_the_runner_starts(
+    app_with_lifespan: tuple[FastAPI, MagicMock, MagicMock, MagicMock, JobStore, JobRunner],
+) -> None:
     # Given - a record left running by the previous process
     app, _start, _stop, _bucket, store, _runner = app_with_lifespan
     stranded = make_record(state="running", started_at=time.time())
@@ -92,7 +100,9 @@ async def test_lifespan_recovers_work_in_flight_before_the_runner_starts(app_wit
     dispatch.assert_not_awaited()
 
 
-async def test_a_document_submitted_before_shutdown_is_terminal_after_the_next_startup(app_with_lifespan):
+async def test_a_document_submitted_before_shutdown_is_terminal_after_the_next_startup(
+    app_with_lifespan: tuple[FastAPI, MagicMock, MagicMock, MagicMock, JobStore, JobRunner],
+) -> None:
     # Given - a submission that never ran, exactly as a shutdown would leave it
     app, _start, _stop, _bucket, store, runner = app_with_lifespan
     record = make_record(state="waiting")
@@ -107,7 +117,7 @@ async def test_a_document_submitted_before_shutdown_is_terminal_after_the_next_s
     assert runner.documents_waiting() == 0
 
 
-def test_create_app_returns_fastapi_instance():
+def test_create_app_returns_fastapi_instance() -> None:
     # When
     app = create_app()
 
@@ -115,7 +125,7 @@ def test_create_app_returns_fastapi_instance():
     assert isinstance(app, FastAPI)
 
 
-async def test_metrics_endpoint_reports_eviction_counter():
+async def test_metrics_endpoint_reports_eviction_counter() -> None:
     # Given. Multiprocess mode (src/__init__.py) merges every process's own file in
     # PROMETHEUS_MULTIPROC_DIR at scrape time instead of reading in-process state, so
     # this also proves the merge path itself works, not just that the counter exists.
@@ -132,7 +142,10 @@ async def test_metrics_endpoint_reports_eviction_counter():
     assert "ascendocr_engine_cache_evictions_total" in response.text
 
 
-async def test_shutdown_waits_for_a_worker_replacement_before_stopping_the_pool(app_with_lifespan, monkeypatch):
+async def test_shutdown_waits_for_a_worker_replacement_before_stopping_the_pool(
+    app_with_lifespan: tuple[FastAPI, MagicMock, MagicMock, MagicMock, JobStore, JobRunner],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # Given: a cancel's replacement still running when shutdown begins
     app, _start, mock_stop_pool, _bucket, _store, _runner = app_with_lifespan
     order: list[str] = []
@@ -155,7 +168,7 @@ async def test_shutdown_waits_for_a_worker_replacement_before_stopping_the_pool(
 LOOPBACK = "127.0.0.1"
 UVICORN_ACCESS_LOGGER = "uvicorn.access"
 UVICORN_ERROR_LOGGER = "uvicorn.error"
-GLOBAL_HANDLER_LOGGER = "src.api.exception_handlers"
+GLOBAL_HANDLER_LOGGER = "ascend_python_common.errors.refusals"
 MCP_SESSION_ID_HEADER = "mcp-session-id"
 MCP_REQUEST_HEADERS = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
 TOOLS_LIST_REQUEST = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
@@ -177,7 +190,9 @@ class ServedService:
         await asyncio.gather(*self.server.server_state.tasks)
 
     def lines_of(self, correlation_id: str) -> list[logging.LogRecord]:
-        return [record for record in self.records if getattr(record, "correlation_id", None) == correlation_id]
+        return [
+            record for record in self.records if getattr(record, "correlation_id", None) == correlation_id
+        ]
 
     def access_line_of(self, correlation_id: str) -> logging.LogRecord:
         [access_line] = [line for line in self.lines_of(correlation_id) if line.name == UVICORN_ACCESS_LOGGER]
@@ -259,30 +274,32 @@ class TestSessionDigestOfTheServedApp:
         assert served_service.access_line_of(response.headers[CORRELATION_ID_HEADER]) in request_lines
         assert [line for line in request_lines if hasattr(line, "mcp_session_id")] == []
 
-    async def test_the_404_access_line_of_an_unknown_session_logs_the_digest_of_the_value_sent(
+    async def test_the_200_access_line_of_a_session_value_with_no_server_side_session_logs_the_digest_of_the_value_sent(
         self, served_service: ServedService
     ) -> None:
-        # Given
-        unknown_session = uuid.uuid4().hex
+        # Given - stateless HTTP mode keeps no server-side session, so any value sent is served
+        session_value = uuid.uuid4().hex
 
         # When
         response = await served_service.client.post(
             MCP_ENDPOINT_PATH,
-            headers={**MCP_REQUEST_HEADERS, MCP_SESSION_ID_HEADER: unknown_session},
+            headers={**MCP_REQUEST_HEADERS, MCP_SESSION_ID_HEADER: session_value},
             json=TOOLS_LIST_REQUEST,
         )
 
         # Then
-        assert response.status_code == 404
+        assert response.status_code == 200
         access_line = served_service.access_line_of(response.headers[CORRELATION_ID_HEADER])
-        assert getattr(access_line, "mcp_session_id", None) == digest_of_mcp_session_id(unknown_session)
+        assert getattr(access_line, "mcp_session_id", None) == digest_of_mcp_session_id(session_value)
 
 
 class TestUnhandledErrorOfTheServedApp:
     async def test_a_rest_500_answers_with_the_requests_id(self, served_service: ServedService) -> None:
         # When
-        with patch("src.main.is_engine_warm", side_effect=_UnhandledProbeError):
-            response = await served_service.client.get("/ready", headers={CORRELATION_ID_HEADER: CALLER_CHOSEN_ID})
+        with patch("ascend_python_common.app.check_readiness", side_effect=_UnhandledProbeError):
+            response = await served_service.client.get(
+                "/ready", headers={CORRELATION_ID_HEADER: CALLER_CHOSEN_ID}
+            )
 
         # Then
         assert response.status_code == INTERNAL_SERVER_ERROR
@@ -292,7 +309,7 @@ class TestUnhandledErrorOfTheServedApp:
         self, served_service: ServedService
     ) -> None:
         # When
-        with patch("src.main.is_engine_warm", side_effect=_UnhandledProbeError):
+        with patch("ascend_python_common.app.check_readiness", side_effect=_UnhandledProbeError):
             await served_service.client.get("/ready", headers={CORRELATION_ID_HEADER: CALLER_CHOSEN_ID})
         await served_service.requests_in_flight_finished()
 
@@ -311,7 +328,11 @@ class TestUnhandledErrorOfTheServedApp:
         # When
         response = await served_service.client.post(
             MCP_ENDPOINT_PATH,
-            headers={**MCP_REQUEST_HEADERS, MCP_SESSION_ID_HEADER: session_id, CORRELATION_ID_HEADER: CALLER_CHOSEN_ID},
+            headers={
+                **MCP_REQUEST_HEADERS,
+                MCP_SESSION_ID_HEADER: session_id,
+                CORRELATION_ID_HEADER: CALLER_CHOSEN_ID,
+            },
             json=TOOLS_LIST_REQUEST,
         )
         await served_service.requests_in_flight_finished()
@@ -320,6 +341,6 @@ class TestUnhandledErrorOfTheServedApp:
         assert response.status_code == INTERNAL_SERVER_ERROR
         assert response.headers[CORRELATION_ID_HEADER] == CALLER_CHOSEN_ID
         logged = [served_service.access_line_of(CALLER_CHOSEN_ID), *served_service.error_lines()]
-        assert [(getattr(line, "correlation_id", None), getattr(line, "mcp_session_id", None)) for line in logged] == [
-            (CALLER_CHOSEN_ID, digest_of_mcp_session_id(session_id))
-        ] * 3
+        assert [
+            (getattr(line, "correlation_id", None), getattr(line, "mcp_session_id", None)) for line in logged
+        ] == [(CALLER_CHOSEN_ID, digest_of_mcp_session_id(session_id))] * 3

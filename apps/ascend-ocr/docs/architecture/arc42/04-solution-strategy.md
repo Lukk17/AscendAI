@@ -36,7 +36,7 @@ the first real request would make it appear to hang, and doing it in the main pr
 copy of the model (~316 MiB) for the container's whole life, since inference always runs in the separate OCR worker
 process (see the next section). Instead, `ocr_service.warm_up_engine(settings.DEFAULT_LANGUAGE)` runs as the worker
 pool's initializer, inside that worker process, and `start_worker_pool()` (`src/main.py`'s lifespan) blocks at
-startup until it completes. The `/ready` endpoint reflects `engine_warm` by reading the worker's own warm-up signal
+startup until it completes. The `/ready` endpoint reflects `checks.engine.warm` by reading the worker's own warm-up signal
 across the process boundary, not by warming anything itself. Until the worker reports warm, `/ready` returns
 `{"status": "not-ready"}` and a load balancer can hold traffic. See
 [ADR-004](../decisions/ADR-004-liveness-readiness-split.md).
@@ -101,6 +101,6 @@ single worker" in [07-deployment-view.md](07-deployment-view.md) for the ceiling
 
 Accepting arbitrary URIs in the MCP tool is a classic SSRF surface. The solution is a layered guard described in
 [ADR-001](../decisions/ADR-001-mcp-file-transport-uri-only.md): a small explicit allowlist for internal docker
-hostnames (`MCP_ALLOWED_HOSTS`), combined with a DNS-resolution IP block that rejects private, loopback, link-local,
+hostnames (`ALLOWED_PRIVATE_HOSTS`), combined with a DNS-resolution IP block that rejects private, loopback, link-local,
 and multicast addresses. The `file://` scheme is disabled by default and requires an operator opt-in via
 `MCP_FILE_URI_ROOT`.

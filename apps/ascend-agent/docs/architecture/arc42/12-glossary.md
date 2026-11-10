@@ -13,4 +13,3 @@
 | **Virtual Threads**        | Java 21 lightweight threads that enable high-throughput concurrency without thread-pool sizing.                       |
 | **Qdrant**                 | Open-source vector database used for RAG similarity search.                                                           |
 | **SearXNG**                | Privacy-respecting meta search engine used by ascend-web-hunter.                                                        |
-| **FlareSolverr**           | Proxy for bypassing Cloudflare protection, used by ascend-web-hunter.                                                   |

@@ -7,16 +7,15 @@
 ```
 apps/ascend-memory/
 ├── src/
-│   ├── main.py                        Entry point: FastAPI app factory, lifespan, warmup, /health
+│   ├── main.py                        Entry point: ServiceDefinition, create_service_app, warmup lifespan, /health/legacy
 │   ├── api/
 │   │   ├── rest/
 │   │   │   └── rest_endpoints.py      REST router: /api/v1/memory/{insert,search,delete,wipe}
 │   │   └── mcp/
-│   │       └── mcp_server.py          FastMCP instance: memory_{insert,search,delete,wipe} tools
+│   │       └── mcp_server.py          FastMCP instance (name ascend-memory): memory_{insert,search,delete,wipe} tools
 │   ├── config/
-│   │   ├── config.py                  Settings (pydantic-settings), PROVIDER_CONFIGS dict
-│   │   ├── logging_config.py          Colorlog formatter, uvicorn log config
-│   │   └── startup_banner.py          ASCII banner, dependency probe, endpoint summary
+│   │   ├── config.py                  Settings (ServiceSettings subclass), PROVIDER_CONFIGS dict
+│   │   └── startup_banner.py          Art text, content lines, probes for the library banner frame
 │   └── service/
 │       └── memory_client.py           AscendMemoryClient, per-provider singletons, monkey-patch
 ├── docs/
@@ -32,14 +31,15 @@ apps/ascend-memory/
 
 #### `src/main.py`
 
-Creates the FastAPI application via `create_app()`. The lifespan context starts a background warmup task
-(`warmup_client`) and initialises the MCP ASGI app's own lifespan. The global `is_ready` flag is set by the warmup
-task; `/health` returns `503` until it is `True`.
+Creates the FastAPI application via `create_service_app()` from `ascend-python-common`, passing a
+`ServiceDefinition` with the service name, settings, MCP server, routers, error registry, the three readiness
+probes, the warmup lifespan, and the banner content. The lifespan starts a background warmup task
+(`warmup_client`). The global `is_ready` flag is set by the warmup task and drives `/health/legacy` (503 until it
+is `True`); `/health` stays 200 and `/ready` aggregates the probes.
 
-The MCP ASGI app is mounted last (`app.mount("/", mcp_asgi_app)`) to avoid capturing specific routes. The request
-logging middleware skips `/health` to keep logs clean.
+The MCP app is attached at the `/mcp` path only, so unmatched paths reach the FastAPI router's problem 404/405.
 
-(`src/main.py:58-99`)
+(`src/main.py`)
 
 ---
 
@@ -49,7 +49,7 @@ FastAPI `APIRouter` prefixed at `/api/v1/memory`. Four handlers:
 
 | Route | Method | Handler | Key behaviour |
 | :---- | :----- | :------ | :------------ |
-| `/search` | GET | `search_memory` | Delegates to `client.search()`. Returns `[]` on exception (logged). |
+| `/search` | GET | `search_memory` | Delegates to `client.search()`. Upstream failures re-raise and map to 500 problem documents. |
 | `/insert` | POST | `insert_memory` | Accepts `text` or `messages`. Raises `400` on `ValueError`, `500` on other errors. |
 | `/wipe` | POST | `wipe_memory` | Deletes all memories for `user_id` via `client.wipe_user()`. |
 | `` (empty path) | DELETE | `delete_memory` | Deletes a single memory by `memory_id`. Raises `400` if `memory_id` is blank. |
@@ -62,7 +62,7 @@ All handlers resolve the provider via `settings.MEM0_DEFAULT_PROVIDER` when the 
 
 #### `src/api/mcp/mcp_server.py`
 
-FastMCP instance named `"AscendMemory"`. Four tools mirror the REST surface exactly:
+FastMCP instance named `"ascend-memory"`. Four tools mirror the REST surface exactly:
 
 | Tool | REST equivalent |
 | :--- | :-------------- |

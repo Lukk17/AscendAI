@@ -1,11 +1,11 @@
 import asyncio
 import contextlib
 import logging
-import os
 import tempfile
 import threading
 import time
 import uuid
+from pathlib import Path
 
 from src.config.config import settings
 
@@ -22,11 +22,11 @@ def store_transcript(content: str, filename: str = "transcript.md") -> tuple[str
 
     file_id = uuid.uuid4().hex
     safe_filename = f"ascendaudioscribe_{file_id}_{filename}"
-    file_path = os.path.join(tempfile.gettempdir(), safe_filename)
+    file_path = str(Path(tempfile.gettempdir()) / safe_filename)
 
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    os.chmod(file_path, 0o600)
+    path = Path(file_path)
+    path.write_text(content, encoding="utf-8")
+    path.chmod(0o600)
 
     with _registry_lock:
         _file_registry[file_id] = (file_path, time.monotonic())
@@ -52,7 +52,7 @@ def get_transcript_path(file_id: str) -> str | None:
         _remove_entry(file_id, file_path)
         return None
 
-    if not os.path.exists(file_path):
+    if not Path(file_path).exists():
         _remove_entry(file_id)
         return None
 
@@ -123,4 +123,4 @@ def _remove_entry(file_id: str, file_path: str | None = None) -> None:
 
 def _cleanup_file(path: str) -> None:
     with contextlib.suppress(OSError):
-        os.remove(path)
+        Path(path).unlink()

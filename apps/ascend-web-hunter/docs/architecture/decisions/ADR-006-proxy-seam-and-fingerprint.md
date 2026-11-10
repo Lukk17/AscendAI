@@ -4,6 +4,22 @@
 
 Accepted - 2026-06-15
 
+## Amendment, 2026-10-20 (remove-flaresolverr-tier)
+
+The proxy seam loses its FlareSolverr branch: `ProxyProvider.for_flaresolverr`
+is deleted, and the FlareSolverr row of the proxy table no longer applies.
+The curl and Playwright branches are unchanged. The rest of this record is
+unchanged. See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
+
+## Amendment, 2026-11-09 (patchright keeps its own user agent)
+
+`4a-patchright` no longer sets `Fingerprint.user_agent`. A stored session still sets the user agent it was saved with,
+because a clearance cookie is tied to it. Measured on `https://www.scrapingcourse.com/cloudflare-challenge` with one
+setting changed at a time, the Windows Chrome 131 text on the Linux Chromium 148 of the image kept the challenge up for
+30 seconds in every run, and leaving it out or naming Linux Chromium 148 cleared the page in about 4 seconds in every
+run. Viewport and window arguments made no difference. `4-playwright_stealth` keeps the fingerprint value, because that
+page stayed a wall for it with and without the value, so this measurement gives no reason to change it.
+
 ## Context
 
 Anti-bot systems on target sites (LinkedIn, Cloudflare-protected domains) detect automation using several signals:

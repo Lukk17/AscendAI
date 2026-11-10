@@ -6,11 +6,11 @@ app:
   ascend-ocr:
     base-url: "http://ascend-ocr:7022"
   s3:
-    # Floci (S3-compatible object store) must be running externally (port 9070)
-    endpoint: "http://host.docker.internal:9070"
+    # Floci (S3-compatible object store) must be running externally (default port 9070)
+    endpoint: "${OBJECT_STORE_S3_ENDPOINT:http://host.docker.internal:9070}"
     # Presigned URLs handed back to API callers must resolve from the caller's
     # network (browser/curl on the host), not from inside the container.
-    public-endpoint: "http://localhost:9070"
+    public-endpoint: "${OBJECT_STORE_S3_PUBLIC_ENDPOINT:http://localhost:9070}"
   memory:
     semantic:
       base-url: "http://ascend-memory:7020"
@@ -52,3 +52,11 @@ spring:
               url: http://ascend-weather-mcp:9998
             ascend-web-hunter:
               url: http://ascend-web-hunter:7021
+
+management:
+  otlp:
+    tracing:
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:http://otel-collector:4318/v1/traces}
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}

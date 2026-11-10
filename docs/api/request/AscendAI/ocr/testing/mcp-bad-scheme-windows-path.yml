@@ -47,7 +47,7 @@ runtime:
             const sseBody = res.getBody();
             const dataLine = String(sseBody).split("\n").find(function (line) { return line.indexOf("data:") === 0; });
             const envelope = JSON.parse(dataLine.replace(/^data:\s*/, ""));
-            expect(JSON.stringify(envelope)).to.include("Unsupported URI scheme: 'c'");
+            expect(JSON.stringify(envelope)).to.include("UNSAFE_URI: URI is not permitted");
         });
         test("No identifier is issued, so nothing was queued", function () {
             const sseBody = res.getBody();

@@ -1,0 +1,49 @@
+info:
+  name: intervention-window-open
+  type: http
+  seq: 61
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Thin turnstile wall page; the profile travels in --env-var profile.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/turnstile-wall",
+        "include_links": false,
+        "heavy_mode": false,
+        "profile": "{{profile}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 428", function () {
+            expect(res.getStatus()).to.equal(428);
+        });
+        test("window opens with its own flow and slot", function () {
+            const b = res.getBody();
+            expect(b.code).to.equal("human_intervention_required");
+            expect(b.status).to.equal(428);
+            expect(b.joined).to.equal(false);
+            expect(b.flow_id).to.be.a("string").and.not.empty;
+            expect(b.vnc_url).to.be.a("string").and.not.empty;
+            expect(b.window.slot).to.be.a("number");
+            expect(b.window.x).to.be.a("number");
+            expect(b.window.y).to.be.a("number");
+            expect(b.window.width).to.be.a("number");
+            expect(b.window.height).to.be.a("number");
+            expect(b.type).to.be.a("string").and.not.empty;
+            expect(b.instance).to.be.a("string").and.not.empty;
+            expect(b.traceId).to.match(/^[0-9a-f]{32}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -126,6 +126,7 @@ Defaults match `application.yaml`. Any other model the provider accepts works at
 - Liquibase for all database schema changes
 - ADRs in `docs/architecture/decisions/` for significant architectural choices
 - `ChatResponseContentResolver` handles multi-block responses from thinking models (see ADR-005)
+- When instrumenting new code (metrics, logs, or spans), follow [../../docs/OBSERVABILITY.md](../../docs/OBSERVABILITY.md)
 
 ## Relevant Skills
 

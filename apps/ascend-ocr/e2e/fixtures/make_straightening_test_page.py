@@ -1,9 +1,10 @@
 """Generate the one-page A4 test page that was printed and photographed for the straightening fixtures.
 
-The page is 2480 x 3508 pixels written at 300 dpi, which is A4, and the ground truth file holds its 21 lines exactly
-as rendered, the title first.
+The page is 2480 x 3508 pixels written at 300 dpi, which is A4, and the ground truth file holds its 21
+lines exactly as rendered, the title first.
 """
 
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -81,5 +82,5 @@ Image.init()
 render_page().save(PDF_OUTPUT, resolution=RESOLUTION)
 TEXT_OUTPUT.write_text("\n".join([TITLE, *LINES]) + "\n", encoding="utf-8", newline="\n")
 
-print(PDF_OUTPUT, PDF_OUTPUT.stat().st_size, "bytes")
-print(TEXT_OUTPUT, TEXT_OUTPUT.stat().st_size, "bytes")
+sys.stdout.write(f"{PDF_OUTPUT} {PDF_OUTPUT.stat().st_size} bytes\n")
+sys.stdout.write(f"{TEXT_OUTPUT} {TEXT_OUTPUT.stat().st_size} bytes\n")

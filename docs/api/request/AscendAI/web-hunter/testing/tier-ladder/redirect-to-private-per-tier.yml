@@ -1,0 +1,42 @@
+info:
+  name: redirect-to-private-per-tier
+  type: http
+  seq: 52
+
+http:
+  method: POST
+  url: "{{protocol}}://{{baseUrl}}:7021/api/v2/web/read"
+  body:
+    type: json
+    # Allowed redirect page whose target sits under the blocked name.
+    # The tier travels in --env-var tier.
+    data: |-
+      {
+        "url": "http://e2e-fake-site:7031/redirect-blocked",
+        "include_links": false,
+        "heavy_mode": false,
+        "tier": "{{tier}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("Status code is 400", function () {
+            expect(res.getStatus()).to.equal(400);
+        });
+        test("redirect to the blocked name refused with unsafe_uri", function () {
+            const b = res.getBody();
+            expect(b.code).to.equal("unsafe_uri");
+            expect(b.status).to.equal(400);
+            expect(b.type).to.be.a("string").and.not.empty;
+            expect(b.instance).to.be.a("string").and.not.empty;
+            expect(b.traceId).to.match(/^[0-9a-f]{32}$/);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

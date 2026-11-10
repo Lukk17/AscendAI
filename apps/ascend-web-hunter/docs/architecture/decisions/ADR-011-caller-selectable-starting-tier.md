@@ -4,6 +4,20 @@
 
 Accepted, 2026-09-18. Reverses Alternative 3 of [ADR-001](ADR-001-multi-tier-extraction-strategy.md) in part.
 
+## Amendment, 2026-10-19 (enhance-web-search-tier-ladder)
+
+D1 grows two public values: `4a-patchright` and `4b-camoufox`, placed after `4-playwright_stealth` and before
+`5-crawlee_adaptive` in `TIER_ORDER`. Every existing value keeps its name and meaning; the accepted values
+are exactly the strings a successful read returns in `mode`, declared once as the `TierName` literal. See
+[ADR-015](ADR-015-patched-browser-tiers-and-tier-memory.md) D1.
+
+## Amendment, 2026-10-20 (remove-flaresolverr-tier)
+
+`3-flaresolverr` leaves the accepted tier values: a request that passes it
+is refused like any value outside the allowed set, and no tier runs. No
+future tier takes the name or the number 3. The rest of this record is
+unchanged. See [ADR-018](ADR-018-flaresolverr-tier-removed.md).
+
 ## Context
 
 ADR-001 fixed the escalation order at six tiers and rejected a caller-selectable strategy under its Alternative 3,
