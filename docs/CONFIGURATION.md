@@ -56,7 +56,7 @@ The settings of `ascend-memory` are listed in its own reference, [apps/ascend-me
 | `ascend-weather-mcp` | `MANAGEMENT_TRACING_SAMPLING_PROBABILITY` | `1.0` | Trace sampling probability | `add-observability` |
 | `ascend-weather-mcp` | `SPRING_PROFILES_ACTIVE` | `docker` | Fixed in `compose.yaml`. Activates the container-mode overrides. | `existing` |
 | `ascend-weather-mcp` | `OTEL_SERVICE_NAME` | `ascend-weather-mcp` | Fixed in `compose.yaml`. Service name carried on every exported span. | `existing` |
-| `ascend-weather-mcp` | `OTEL_RESOURCE_ATTRIBUTES` | `service.version=0.0.4` | Fixed in `compose.yaml`. Resource attributes carried on every exported span. | `existing` |
+| `ascend-weather-mcp` | `OTEL_RESOURCE_ATTRIBUTES` | `service.version=0.0.5` | Fixed in `compose.yaml`. Resource attributes carried on every exported span. | `existing` |
 
 ---
 

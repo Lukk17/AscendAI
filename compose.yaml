@@ -272,7 +272,7 @@ services:
       - MANAGEMENT_OTLP_TRACING_ENDPOINT=${MANAGEMENT_OTLP_TRACING_ENDPOINT:-http://otel-collector:4318/v1/traces}
       - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:-1.0}
       - OTEL_SERVICE_NAME=ascend-weather-mcp
-      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.0.4
+      - OTEL_RESOURCE_ATTRIBUTES=service.version=0.0.5
     # Memory sized from measured usage: peak observed at 374 MiB over 24h
     # (docker stats, 2026-09-04). The Dockerfile already pins heap to 70% of
     # this limit via JAVA_TOOL_OPTIONS, so this value and that heap setting
